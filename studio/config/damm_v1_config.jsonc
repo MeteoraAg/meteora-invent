@@ -1,0 +1,57 @@
+{
+    "rpcUrl": "https://api.devnet.solana.com",
+    "dryRun": false,
+    "keypairFilePath": "./keypair.json",
+    "computeUnitPriceMicroLamports": 100000,
+    "baseMint": "6KT7tNK8aKifqkhrqmCXWemFwGeEpfPc5Ey1zHdT3GvP",
+    // "createBaseToken": {
+    //     "mintBaseTokenAmount": 10000000,
+    //     "baseDecimals": 6
+    // },
+    "quoteMint": "So11111111111111111111111111111111111111112",
+    "dynamicAmm": {
+        "baseAmount": 100,
+        "quoteAmount": 0.001,
+        "tradeFeeNumerator": 2500,
+        "activationType": "timestamp",
+        "activationPoint": null,
+        "hasAlphaVault": false
+    },
+    "alphaVault": {
+        "poolType": "dynamic",
+        "alphaVaultType": "fcfs",
+        "depositingPoint": 1733547099,
+        "startVestingPoint": 1733548099,
+        "endVestingPoint": 1733549099,
+        "maxDepositCap": 100,
+        "individualDepositingCap": 1,
+        // "maxBuyingCap": 100,
+        "escrowFee": 0,
+        "whitelistMode": "permissionless"
+        // "whitelistFilepath": "./config/whitelist_wallet.csv",
+        // "merkleProofBaseUrl": "https://example.workers.dev/",
+		// "cloudflareKvProofUpload": {
+		// 	"kvNamespaceId": "",
+		// 	"accountId": "",
+		// 	"apiKey": ""
+		// }
+    },
+    "m3m3": {
+        "topListLength": 100,
+        "unstakeLockDurationSecs": 25200,
+        "secondsToFullUnlock": 86400,
+        "startFeeDistributeTimestamp": 1753441790
+    },
+    "lockLiquidity": {
+      "allocations": [
+        {
+          "percentage": 80,
+          "address": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1"
+        },
+        {
+          "percentage": 20,
+          "address": "DVqZW2vC26hBmikPixfdw3hQ7kTTepkPQtBZRn4Bm1Cd"
+        }
+      ]
+    }
+}

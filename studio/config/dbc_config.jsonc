@@ -1,0 +1,55 @@
+{
+    "rpcUrl": "https://api.mainnet-beta.solana.com",
+    "dryRun": false,
+    "keypairFilePath": "./keypair.json",
+    "computeUnitPriceMicroLamports": 100000,
+    "quoteMint": "So11111111111111111111111111111111111111112",
+    "dbc": {
+       "buildCurveMode": 1,
+       "totalTokenSupply": 1000000000,
+       "initialMarketCap": 30,
+       "migrationMarketCap": 600,
+       "migrationOption": 0,
+       "tokenBaseDecimal": 6,
+       "tokenQuoteDecimal": 9,
+       "lockedVestingParam": {
+           "totalLockedVestingAmount": 0,
+           "numberOfVestingPeriod": 0,
+           "cliffUnlockAmount": 0,
+           "totalVestingDuration": 0,
+           "cliffDurationFromMigrationTime": 0
+        },
+        "baseFeeParams": {
+            "baseFeeMode": 0,
+            "feeSchedulerParam": {
+                "startingFeeBps": 200,
+                "endingFeeBps": 200,
+                "numberOfPeriod": 0,
+                "totalDuration": 0
+            }
+        },
+        "dynamicFeeEnabled": true,
+        "activationType": 1,
+        "collectFeeMode": 0,
+        "migrationFeeOption": 3,
+        "tokenType": 0,
+        "partnerLpPercentage": 0,
+        "creatorLpPercentage": 0,
+        "partnerLockedLpPercentage": 100,
+        "creatorLockedLpPercentage": 0,
+        "creatorTradingFeePercentage": 0,
+        "leftover": 0,
+        "tokenUpdateAuthority": 1,
+        "migrationFee": {
+            "feePercentage": 0,
+            "creatorFeePercentage": 0
+        },
+        "leftoverReceiver": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1",
+        "feeClaimer": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1",
+        "createPool": {
+            "name": "DBC Pool",
+            "symbol": "DBC",
+            "uri": "https://example.com"
+        }
+    }
+}

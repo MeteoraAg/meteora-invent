@@ -12,6 +12,7 @@ build/
 dist/
 .next/
 out/
+test-ledger/
 
 # Misc
 .DS_Store
@@ -28,6 +29,7 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+keypair.json
 
 # Vercel
 .vercel
@@ -54,3 +56,6 @@ Thumbs.db
 # Package manager
 package-lock.json
 yarn.lock
+
+# Studio
+studio/keypair.json
