@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Meteora Invent - Monorepo for studio scripts and scaffold templates",
-  "author": "@dannweeeee",
+  "author": "Dann Wee <dann@raccoons.dev>",
   "license": "ISC",
   "packageManager": "pnpm@9.0.0",
   "engines": {

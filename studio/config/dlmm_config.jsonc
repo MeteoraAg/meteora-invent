@@ -1,0 +1,54 @@
+{
+    "rpcUrl": "https://api.devnet.solana.com",
+    "dryRun": false,
+    "keypairFilePath": "./keypair.json",
+    "computeUnitPriceMicroLamports": 100000,
+    "baseMint": "HYiYuRUjKTaUHt5PoN3QK3CxEYDSfQKpRZFaWdf4up2g",
+    "quoteMint": "So11111111111111111111111111111111111111112",
+    "dlmmConfig": {
+        "binStep": 400,
+        "feeBps": 200,
+        "initialPrice": 0.0000017,
+        "activationType": "timestamp",
+        "activationPoint": 1753328078,
+        "priceRounding": "up",
+        "hasAlphaVault": false,
+        "creatorPoolOnOffControl": false
+    },
+    "alphaVault": {
+        "poolType": "dlmm",
+        "alphaVaultType": "fcfs",
+        "depositingPoint": 1753180200,
+        "startVestingPoint": 1753194600,
+        "endVestingPoint": 1753220200,
+        "maxDepositCap": 100,
+        "individualDepositingCap": 0.001,
+        "escrowFee": 0,
+        "whitelistMode": "permissionless"
+    },
+    "lfgSeedLiquidity": {
+        "minPrice": 0.003393,
+        "maxPrice": 0.004393,
+        "seedAmount": "200000",
+        "curvature": 0.6,
+        "operatorKeypairFilepath": "./keypair.json",
+        "positionOwner": "2vqFyczcehkR7hTeZjEkiN5jvYnFXuFRinovqR2gakSb",
+        "feeOwner": "2vqFyczcehkR7hTeZjEkiN5jvYnFXuFRinovqR2gakSb",
+        "lockReleasePoint": 0,
+        "seedTokenXToPositionOwner": true
+    },
+    "singleBinSeedLiquidity": {
+        "price": 0.0000017,
+        "priceRounding": "up",
+        "seedAmount": "100000",
+        "operatorKeypairFilepath": "./keypair.json",
+        "positionOwner": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1",
+        "feeOwner": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1",
+        "lockReleasePoint": 0,
+        "seedTokenXToPositionOwner": true
+    },
+    "setDlmmPoolStatus": {
+        "poolAddress": "9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2",
+        "enabled": true
+    }
+}

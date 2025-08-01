@@ -7,7 +7,6 @@ module.exports = {
   rules: {
     // Node.js specific rules
     'no-process-exit': 'error',
-    'no-sync': 'warn',
 
     // Allow console in Node.js scripts
     'no-console': 'off',

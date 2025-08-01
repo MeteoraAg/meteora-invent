@@ -1,0 +1,45 @@
+{
+    "rpcUrl": "https://api.devnet.solana.com",
+    "dryRun": true,
+    "keypairFilePath": "./keypair.json",
+    "computeUnitPriceMicroLamports": 100000,
+    "baseMint": "G7p5aNEWd1gVa4vAzmXEoxkgFt6XMGvRjjMFgjMHJ2Am",
+    "quoteMint": "So11111111111111111111111111111111111111112",
+    "dammV2Config": {
+        "creator": "2VuxXtec8Gpcu49y8VZ4yYutbi98WWtRC6Zvvs8APVy1",
+        "baseAmount": 1000,
+        "quoteAmount": null,
+        "initPrice": 10,
+        "maxPrice": null,
+        "poolFees": {
+            "maxBaseFeeBps": 400,
+            "minBaseFeeBps": 400,
+            "numberOfPeriod": 0,
+            "totalDuration": 0,
+            "feeSchedulerMode": 0,
+            "useDynamicFee": true,
+            "dynamicFeeConfig": {
+                "filterPeriod": 10,
+                "decayPeriod": 120,
+                "reductionFactor": 5000,
+                "variableFeeControl": 14460000,
+                "maxVolatilityAccumulator": 239
+            }
+        },
+        "hasAlphaVault": false,
+        "collectFeeMode": 0,
+        "activationType": "timestamp",
+        "activationPoint": null
+    },
+    "alphaVault": {
+        "poolType": "damm2",
+        "alphaVaultType": "fcfs",
+        "depositingPoint": 1733626299,
+        "startVestingPoint": 1746808201,
+        "endVestingPoint": 1746808201,
+        "maxDepositCap": 10000,
+        "individualDepositingCap": 1,
+        "escrowFee": 0,
+        "whitelistMode": "permissionless"
+    }
+}

@@ -1,0 +1,142 @@
+{
+    /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+    "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+    /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+    "dryRun": false,
+
+    /* keypairFilePath is required and will be the payer + signer for all transactions */
+    "keypairFilePath": "./keypair.json",
+
+    /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+    "computeUnitPriceMicroLamports": 100000,
+
+    /* quoteMint is required for the following actions:
+     * 1. create-dbc-config
+     * 2. create-dbc-pool (if there is no configKeyAddress)
+     * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
+     */
+    "quoteMint": "So11111111111111111111111111111111111111112", 
+
+    /* baseMint is required for the following actions:
+     * 1. swap-dbc (Buy or Sell)
+     * 2. migrate-damm-v1
+     * 3. migrate-damm-v2
+     */
+    "baseMint": "YOUR_BASE_MINT_ADDRESS",
+
+    /* Either use dbcConfigAddress or dbcConfig, but not both.
+     * dbcConfigAddress is only used in the following action:
+     * 1. create-dbc-pool (if the dbcConfigAddress is already created)
+     */
+    // "dbcConfigAddress": "YOUR_DBC_CONFIG_ADDRESS",
+
+    /* Either use dbcConfigAddress or dbcConfig, but not both.
+     * dbcConfig is only used in the following actions:
+     * 1. create-dbc-config
+     * 2. create-dbc-pool (if there is no dbcConfigAddress)
+     */
+    "dbcConfig": {
+       "buildCurveMode": 0, // 0 - buildCurve | 1 - buildCurveWithMarketCap | 2 - buildCurveWithTwoSegments | 3 - buildCurveWithLiquidityWeights
+
+        /* Only use the following parameters for buildCurveMode: 0 (buildCurve)
+        * 1. percentageSupplyOnMigration
+        * 2. migrationQuoteThreshold
+        */
+       "percentageSupplyOnMigration": 20, // percentage of total token supply to be migrated
+       "migrationQuoteThreshold": 1, // migration quote threshold needed to migrate the DBC token pool
+
+        /* Only use the following parameters for buildCurveMode: 1 (buildCurveWithMarketCap)
+        * 1. initialMarketCap
+        * 2. migrationMarketCap
+        */
+        // "initialMarketCap": 20, // the market cap of the DBC token pool when the pool is created specified in terms of quoteMint (not in lamports)
+        // "migrationMarketCap": 600, // the market cap of the DBC token pool when the pool graduates specified in terms of quoteMint (not in lamports)
+
+        /* Only use the following parameters for buildCurveMode: 2 (buildCurveWithTwoSegments)
+        * 1. initialMarketCap
+        * 2. migrationMarketCap
+        * 3. percentageSupplyOnMigration
+        */
+        // "initialMarketCap": 20, // the market cap of the DBC token pool when the pool is created specified in terms of quoteMint (not in lamports)
+        // "migrationMarketCap": 600, // the market cap of the DBC token pool when the pool graduates specified in terms of quoteMint (not in lamports)
+        // "percentageSupplyOnMigration": 20, // percentage of total token supply to be migrated
+
+        /* Only use the following parameters for buildCurveMode: 3 (buildCurveWithLiquidityWeights)
+        * 1. initialMarketCap
+        * 2. migrationMarketCap
+        * 3. liquidityWeights
+        */
+        // "initialMarketCap": 20, // the market cap of the DBC token pool when the pool is created specified in terms of quoteMint (not in lamports)
+        // "migrationMarketCap": 600, // the market cap of the DBC token pool when the pool graduates specified in terms of quoteMint (not in lamports)
+        // "liquidityWeights": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // a array of 16 liquidity weights for each liquidity segment in the curve
+
+
+       "totalTokenSupply": 1000000000, // total token supply (not in lamports)
+       "migrationOption": 1, // 0 - Migrate to DAMM v1 | 1 - Migrate to DAMM v2
+       "tokenBaseDecimal": 6, // token base decimal
+       "tokenQuoteDecimal": 9, // token quote decimal
+       "lockedVestingParam": {
+           "totalLockedVestingAmount": 100000000, // total locked vesting amount (not in lamports)
+           "numberOfVestingPeriod": 24, // number of vesting period
+           "cliffUnlockAmount": 100000000, // cliff unlock amount (not in lamports)
+           "totalVestingDuration":2592000, // total vesting duration (in seconds)
+           "cliffDurationFromMigrationTime": 0 // cliff duration from migration time (in seconds)
+        },
+        "baseFeeParams": {
+            "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential
+            "feeSchedulerParam": {
+                "startingFeeBps": 200, // starting fee (max 99% fee === 9900 bps)
+                "endingFeeBps": 200, // ending fee (minimum 0.01% fee === 1 bps)
+                "numberOfPeriod": 0, // number of period
+                "totalDuration": 0 // total duration (If activationType is 0, totalDuration = duration / 0.4, If activationType is 1, totalDuration = duration)
+            }
+            /*
+            "baseFeeMode": 2, // 2 - Rate Limiter
+            "rateLimiterParam": {
+                "baseFeeBps": 200, // base fee (max 99% base fee === 9900 bps)
+                "feeIncrementBps": 200, // fee increment (max fee increment = 9900 bps - baseFeeBps)
+                "referenceAmount": 0, // reference amount (not in lamports)
+                "maxLimiterDuration": 0 // if activationType is 0, maxLimiterDuration = duration / 0.4, if activationType is 1, maxLimiterDuration = duration)
+            }
+            */
+        },
+        "dynamicFeeEnabled": true, // If true, dynamic fee will add 20% of minimum base fee to the total fee.
+        "activationType": 1, // 0 - Slot | 1 - Timestamp
+        "collectFeeMode": 0, // 0 - Quote Token | 1 - Output Token
+        "migrationFeeOption": 3, // 0 - LP Fee 0.25% | 1 - LP Fee 0.3% | 2 - LP Fee 1% | 3 - LP Fee 2% | 4 - LP Fee 4% | 5 - LP Fee 6%
+        "tokenType": 0, // 0 - SPL | 1 - Token 2022
+        "partnerLpPercentage": 25, // Partner claimable LP (withdrawable LP once pool migrates)
+        "creatorLpPercentage": 25, // Creator claimable LP (withdrawable LP once pool migrates)
+        "partnerLockedLpPercentage": 25, // Partner locked LP (permanently locked LP once pool migrates)
+        "creatorLockedLpPercentage": 25, // Creator locked LP (permanently locked LP once pool migrates)
+        "creatorTradingFeePercentage": 0, // Bonding curve trading fee sharing (0% to 100%) - 0% means all trading fees go to the partner
+        "leftover": 0, // leftover tokens in the bonding curve (claimable once pool migrates)
+        "tokenUpdateAuthority": 1, // 0 - CreatorUpdateAuthority | 1 - Immutable | 2 - PartnerUpdateAuthority | 3 - CreatorUpdateAndMintAuthority | 4 - PartnerUpdateAndMintAuthority
+        "migrationFee": {
+            "feePercentage": 0, // Percentage of fee taken from migration quote threshold once pool migrates (0% to 50%)
+            "creatorFeePercentage": 0 // Percentage of the migrationFee.feePercentage claimable by creator (0% to 100%)
+        },
+        "leftoverReceiver": "YOUR_LEFTOVER_RECEIVER_ADDRESS", // leftover receiver address
+        "feeClaimer": "YOUR_FEE_CLAIMER_ADDRESS" // fee claimer address
+    },
+
+    /* dbcPool is only used in the following actions:
+     * 1. create-dbc-pool
+     */
+    "dbcPool": {
+        "name": "DBC Pool", // token name
+        "symbol": "DBC", // token symbol
+        "uri": "https://example.com" // metaplex token metadata format for the token - https://developers.metaplex.com/core/json-schema
+    },
+
+    /* dbcSwap is only used in the following actions:
+     * 1. swap-dbc (Buy or Sell)
+     */
+    "dbcSwap": {
+        "amountIn": 1.03, // the amount of quoteMint or baseMint to be swapped
+        "slippageBps": 100, // slippage in bps
+        "swapBaseForQuote": false, // if true, swap base for quote | if false, swap quote for base
+        "referralTokenAccount": null // optional referral token account address
+    }
+}
