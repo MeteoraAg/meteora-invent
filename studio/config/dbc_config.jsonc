@@ -146,7 +146,7 @@
   /* dbcTransferPoolCreator is only used in the following actions:
    * 1. dbc-transfer-pool-creator
    */
-   "dbcTransferPoolCreator": {
+  "dbcTransferPoolCreator": {
     "newCreator": "YOUR_NEW_CREATOR_ADDRESS" // new creator address
   }
 }
