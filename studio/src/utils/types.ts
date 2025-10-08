@@ -230,6 +230,7 @@ export type DbcConfig = MeteoraConfigBase & {
     | null;
   dbcPool?: DbcPool | null;
   dbcSwap?: DbcSwap | null;
+  dbcTransferPoolCreator?: DbcTransferPoolCreator | null;
 };
 
 export type BaseFee =
@@ -315,6 +316,7 @@ export type BuildCurveWithLiquidityWeights = BuildCurveBase & {
 
 export type DbcPool = {
   baseMintKeypairFilepath?: string;
+  creator: string;
   name: string;
   symbol: string;
   metadata: TokenMetadata;
@@ -325,6 +327,10 @@ export type DbcSwap = {
   slippageBps: number;
   swapBaseForQuote: boolean;
   referralTokenAccount?: string | null;
+};
+
+export type DbcTransferPoolCreator = {
+  newCreator: string;
 };
 
 /* Alpha Vault */

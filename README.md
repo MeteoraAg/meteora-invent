@@ -365,6 +365,15 @@ pool.
 pnpm studio dbc-swap --baseMint <YOUR_BASE_MINT_ADDRESS>
 ```
 
+##### Transfer Pool Creator
+
+Configure `dbcTransferPoolCreator` in `dbc_config.jsonc` file and run the following command to
+transfer the pool creator of the DBC pool.
+
+```bash
+pnpm studio dbc-transfer-pool-creator --baseMint <YOUR_BASE_MINT_ADDRESS>
+```
+
 ---
 
 #### Alpha Vault Actions
@@ -461,7 +470,8 @@ meteora-invent/
     │   │   │   ├── create_pool.ts
     │   │   │   ├── migrate_damm_v1.ts
     │   │   │   ├── migrate_damm_v2.ts
-    │   │   │   └── swap.ts
+    │   │   │   ├── swap.ts
+    │   │   │   └── transfer_pool_creator.ts
     │   │   ├── dlmm
     │   │   │   ├── create_pool.ts
     │   │   │   ├── seed_liquidity_lfg.ts

@@ -185,7 +185,7 @@ export async function createDbcPool(
         symbol: config.dbcPool.symbol,
         uri: metadataUri,
         payer: wallet.publicKey,
-        poolCreator: wallet.publicKey,
+        poolCreator: new PublicKey(config.dbcPool.creator),
       });
 
       modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports);
@@ -957,4 +957,68 @@ export async function migrateDammV2(
   }
 
   console.log('> DAMM V2 migration process completed successfully');
+}
+
+/**
+ * Transfer DBC pool creator
+ * @param config - The DBC config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet to use for the transaction
+ * @param baseMint - The base mint
+ * @returns The public key of the DBC config
+ */
+export async function transferDbcPoolCreator(
+  config: DbcConfig,
+  connection: Connection,
+  wallet: Wallet,
+  baseMint: PublicKey
+) {
+  if (!config.dbcTransferPoolCreator) {
+    throw new Error('Missing dbc transfer pool creator parameters');
+  }
+
+  console.log('\n> Initializing DBC pool creator transfer...');
+
+  const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
+
+  const poolState = await dbcInstance.state.getPoolByBaseMint(new PublicKey(baseMint));
+  if (!poolState) {
+    throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
+  }
+
+  const poolAddress = poolState.publicKey;
+
+  const transferPoolCreatorTx = await dbcInstance.creator.transferPoolCreator({
+    virtualPool: poolAddress,
+    creator: wallet.publicKey,
+    newCreator: new PublicKey(config.dbcTransferPoolCreator.newCreator),
+  });
+
+  modifyComputeUnitPriceIx(transferPoolCreatorTx, config.computeUnitPriceMicroLamports);
+
+  if (config.dryRun) {
+    console.log('> Simulating transfer pool creator tx...');
+    await runSimulateTransaction(connection, [wallet.payer], wallet.publicKey, [
+      transferPoolCreatorTx,
+    ]);
+    console.log('> Transfer pool creator tx simulation successful');
+    return;
+  }
+
+  try {
+    const txHash = await sendAndConfirmTransaction(
+      connection,
+      transferPoolCreatorTx,
+      [wallet.payer],
+      {
+        commitment: connection.commitment,
+        maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
+      }
+    );
+
+    console.log(`> Transfer pool creator tx successful with tx hash: ${txHash}`);
+  } catch (error) {
+    console.error('Failed to swap:', error);
+    throw error;
+  }
 }
