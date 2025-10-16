@@ -117,8 +117,9 @@
    */
   "dbcPool": {
     // "baseMintKeypairFilepath": "./mint-keypair.json", // optional base mint keypair file path
-    "name": "YOUR_TOKEN_NAME", // token name
-    "symbol": "YOUR_TOKEN_SYMBOL", // token symbol
+    "creator": "YOUR_CREATOR_ADDRESS", // creator address
+    "name": "TOKEN_NAME", // token name
+    "symbol": "TOKEN_SYMBOL", // token symbol
     "metadata": {
       // "uri": "https://gateway.irys.xyz/123456789", // if you already have a metadata URI created, you can specify it here
 
