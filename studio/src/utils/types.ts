@@ -443,3 +443,9 @@ export type Stake2EarnConfig = MeteoraConfigBase & {
   dammV1LockLiquidity: LockLiquidityConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
 };
+
+/* Presale */
+
+export type PresaleConfig = MeteoraConfigBase & {
+  createBaseToken: TokenConfig | null;
+};
