@@ -102,7 +102,7 @@ export async function createPermissionlessDlmmPool(
     }
   );
 
-  modifyComputeUnitPriceIx(initPoolTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(initPoolTx, config.computeUnitPriceMicroLamports ?? 0);
 
   const [poolKey] = deriveCustomizablePermissionlessLbPair(baseMint, quoteMint, dlmmProgramId);
 
