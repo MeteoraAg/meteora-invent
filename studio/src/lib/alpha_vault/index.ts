@@ -637,7 +637,7 @@ export async function createAlphaVault(
       config.alphaVault,
       whitelistList,
       config.dryRun,
-      config.computeUnitPriceMicroLamports
+      config.computeUnitPriceMicroLamports ?? 0
     );
   } else if (config.alphaVault.whitelistMode == WhitelistModeConfig.Permissionless) {
     if (config.alphaVault.alphaVaultType == AlphaVaultTypeConfig.Fcfs) {
@@ -651,7 +651,7 @@ export async function createAlphaVault(
         quoteDecimals,
         config.alphaVault as FcfsAlphaVaultConfig,
         config.dryRun,
-        config.computeUnitPriceMicroLamports
+        config.computeUnitPriceMicroLamports ?? 0
       );
     } else if (config.alphaVault.alphaVaultType == AlphaVaultTypeConfig.Prorata) {
       await createProrataAlphaVault(
@@ -664,7 +664,7 @@ export async function createAlphaVault(
         quoteDecimals,
         config.alphaVault as ProrataAlphaVaultConfig,
         config.dryRun,
-        config.computeUnitPriceMicroLamports
+        config.computeUnitPriceMicroLamports ?? 0
       );
     } else {
       throw new Error(`Invalid alpha vault type ${config.alphaVault.alphaVaultType}`);
@@ -698,7 +698,7 @@ export async function createAlphaVault(
       config.alphaVault,
       whitelistList,
       config.dryRun,
-      config.computeUnitPriceMicroLamports
+      config.computeUnitPriceMicroLamports ?? 0
     );
 
     if (config.alphaVault.cloudflareKvProofUpload) {

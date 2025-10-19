@@ -85,7 +85,7 @@ export async function createDbcConfig(
     ...curveConfig,
   });
 
-  modifyComputeUnitPriceIx(createConfigTx as any, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(createConfigTx as any, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`> Simulating create config tx...`);
@@ -188,7 +188,7 @@ export async function createDbcPool(
         poolCreator: new PublicKey(config.dbcPool.creator),
       });
 
-      modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);
 
       await runSimulateTransaction(connection, [wallet.payer, baseMint], wallet.publicKey, [
         createPoolTx,
@@ -211,7 +211,7 @@ export async function createDbcPool(
       poolCreator: wallet.publicKey,
     });
 
-    modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);
 
     console.log(`>> Sending create pool transaction...`);
     const createPoolTxHash = await sendAndConfirmTransaction(
@@ -283,7 +283,7 @@ export async function claimTradingFee(
       maxQuoteAmount: feeMetrics.current.creatorQuoteFee,
       payer: wallet.publicKey,
     });
-    modifyComputeUnitPriceIx(claimCreatorTradingFeeTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(claimCreatorTradingFeeTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(claimCreatorTradingFeeTx);
   } else {
     console.log('> This is not the creator of the pool');
@@ -297,7 +297,7 @@ export async function claimTradingFee(
       maxQuoteAmount: feeMetrics.current.partnerQuoteFee,
       payer: wallet.publicKey,
     });
-    modifyComputeUnitPriceIx(claimPartnerTradingFeeTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(claimPartnerTradingFeeTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(claimPartnerTradingFeeTx);
   } else {
     console.log('> This is not the launchpad fee claimer');
@@ -406,7 +406,7 @@ export async function swap(
       : null,
   });
 
-  modifyComputeUnitPriceIx(swapTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(swapTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log('> Simulating swap tx...');
@@ -487,7 +487,7 @@ export async function migrateDammV1(
       virtualPool: poolAddress,
       config: dbcConfigAddress,
     });
-    modifyComputeUnitPriceIx(createMetadataTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(createMetadataTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(createMetadataTx);
   } else {
     console.log('Migration metadata already exists');
@@ -506,7 +506,7 @@ export async function migrateDammV1(
         virtualPool: poolAddress,
         payer: wallet.publicKey,
       });
-      modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(createLockerTx);
     } else {
       console.log('> Locker already exists, skipping creation');
@@ -625,7 +625,7 @@ export async function migrateDammV1(
         dammConfig: dammConfigAddress,
         isPartner: false, // Use creator (false) for the combined claim
       });
-      modifyComputeUnitPriceIx(claimCreatorLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(claimCreatorLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(claimCreatorLpTx);
       transactionLabels.push('Combined Creator+Partner LP claim');
     } else if (!hasClaimableLp) {
@@ -645,7 +645,7 @@ export async function migrateDammV1(
         dammConfig: dammConfigAddress,
         isPartner: false,
       });
-      modifyComputeUnitPriceIx(claimCreatorLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(claimCreatorLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(claimCreatorLpTx);
       transactionLabels.push('Creator LP claim');
     } else {
@@ -663,7 +663,7 @@ export async function migrateDammV1(
         dammConfig: dammConfigAddress,
         isPartner: true,
       });
-      modifyComputeUnitPriceIx(claimPartnerLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(claimPartnerLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(claimPartnerLpTx);
       transactionLabels.push('Partner LP claim');
     } else {
@@ -689,7 +689,7 @@ export async function migrateDammV1(
         dammConfig: dammConfigAddress,
         isPartner: false, // Use creator (false) for the combined lock
       });
-      modifyComputeUnitPriceIx(lockCreatorLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(lockCreatorLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(lockCreatorLpTx);
       transactionLabels.push('Combined Creator+Partner LP lock');
     } else if (!hasLockedLp) {
@@ -709,7 +709,7 @@ export async function migrateDammV1(
         dammConfig: dammConfigAddress,
         isPartner: false,
       });
-      modifyComputeUnitPriceIx(lockCreatorLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(lockCreatorLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(lockCreatorLpTx);
       transactionLabels.push('Creator LP lock');
     } else {
@@ -728,7 +728,7 @@ export async function migrateDammV1(
         isPartner: true,
       });
 
-      modifyComputeUnitPriceIx(lockPartnerLpTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(lockPartnerLpTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(lockPartnerLpTx);
       transactionLabels.push('Partner LP lock');
     } else {
@@ -850,7 +850,7 @@ export async function migrateDammV2(
       virtualPool: poolAddress,
       config: dbcConfigAddress,
     });
-    modifyComputeUnitPriceIx(createMetadataTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(createMetadataTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(createMetadataTx);
   } else {
     console.log('Migration metadata already exists');
@@ -869,7 +869,7 @@ export async function migrateDammV2(
         virtualPool: poolAddress,
         payer: wallet.publicKey,
       });
-      modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports);
+      modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports ?? 0);
       transactions.push(createLockerTx);
     } else {
       console.log('> Locker already exists, skipping creation');
@@ -928,7 +928,7 @@ export async function migrateDammV2(
       dammConfig: dammConfigAddress,
     });
 
-    modifyComputeUnitPriceIx(migrateTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(migrateTx, config.computeUnitPriceMicroLamports ?? 0);
 
     if (config.dryRun) {
       console.log('> Simulating migration to DAMM V2 transaction...');
@@ -994,7 +994,7 @@ export async function transferDbcPoolCreator(
     newCreator: new PublicKey(config.dbcTransferPoolCreator.newCreator),
   });
 
-  modifyComputeUnitPriceIx(transferPoolCreatorTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(transferPoolCreatorTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log('> Simulating transfer pool creator tx...');

@@ -33,7 +33,8 @@
     "dbc-migrate-to-damm-v2": "tsx src/actions/dbc/migrate_damm_v2.ts",
     "dbc-swap": "tsx src/actions/dbc/swap.ts",
     "dbc-transfer-pool-creator": "tsx src/actions/dbc/transfer_pool_creator.ts",
-    "alpha-vault-create": "tsx src/actions/alpha_vault/create_alpha_vault.ts"
+    "alpha-vault-create": "tsx src/actions/alpha_vault/create_alpha_vault.ts",
+    "presale-vault-create": "tsx src/actions/presale/create_presale_vault.ts"
   },
   "keywords": [
     "studio",

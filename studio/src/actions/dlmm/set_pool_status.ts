@@ -42,7 +42,7 @@ async function main() {
   const lbPair = await DLMM.create(connection, poolAddress);
 
   const tx = await lbPair.setPairStatusPermissionless(enabled, wallet.publicKey);
-  modifyComputeUnitPriceIx(tx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(tx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating set DLMM pool status tx...`);

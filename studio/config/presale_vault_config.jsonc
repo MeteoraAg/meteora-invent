@@ -1,0 +1,60 @@
+{
+  /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": false,
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* quoteMint is required for the presale
+   * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
+   */
+  "quoteMint": "So11111111111111111111111111111111111111112",
+
+  /* presaleVaultType is required. Options: fcfs | prorata | fixed_price | permissioned_fixed_price_with_authority | permissioned_fixed_price_with_merkle_proof */
+  "presaleVaultType": "fcfs",
+
+  /* presaleVault configuration for FCFS presale */
+  "presaleVault": {
+    /* Presale registries: Define one or more tiers for your presale
+     * Each tier can have different caps and fees
+     */
+    "presaleRegistries": [
+      {
+        "presaleSupply": 100000000000000, // Total token supply allocated for this tier (in base token units)
+        "buyerMaximumDepositCap": 1000000000, // Maximum amount a buyer can deposit in this tier (in quote token lamports, e.g., 1 SOL = 1000000000 lamports)
+        "buyerMinimumDepositCap": 10000000, // Minimum amount a buyer must deposit in this tier (in quote token lamports, e.g., 0.01 SOL = 10000000 lamports)
+        "depositFeeBps": 0 // Deposit fee in basis points (100 = 1%, 0 = no fee)
+      }
+      /* You can add more tiers if needed:
+      ,{
+        "presaleSupply": 500000,
+        "buyerMaximumDepositCap": 5000000000,
+        "buyerMinimumDepositCap": 50000000,
+        "depositFeeBps": 100
+      }
+      */
+    ],
+
+    /* General presale configuration */
+    "presaleArgs": {
+      "presaleMaximumCap": 100000000000, // Maximum total amount that can be raised (in quote token lamports, e.g., 100 SOL = 100000000000 lamports)
+      "presaleMinimumCap": 1000000000, // Minimum total amount to reach for presale success (in quote token lamports, e.g., 1 SOL = 1000000000 lamports)
+      "presaleStartTime": 0, // Presale start time (unix timestamp in seconds, 0 = start immediately)
+      "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds, e.g., Date.now() / 1000 + 86400 for 24 hours from now)
+      "whitelistMode": 0, // Whitelist mode: 0 = permissionless (anyone can participate) | 1 = permissioned_with_merkle_proof | 2 = permissioned_with_authority
+      "unsoldTokenAction": 1 // Action for unsold tokens: 0 = burn | 1 = refund to creator
+    },
+
+    /* Optional: Locked vesting configuration
+     * Uncomment to enable token vesting after presale
+     */
+    "lockedVestingArgs": {
+      "lockDuration": 3600, // Duration tokens are locked before vesting starts (in seconds, e.g., 3600 = 1 hour)
+      "vestDuration": 3600, // Duration over which tokens vest linearly (in seconds, e.g., 3600 = 1 hour)
+      "immediateReleaseBps": 0 // Percentage of tokens released immediately in basis points (1000 = 10%, 0 = no immediate release)
+    }
+  }
+}

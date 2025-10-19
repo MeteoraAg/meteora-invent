@@ -1,4 +1,5 @@
 import { Creator, Collection, Uses } from '@metaplex-foundation/mpl-token-metadata';
+import { ILockedVestingArgs, IPresaleArgs, IPresaleRegistryArgs } from '@meteora-ag/presale';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 
@@ -60,7 +61,7 @@ export type MeteoraConfigBase = {
   rpcUrl: string;
   dryRun: boolean;
   keypairFilePath: string;
-  computeUnitPriceMicroLamports: number;
+  computeUnitPriceMicroLamports?: number;
   quoteMint?: string | null;
 };
 
@@ -448,4 +449,20 @@ export type Stake2EarnConfig = MeteoraConfigBase & {
 
 export type PresaleConfig = MeteoraConfigBase & {
   createBaseToken: TokenConfig | null;
+  presaleVault: FcfsPresaleVaultConfig | null;
+  presaleVaultType: PresaleVaultTypeConfig;
 };
+
+export enum PresaleVaultTypeConfig {
+  Fcfs = 'fcfs',
+  Prorata = 'prorata',
+  FixedPrice = 'fixed_price',
+  PermissionedFixedPriceWithAuthority = 'permissioned_fixed_price_with_authority',
+  PermissionedFixedPriceWithMerkleProof = 'permissioned_fixed_price_with_merkle_proof',
+}
+
+export interface FcfsPresaleVaultConfig {
+  presaleArgs: IPresaleArgs;
+  presaleRegistries: IPresaleRegistryArgs[];
+  lockedVestingArgs?: ILockedVestingArgs;
+}

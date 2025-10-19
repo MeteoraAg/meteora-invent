@@ -101,7 +101,7 @@ export async function createDammV1Pool(
       programId: opts?.programId?.toString(),
     }
   );
-  modifyComputeUnitPriceIx(initPoolTx as any, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(initPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);
   const poolKey = deriveCustomizablePermissionlessConstantProductPoolAddress(
     baseMint,
     quoteMint,
