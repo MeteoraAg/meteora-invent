@@ -203,7 +203,7 @@ export async function createDammV2OneSidedPool(
     tokenBProgram: TOKEN_PROGRAM_ID,
   });
 
-  modifyComputeUnitPriceIx(initCustomizePoolTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(initCustomizePoolTx, config.computeUnitPriceMicroLamports ?? 0);
 
   console.log(`\n> Pool address: ${pool}`);
   console.log(`\n> Position address: ${position}`);
@@ -440,7 +440,7 @@ export async function createDammV2BalancedPool(
     tokenBProgram: TOKEN_PROGRAM_ID,
   });
 
-  modifyComputeUnitPriceIx(initCustomizePoolTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(initCustomizePoolTx, config.computeUnitPriceMicroLamports ?? 0);
 
   console.log(`\n> Pool address: ${pool}`);
   console.log(`\n> Position address: ${position}`);
@@ -637,7 +637,7 @@ export async function splitPosition(
     reward1Percentage: config.splitPosition.reward1Percentage,
   });
 
-  modifyComputeUnitPriceIx(splitPositionTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(splitPositionTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating split position transaction...`);
@@ -776,7 +776,7 @@ export async function claimPositionFee(
     feePayer: wallet.publicKey,
   });
 
-  modifyComputeUnitPriceIx(claimPositionFeeTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(claimPositionFeeTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating claim position fee transaction...`);
@@ -957,7 +957,7 @@ export async function addLiquidity(
     tokenBProgram: getTokenProgram(poolState.tokenBFlag),
   });
 
-  modifyComputeUnitPriceIx(addLiquidityTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(addLiquidityTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating add liquidity transaction...`);
@@ -1185,7 +1185,7 @@ export async function removeLiquidity(
     })),
   });
 
-  modifyComputeUnitPriceIx(removeLiquidityTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(removeLiquidityTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating remove liquidity transaction...`);
@@ -1265,7 +1265,7 @@ export async function removeLiquidity(
       tokenBProgram: getTokenProgram(poolState.tokenBFlag),
     });
 
-    modifyComputeUnitPriceIx(claimPositionFeeTx, config.computeUnitPriceMicroLamports);
+    modifyComputeUnitPriceIx(claimPositionFeeTx, config.computeUnitPriceMicroLamports ?? 0);
 
     if (config.dryRun) {
       console.log(`\n> Simulating claim position fee transaction...`);
@@ -1319,7 +1319,7 @@ export async function removeLiquidity(
     positionNftAccount: userPosition.positionNftAccount,
   });
 
-  modifyComputeUnitPriceIx(closePositionTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(closePositionTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating close position transaction...`);
@@ -1465,7 +1465,7 @@ export async function closePosition(
     positionNftAccount: userPosition.positionNftAccount,
   });
 
-  modifyComputeUnitPriceIx(closePositionTx, config.computeUnitPriceMicroLamports);
+  modifyComputeUnitPriceIx(closePositionTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`\n> Simulating close position transaction...`);

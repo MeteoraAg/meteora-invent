@@ -36,7 +36,7 @@ async function main() {
     }
     baseMint = await createTokenMint(connection, wallet, {
       dryRun: config.dryRun,
-      computeUnitPriceMicroLamports: config.computeUnitPriceMicroLamports,
+      computeUnitPriceMicroLamports: config.computeUnitPriceMicroLamports ?? 0,
       tokenConfig: config.createBaseToken,
     });
   } else {

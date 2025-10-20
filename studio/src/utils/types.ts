@@ -1,4 +1,5 @@
 import { Creator, Collection, Uses } from '@metaplex-foundation/mpl-token-metadata';
+import { ILockedVestingArgs, IPresaleArgs, IPresaleRegistryArgs } from '@meteora-ag/presale';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 
@@ -60,7 +61,7 @@ export type MeteoraConfigBase = {
   rpcUrl: string;
   dryRun: boolean;
   keypairFilePath: string;
-  computeUnitPriceMicroLamports: number;
+  computeUnitPriceMicroLamports?: number;
   quoteMint?: string | null;
 };
 
@@ -73,6 +74,11 @@ export type AllocationByAmount = {
 export interface NetworkConfig {
   rpcUrl: string;
   airdropAmount: number;
+}
+
+export enum PriceRoundingConfig {
+  Up = 'up',
+  Down = 'down',
 }
 
 /* DAMM v1 */
@@ -213,12 +219,6 @@ export interface SingleBinSeedLiquidityConfig {
 export interface SetDlmmPoolStatusConfig {
   enabled: boolean;
 }
-
-export enum PriceRoundingConfig {
-  Up = 'up',
-  Down = 'down',
-}
-
 /* DBC */
 
 export type DbcConfig = MeteoraConfigBase & {
@@ -443,3 +443,31 @@ export type Stake2EarnConfig = MeteoraConfigBase & {
   dammV1LockLiquidity: LockLiquidityConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
 };
+
+/* Presale */
+
+export type PresaleConfig = MeteoraConfigBase & {
+  createBaseToken: TokenConfig | null;
+  presaleVault: PresaleVaultConfig | null;
+  presaleVaultType: PresaleVaultTypeConfig;
+};
+
+export enum PresaleVaultTypeConfig {
+  Fcfs = 'fcfs',
+  Prorata = 'prorata',
+  FixedPrice = 'fixed_price',
+  PermissionedFixedPriceWithAuthority = 'permissioned_fixed_price_with_authority',
+  PermissionedFixedPriceWithMerkleProof = 'permissioned_fixed_price_with_merkle_proof',
+}
+
+export interface PresaleVaultConfig {
+  presaleArgs: IPresaleArgs;
+  presaleRegistries: IPresaleRegistryArgs[];
+  lockedVestingArgs?: ILockedVestingArgs;
+  fixedPricePresaleConfig?: FixedPricePresaleVaultConfig;
+}
+
+export interface FixedPricePresaleVaultConfig {
+  price: number;
+  rounding: 'up' | 'down';
+}

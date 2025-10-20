@@ -40,7 +40,7 @@ async function main() {
     quoteMint,
     config.dammV1LockLiquidity.allocations,
     config.dryRun,
-    config.computeUnitPriceMicroLamports
+    config.computeUnitPriceMicroLamports ?? 0
   );
 }
 

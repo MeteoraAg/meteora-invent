@@ -8,6 +8,7 @@ import {
   DlmmConfig,
   MeteoraConfig,
   NetworkConfig,
+  PresaleConfig,
 } from '../utils/types';
 import { parseArgs } from 'util';
 import { safeParseJsonFromFile } from './utils';
@@ -77,6 +78,12 @@ export async function getDbcConfig(): Promise<DbcConfig> {
 export async function getAlphaVaultConfig(): Promise<AlphaVaultConfig> {
   const configPath = path.join(__dirname, '../../config/alpha_vault_config.jsonc');
   const config: AlphaVaultConfig = await safeParseJsonFromFile(configPath);
+  return config;
+}
+
+export async function getPresaleConfig(): Promise<PresaleConfig> {
+  const configPath = path.join(__dirname, '../../config/presale_vault_config.jsonc');
+  const config: PresaleConfig = await safeParseJsonFromFile(configPath);
   return config;
 }
 

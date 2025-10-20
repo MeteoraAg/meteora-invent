@@ -62,7 +62,7 @@ async function main() {
     new PublicKey(baseMint),
     config.stake2EarnFarm,
     config.dryRun,
-    config.computeUnitPriceMicroLamports
+    config.computeUnitPriceMicroLamports ?? 0
   );
 }
 
