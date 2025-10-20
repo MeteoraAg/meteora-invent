@@ -2,6 +2,7 @@ import { Keypair, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import fs from 'fs/promises';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { PriceRoundingConfig } from '../utils/types';
+import { Rounding } from '@meteora-ag/presale';
 
 export async function safeParseJsonFromFile<T>(filePath: string): Promise<T> {
   try {
@@ -45,4 +46,8 @@ export async function airdropSol(
 
 export function isPriceRoundingUp(priceRoundingConfig: PriceRoundingConfig): boolean {
   return priceRoundingConfig == PriceRoundingConfig.Up;
+}
+
+export function getRounding(rounding: 'up' | 'down'): Rounding {
+  return rounding === 'up' ? Rounding.Up : Rounding.Down;
 }

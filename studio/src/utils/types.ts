@@ -76,6 +76,11 @@ export interface NetworkConfig {
   airdropAmount: number;
 }
 
+export enum PriceRoundingConfig {
+  Up = 'up',
+  Down = 'down',
+}
+
 /* DAMM v1 */
 
 export type DammV1Config = MeteoraConfigBase & {
@@ -214,12 +219,6 @@ export interface SingleBinSeedLiquidityConfig {
 export interface SetDlmmPoolStatusConfig {
   enabled: boolean;
 }
-
-export enum PriceRoundingConfig {
-  Up = 'up',
-  Down = 'down',
-}
-
 /* DBC */
 
 export type DbcConfig = MeteoraConfigBase & {
@@ -449,7 +448,7 @@ export type Stake2EarnConfig = MeteoraConfigBase & {
 
 export type PresaleConfig = MeteoraConfigBase & {
   createBaseToken: TokenConfig | null;
-  presaleVault: FcfsPresaleVaultConfig | null;
+  presaleVault: PresaleVaultConfig | null;
   presaleVaultType: PresaleVaultTypeConfig;
 };
 
@@ -461,8 +460,14 @@ export enum PresaleVaultTypeConfig {
   PermissionedFixedPriceWithMerkleProof = 'permissioned_fixed_price_with_merkle_proof',
 }
 
-export interface FcfsPresaleVaultConfig {
+export interface PresaleVaultConfig {
   presaleArgs: IPresaleArgs;
   presaleRegistries: IPresaleRegistryArgs[];
   lockedVestingArgs?: ILockedVestingArgs;
+  fixedPricePresaleConfig?: FixedPricePresaleVaultConfig;
+}
+
+export interface FixedPricePresaleVaultConfig {
+  price: number;
+  rounding: 'up' | 'down';
 }

@@ -16,7 +16,7 @@
   /* presaleVaultType is required. Options: fcfs | prorata | fixed_price | permissioned_fixed_price_with_authority | permissioned_fixed_price_with_merkle_proof */
   "presaleVaultType": "fcfs",
 
-  /* presaleVault configuration for FCFS presale */
+  /* presaleVault configuration */
   "presaleVault": {
     /* Presale registries: Define one or more tiers for your presale
      * Each tier can have different caps and fees
@@ -46,6 +46,15 @@
       "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds, e.g., Date.now() / 1000 + 86400 for 24 hours from now)
       "whitelistMode": 0, // Whitelist mode: 0 = permissionless (anyone can participate) | 1 = permissioned_with_merkle_proof | 2 = permissioned_with_authority
       "unsoldTokenAction": 1 // Action for unsold tokens: 0 = burn | 1 = refund to creator
+    },
+
+    /* Fixed Price Presale specific fields (only required for fixed_price presaleVaultType)
+     * price: The fixed price per token (e.g., 0.1 means 1 quote token buys 10 base tokens)
+     * rounding: 'up' or 'down' (default: 'down')
+     */
+    "fixedPricePresaleConfig": {
+      "price": 0.1,
+      "rounding": "down"
     },
 
     /* Optional: Locked vesting configuration
