@@ -60,7 +60,7 @@
     "@meteora-ag/farming-sdk": "^1.0.18",
     "@meteora-ag/m3m3": "^1.0.10",
     "@meteora-ag/met-lock-sdk": "^1.0.1",
-    "@meteora-ag/presale": "^0.0.3",
+    "@meteora-ag/presale": "^0.0.5",
     "@meteora-ag/vault-sdk": "^2.3.1",
     "@meteora-ag/zap-sdk": "^1.0.8",
     "@solana/spl-token": "^0.4.14",
