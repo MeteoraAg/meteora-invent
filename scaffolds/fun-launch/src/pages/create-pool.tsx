@@ -33,6 +33,7 @@ export default function CreatePool() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [poolCreated, setPoolCreated] = useState(false);
+  const [tokenLogoPreview, setTokenLogoPreview] = useState<File | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -93,7 +94,20 @@ export default function CreatePool() {
         transaction.sign(keyPair);
 
         // Step 3: Then sign with user's wallet
-        const signedTransaction = await signTransaction(transaction);
+        let signedTransaction;
+        try {
+          signedTransaction = await signTransaction(transaction);
+        } catch (walletError: any) {
+          // Handle wallet-specific errors
+          if (walletError.message?.includes('User rejected') || walletError.message?.includes('rejected the request')) {
+            toast.error('Transaction cancelled - You rejected the signature request');
+          } else if (walletError.message?.includes('Transaction cancelled')) {
+            toast.error('Transaction cancelled');
+          } else {
+            toast.error(`Wallet error: ${walletError.message || 'Failed to sign transaction'}`);
+          }
+          return;
+        }
 
         // Step 4: Send signed transaction
         const sendResponse = await fetch('/api/send-transaction', {
@@ -108,17 +122,31 @@ export default function CreatePool() {
 
         if (!sendResponse.ok) {
           const error = await sendResponse.json();
-          throw new Error(error.error);
+          throw new Error(error.error || 'Failed to send transaction');
         }
 
         const { success } = await sendResponse.json();
         if (success) {
-          toast.success('Pool created successfully');
+          toast.success('Token launched successfully! 🚀');
           setPoolCreated(true);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error creating pool:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to create pool');
+
+        // Provide user-friendly error messages
+        if (error.message?.includes('Failed to upload image')) {
+          toast.error('Failed to upload image. Please try again or use a different image.');
+        } else if (error.message?.includes('Failed to upload metadata')) {
+          toast.error('Failed to upload token metadata. Please try again.');
+        } else if (error.message?.includes('Insufficient funds')) {
+          toast.error('Insufficient SOL balance to create pool. Please add funds to your wallet.');
+        } else if (error.message?.includes('blockhash')) {
+          toast.error('Transaction expired. Please try again.');
+        } else if (error.message?.includes('Network request failed')) {
+          toast.error('Network error. Please check your connection and try again.');
+        } else {
+          toast.error(error.message || 'Failed to create pool. Please try again.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -137,26 +165,25 @@ export default function CreatePool() {
   return (
     <>
       <Head>
-        <title>Create Pool - Virtual Curve</title>
+        <title>Launch Token - TrenchFun</title>
         <meta
           name="description"
-          content="Create a new token pool on Virtual Curve with customizable price curves."
+          content="Launch your token on TrenchFun with fair bonding curves and instant liquidity."
         />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-b text-white">
+      <div className="min-h-screen bg-black text-white relative">
+        {/* Gradient background */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-1/3 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-1/3 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        </div>
+
         {/* Header */}
         <Header />
 
         {/* Page Content */}
-        <main className="container mx-auto px-4 py-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">Create Pool</h1>
-              <p className="text-gray-300">Launch your token with a customizable price curve</p>
-            </div>
-          </div>
-
+        <main className="container mx-auto px-4 py-8 max-w-4xl relative z-10">
           {poolCreated && !isLoading ? (
             <PoolCreationSuccess />
           ) : (
@@ -165,18 +192,26 @@ export default function CreatePool() {
                 e.preventDefault();
                 form.handleSubmit();
               }}
-              className="space-y-8"
+              className="space-y-6"
             >
               {/* Token Details Section */}
-              <div className="bg-white/5 rounded-xl p-8 backdrop-blur-sm border border-white/10">
-                <h2 className="text-2xl font-bold mb-4">Token Details</h2>
+              <div className="bg-black/40 rounded-2xl p-8 backdrop-blur-md border border-purple-500/20 shadow-2xl shadow-purple-500/5">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-purple-500 rounded-xl blur-md opacity-30" />
+                    <div className="relative w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                      <span className="iconify ph--coin-bold w-7 h-7 text-white" />
+                    </div>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Token Details</h2>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <div className="mb-4">
                       <label
                         htmlFor="tokenName"
-                        className="block text-sm font-medium text-gray-300 mb-1"
+                        className="block text-sm font-medium text-purple-200/80 mb-2"
                       >
                         Token Name*
                       </label>
@@ -187,8 +222,8 @@ export default function CreatePool() {
                             id="tokenName"
                             name={field.name}
                             type="text"
-                            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white"
-                            placeholder="e.g. Virtual Coin"
+                            className="w-full p-3 bg-black/40 border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                            placeholder="e.g. Trench Coin"
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
                             required
@@ -201,7 +236,7 @@ export default function CreatePool() {
                     <div className="mb-4">
                       <label
                         htmlFor="tokenSymbol"
-                        className="block text-sm font-medium text-gray-300 mb-1"
+                        className="block text-sm font-medium text-purple-200/80 mb-2"
                       >
                         Token Symbol*
                       </label>
@@ -212,8 +247,8 @@ export default function CreatePool() {
                             id="tokenSymbol"
                             name={field.name}
                             type="text"
-                            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white"
-                            placeholder="e.g. VRTL"
+                            className="w-full p-3 bg-black/40 border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
+                            placeholder="e.g. TRNCH"
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
                             required
@@ -227,34 +262,82 @@ export default function CreatePool() {
                   <div>
                     <label
                       htmlFor="tokenLogo"
-                      className="block text-sm font-medium text-gray-300 mb-1"
+                      className="block text-sm font-medium text-purple-200/80 mb-2"
                     >
                       Token Logo*
                     </label>
                     {form.Field({
                       name: 'tokenLogo',
                       children: (field) => (
-                        <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center">
-                          <span className="iconify w-6 h-6 mx-auto mb-2 text-gray-400 ph--upload-bold" />
-                          <p className="text-gray-400 text-xs mb-2">PNG, JPG or SVG (max. 2MB)</p>
-                          <input
-                            type="file"
-                            id="tokenLogo"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                field.handleChange(file);
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor="tokenLogo"
-                            className="bg-white/10 px-4 py-2 rounded-lg text-sm hover:bg-white/20 transition cursor-pointer"
-                          >
-                            Browse Files
-                          </label>
-                        </div>
+                        <>
+                          {tokenLogoPreview ? (
+                            <div className="relative border-2 border-dashed border-purple-500/30 rounded-lg p-8 text-center bg-black/20 group hover:border-purple-500/50 transition-all cursor-pointer">
+                              {/* Remove button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTokenLogoPreview(null);
+                                  field.handleChange(undefined);
+                                }}
+                                className="absolute -top-2 -right-2 w-7 h-7 bg-red-500/90 hover:bg-red-600 rounded-full flex items-center justify-center z-10 transition-colors shadow-lg"
+                              >
+                                <span className="iconify ph--x-bold w-4 h-4 text-white" />
+                              </button>
+
+                              {/* Image preview with overlay */}
+                              <label htmlFor="tokenLogo" className="cursor-pointer block relative">
+                                <img
+                                  src={URL.createObjectURL(tokenLogoPreview)}
+                                  alt="Token Logo Preview"
+                                  className="w-full h-32 object-contain mb-2 rounded-lg"
+                                />
+
+                                {/* Hover overlay */}
+                                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex flex-col items-center justify-center gap-2">
+                                  <span className="iconify ph--pencil-simple-bold w-6 h-6 text-purple-300" />
+                                  <span className="text-purple-300 text-sm font-medium">Change Image</span>
+                                </div>
+                              </label>
+
+                              <input
+                                type="file"
+                                id="tokenLogo"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    field.handleChange(file);
+                                    setTokenLogoPreview(file);
+                                  }
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-purple-500/30 rounded-lg p-8 text-center bg-black/20 hover:border-purple-500/50 transition-all">
+                              <span className="iconify w-6 h-6 mx-auto mb-2 text-purple-400 ph--upload-bold" />
+                              <p className="text-gray-400 text-xs mb-2">PNG, JPG or SVG (max. 2MB)</p>
+                              <input
+                                type="file"
+                                id="tokenLogo"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    field.handleChange(file);
+                                    setTokenLogoPreview(file);
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor="tokenLogo"
+                                className="inline-block bg-purple-600/20 border border-purple-500/30 px-4 py-2 rounded-lg text-sm text-purple-200 hover:bg-purple-600/30 hover:border-purple-500/50 transition cursor-pointer"
+                              >
+                                Browse Files
+                              </label>
+                            </div>
+                          )}
+                        </>
                       ),
                     })}
                   </div>
@@ -262,14 +345,22 @@ export default function CreatePool() {
               </div>
 
               {/* Social Links Section */}
-              <div className="bg-white/5 rounded-xl p-8 backdrop-blur-sm border border-white/10">
-                <h2 className="text-2xl font-bold mb-6">Social Links (Optional)</h2>
+              <div className="bg-black/40 rounded-2xl p-8 backdrop-blur-md border border-purple-500/20 shadow-2xl shadow-purple-500/5">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="relative w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 blur-xl" />
+                    <div className="relative bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-lg w-full h-full flex items-center justify-center border border-purple-400/20">
+                      <span className="iconify ph--share-network-bold w-6 h-6 text-purple-300" />
+                    </div>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Social Links (Optional)</h2>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="mb-4">
                     <label
                       htmlFor="website"
-                      className="block text-sm font-medium text-gray-300 mb-1"
+                      className="block text-sm font-medium text-purple-200/80 mb-2"
                     >
                       Website
                     </label>
@@ -280,7 +371,7 @@ export default function CreatePool() {
                           id="website"
                           name={field.name}
                           type="url"
-                          className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                          className="w-full p-3 bg-black/40 border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
                           placeholder="https://yourwebsite.com"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -292,7 +383,7 @@ export default function CreatePool() {
                   <div className="mb-4">
                     <label
                       htmlFor="twitter"
-                      className="block text-sm font-medium text-gray-300 mb-1"
+                      className="block text-sm font-medium text-purple-200/80 mb-2"
                     >
                       Twitter
                     </label>
@@ -303,7 +394,7 @@ export default function CreatePool() {
                           id="twitter"
                           name={field.name}
                           type="url"
-                          className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                          className="w-full p-3 bg-black/40 border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
                           placeholder="https://twitter.com/yourusername"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -315,11 +406,12 @@ export default function CreatePool() {
               </div>
 
               {form.state.errors && form.state.errors.length > 0 && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 space-y-2">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-2">
                   {form.state.errors.map((error, index) =>
                     Object.entries(error || {}).map(([, value]) => (
                       <div key={index} className="flex items-start gap-2">
-                        <p className="text-red-200">
+                        <span className="iconify ph--warning-circle-bold w-5 h-5 text-red-400 mt-0.5" />
+                        <p className="text-red-300">
                           {Array.isArray(value)
                             ? value.map((v: any) => v.message || v).join(', ')
                             : typeof value === 'string'
@@ -332,7 +424,7 @@ export default function CreatePool() {
                 </div>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex justify-center pt-4">
                 <SubmitButton isSubmitting={isLoading} />
               </div>
             </form>
@@ -349,23 +441,31 @@ const SubmitButton = ({ isSubmitting }: { isSubmitting: boolean }) => {
 
   if (!publicKey) {
     return (
-      <Button type="button" onClick={() => setShowModal(true)}>
-        <span>Connect Wallet</span>
+      <Button
+        type="button"
+        onClick={() => setShowModal(true)}
+        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 px-8 py-6 text-lg font-semibold rounded-xl shadow-lg shadow-purple-500/30"
+      >
+        <span>Connect Wallet to Launch</span>
       </Button>
     );
   }
 
   return (
-    <Button className="flex items-center gap-2" type="submit" disabled={isSubmitting}>
+    <Button
+      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 px-8 py-6 text-lg font-semibold rounded-xl shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+      type="submit"
+      disabled={isSubmitting}
+    >
       {isSubmitting ? (
         <>
-          <span className="iconify ph--spinner w-5 h-5 animate-spin" />
-          <span>Creating Pool...</span>
+          <span className="iconify ph--spinner w-6 h-6 animate-spin" />
+          <span>Launching Token...</span>
         </>
       ) : (
         <>
-          <span className="iconify ph--rocket-bold w-5 h-5" />
-          <span>Launch Pool</span>
+          <span className="iconify ph--rocket-launch-bold w-6 h-6" />
+          <span>Launch Token</span>
         </>
       )}
     </Button>
@@ -375,29 +475,35 @@ const SubmitButton = ({ isSubmitting }: { isSubmitting: boolean }) => {
 const PoolCreationSuccess = () => {
   return (
     <>
-      <div className="bg-white/5 rounded-xl p-8 backdrop-blur-sm border border-white/10 text-center">
-        <div className="bg-green-500/20 p-4 rounded-full inline-flex mb-6">
-          <span className="iconify ph--check-bold w-12 h-12 text-green-500" />
+      <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-2xl p-12 backdrop-blur-md border border-purple-500/30 text-center shadow-2xl shadow-purple-500/20">
+        <div className="relative inline-flex mb-8">
+          <div className="absolute inset-0 bg-purple-500 rounded-full blur-2xl opacity-30" />
+          <div className="relative bg-purple-500/20 p-6 rounded-full ring-4 ring-purple-500/10">
+            <span className="iconify ph--check-circle-bold w-16 h-16 text-purple-300" />
+          </div>
         </div>
-        <h2 className="text-3xl font-bold mb-4">Pool Created Successfully!</h2>
-        <p className="text-gray-300 mb-8 max-w-lg mx-auto">
-          Your token pool has been created and is now live on the Virtual Curve platform. Users can
-          now buy and trade your tokens.
+        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-purple-300 via-blue-300 to-pink-300 bg-clip-text text-transparent">
+          Token Launched Successfully!
+        </h2>
+        <p className="text-gray-300 mb-10 max-w-lg mx-auto text-lg">
+          Your token is now live on TrenchFun! Users can start discovering and trading your token.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/"
-            className="bg-white/10 px-6 py-3 rounded-xl font-medium hover:bg-white/20 transition"
+            className="bg-black/40 hover:bg-black/60 px-8 py-4 rounded-xl font-semibold transition border border-purple-500/30 hover:border-purple-400/50 flex items-center justify-center gap-2"
           >
-            Explore Pools
+            <span className="iconify ph--compass-bold w-5 h-5" />
+            <span>Explore Tokens</span>
           </Link>
           <button
             onClick={() => {
               window.location.reload();
             }}
-            className="cursor-pointer bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 rounded-xl font-medium hover:opacity-90 transition"
+            className="cursor-pointer bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-8 py-4 rounded-xl font-semibold transition shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2"
           >
-            Create Another Pool
+            <span className="iconify ph--plus-bold w-5 h-5" />
+            <span>Launch Another Token</span>
           </button>
         </div>
       </div>

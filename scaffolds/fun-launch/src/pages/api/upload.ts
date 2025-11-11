@@ -69,15 +69,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Validate token name and symbol
+    if (tokenName.length < 3) {
+      return res.status(400).json({ error: 'Token name must be at least 3 characters' });
+    }
+
+    if (tokenSymbol.length > 10) {
+      return res.status(400).json({ error: 'Token symbol must be 10 characters or less' });
+    }
+
     // Upload image and metadata
     const imageUrl = await uploadImage(tokenLogo, mint);
     if (!imageUrl) {
-      return res.status(400).json({ error: 'Failed to upload image' });
+      return res.status(400).json({ error: 'Failed to upload image. Please check the file format and size.' });
     }
 
     const metadataUrl = await uploadMetadata({ tokenName, tokenSymbol, mint, image: imageUrl });
     if (!metadataUrl) {
-      return res.status(400).json({ error: 'Failed to upload metadata' });
+      return res.status(400).json({ error: 'Failed to upload metadata. Please try again.' });
     }
 
     // Create pool transaction
@@ -98,32 +107,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .toString('base64'),
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+
+    // Provide specific error messages
+    let errorMessage = 'An unexpected error occurred';
+
+    if (error.message?.includes('Invalid public key')) {
+      errorMessage = 'Invalid wallet address';
+    } else if (error.message?.includes('not found')) {
+      errorMessage = 'Pool configuration not found. Please contact support.';
+    } else if (error.message?.includes('connection')) {
+      errorMessage = 'Failed to connect to Solana network. Please try again.';
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
+    res.status(500).json({ error: errorMessage });
   }
 }
 
 async function uploadImage(tokenLogo: string, mint: string): Promise<string | false> {
   const matches = tokenLogo.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
   if (!matches || matches.length !== 3) {
+    console.error('Invalid image format');
     return false;
   }
 
   const [, contentType, base64Data] = matches;
 
   if (!contentType || !base64Data) {
+    console.error('Missing content type or base64 data');
+    return false;
+  }
+
+  // Validate file type
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+  if (!allowedTypes.includes(contentType)) {
+    console.error('Unsupported file type:', contentType);
     return false;
   }
 
   const fileBuffer = Buffer.from(base64Data, 'base64');
+
+  // Check file size (max 2MB)
+  const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+  if (fileBuffer.length > maxSize) {
+    console.error('File size exceeds 2MB limit');
+    return false;
+  }
+
   const fileName = `images/${mint}.${contentType.split('/')[1]}`;
 
   try {
     await uploadToR2(fileBuffer, contentType, fileName);
     return `${PUBLIC_R2_URL}/${fileName}`;
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Error uploading image to R2:', error);
     return false;
   }
 }

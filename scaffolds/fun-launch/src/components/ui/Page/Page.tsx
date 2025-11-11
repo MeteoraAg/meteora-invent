@@ -14,14 +14,20 @@ const Page: React.FC<React.PropsWithChildren<IProps>> = ({
   return (
     <div
       className={cn(
-        'flex min-h-screen flex-col justify-between bg-black text-white',
+        'flex min-h-screen flex-col justify-between bg-black text-white relative',
         pageClassName
       )}
     >
+      {/* Gradient orbs background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      </div>
+
       <Header />
       <div
         className={cn(
-          'flex flex-1 flex-col items-center px-1 md:px-3 pt-4 pb-16',
+          'flex flex-1 flex-col items-center px-1 md:px-3 pt-6 pb-16 relative z-10',
           containerClassName
         )}
       >

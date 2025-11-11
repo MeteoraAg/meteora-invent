@@ -6,8 +6,11 @@ export default function Document() {
     <Html lang="en">
       <Head>
         <Script src="https://terminal.jup.ag/main-v4.js" />
+        <meta name="title" content="TrenchFun - Fair Launch Platform" />
+        <meta name="description" content="Launch and trade Solana tokens with fair bonding curves. No presales, no team allocation." />
+        <link rel="icon" href="/favicon.ico" />
       </Head>
-      <body className="antialiased">
+      <body className="antialiased bg-black">
         <Main />
         <NextScript />
       </body>
