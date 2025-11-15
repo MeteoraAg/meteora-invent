@@ -722,6 +722,7 @@ studio/
 │   │   ├── damm_v1/              # DAMM V1 actions
 │   │   ├── damm_v2/              # DAMM V2 actions
 │   │   ├── dlmm/                 # DLMM actions
+│   │   ├── presale_vault/        # Presale Vault actions
 │   │   ├── alpha_vault/          # Alpha vault actions
 │   │   └── settings/             # Utility actions
 │   ├── lib/                      # Protocol libraries

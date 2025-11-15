@@ -389,6 +389,19 @@ pnpm studio alpha-vault-create --baseMint <YOUR_BASE_MINT_ADDRESS>
 
 ---
 
+#### Presale Vault Actions
+
+##### Create a Presale Vault
+
+Configure `presaleVault` in `presale_vault_config.jsonc` file and run the following command to
+create the presale vault for a specific base token.
+
+```bash
+pnpm studio presale-vault-create --baseMint <YOUR_BASE_MINT_ADDRESS>
+```
+
+---
+
 ### Scaffolds
 
 ---
@@ -477,6 +490,8 @@ meteora-invent/
     │   │   │   ├── seed_liquidity_lfg.ts
     │   │   │   ├── seed_liquidity_single_bin.ts
     │   │   │   └── set_pool_status.ts
+    │   │   ├── presale_vault
+    │   │   │   └── create_presale_vault.ts
     │   │   └── settings
     │   │       ├── airdrop_sol.ts
     │   │       └── generate_keypair.ts

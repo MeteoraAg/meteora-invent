@@ -252,6 +252,12 @@ early access for genuine supporters to deposit and purchase tokens before the po
 thereby getting tokens at the earliest price and helping to safeguard the token launch against
 sniper bots.
 
+### Presale Vault
+
+Presale Vault is a permissionless presale vault that allows anyone to create and participate in a
+presale for a specific base token. It supports various presale types, including FCFS, Prorata, Fixed
+Price with either a Permissioned or Permissionless setup.
+
 ## 🤝 Contributing
 
 For contributing guidelines, please refer to the main [CONTRIBUTING.md](../CONTRIBUTING.md) file in
