@@ -2,7 +2,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { Wallet } from '@coral-xyz/anchor';
 import { getPresaleConfig, parseCliArguments, safeParseKeypairFromFile } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
-import { createPresaleVault } from '../../lib/presale';
+import { createPresaleVault } from '../../lib/presale_vault';
 
 async function main() {
   const config = await getPresaleConfig();

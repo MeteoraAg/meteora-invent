@@ -60,9 +60,10 @@
   "dammV2Config": {
     "creator": "YOUR_CREATOR_ADDRESS", // creator address
     "baseAmount": 100000000, // base token amount
-    "quoteAmount": null, // quote token amount
-    "initPrice": 0.001, // initial price (in terms of quote/base   price) 1 SOL / 1000000000 = initialPrice
-    "maxPrice": null, // max price (in terms of quote/base price)
+    "quoteAmount": 1, // quote token amount
+    "initPrice": 0.0001, // initial price (in terms of quote/base   price) 1 SOL / 1000000000 = initialPrice
+    "minPrice": null, // min price (in terms of quote/base price) - NOTE: null would use the MIN_SQRT_PRICE for the DAMM v2 balanced pool
+    "maxPrice": null, // max price (in terms of quote/base price) - NOTE: null would use the MAX_SQRT_PRICE for the DAMM v2 balanced pool
     "poolFees": {
       "maxBaseFeeBps": 120, // max base fee (in basis points)
       "minBaseFeeBps": 120, // min base fee (in basis points)

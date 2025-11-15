@@ -139,6 +139,7 @@ meteora-invent/
 │   │   │   ├── damm_v2/              # DAMM V2 actions
 │   │   │   ├── dbc/                  # DBC actions
 │   │   │   ├── dlmm/                 # DLMM actions
+│   │   │   ├── presale_vault/        # Presale Vault actions
 │   │   │   └── settings/             # Utility actions (generate keypair, airdrop SOL on devnet/localnet)
 │   │   ├── lib/                      # Protocol-specific libraries
 │   │   ├── helpers/                  # Utility functions

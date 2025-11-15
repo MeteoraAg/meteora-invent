@@ -311,6 +311,8 @@ export async function createDammV2BalancedPool(
     baseAmount,
     quoteAmount,
     initPrice,
+    minPrice,
+    maxPrice,
     poolFees,
     hasAlphaVault,
     activationPoint,
@@ -356,8 +358,12 @@ export async function createDammV2BalancedPool(
 
   const initSqrtPrice = getSqrtPriceFromPrice(initPrice.toString(), baseDecimals, quoteDecimals);
 
-  const minSqrtPrice = MIN_SQRT_PRICE;
-  const maxSqrtPrice = MAX_SQRT_PRICE;
+  const minSqrtPrice = minPrice
+    ? getSqrtPriceFromPrice(minPrice.toString(), baseDecimals, quoteDecimals)
+    : MIN_SQRT_PRICE;
+  const maxSqrtPrice = maxPrice
+    ? getSqrtPriceFromPrice(maxPrice.toString(), baseDecimals, quoteDecimals)
+    : MAX_SQRT_PRICE;
 
   const liquidityDelta = cpAmmInstance.getLiquidityDelta({
     maxAmountTokenA: tokenAAmount,
@@ -376,6 +382,10 @@ export async function createDammV2BalancedPool(
   );
 
   console.log(`- Init price ${getPriceFromSqrtPrice(initSqrtPrice, baseDecimals, quoteDecimals)}`);
+
+  console.log(`- Min price ${getPriceFromSqrtPrice(minSqrtPrice, baseDecimals, quoteDecimals)}`);
+
+  console.log(`- Max price ${getPriceFromSqrtPrice(maxSqrtPrice, baseDecimals, quoteDecimals)}`);
 
   console.log(
     `- Price range [${getPriceFromSqrtPrice(minSqrtPrice, baseDecimals, quoteDecimals)}, ${getPriceFromSqrtPrice(maxSqrtPrice, baseDecimals, quoteDecimals)}]`
