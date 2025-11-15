@@ -131,6 +131,7 @@ export interface DynamicAmmV2Config {
   baseAmount: number | string;
   quoteAmount: number | string | null;
   initPrice: number | string;
+  minPrice: number | string | null;
   maxPrice: number | string | null;
   poolFees: {
     maxBaseFeeBps: number;
