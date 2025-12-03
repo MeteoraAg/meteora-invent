@@ -57,21 +57,31 @@
    * 1. damm-v2-create-balanced-pool
    * 2. damm-v2-create-one-sided-pool
    */
-  "dammV2Config": {
+   "dammV2Config": {
     "creator": "YOUR_CREATOR_ADDRESS", // creator address
     "baseAmount": 100000000, // base token amount
-    "quoteAmount": 1, // quote token amount
+    "quoteAmount": null, // quote token amount
     "initPrice": 0.0001, // initial price (in terms of quote/base   price) 1 SOL / 1000000000 = initialPrice
     "minPrice": null, // min price (in terms of quote/base price) - NOTE: null would use the MIN_SQRT_PRICE for the DAMM v2 balanced pool
     "maxPrice": null, // max price (in terms of quote/base price) - NOTE: null would use the MAX_SQRT_PRICE for the DAMM v2 balanced pool
-    "poolFees": {
-      "maxBaseFeeBps": 120, // max base fee (in basis points)
-      "minBaseFeeBps": 120, // min base fee (in basis points)
-      "numberOfPeriod": 0, // number of period
-      "totalDuration": 0, // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
-      "feeSchedulerMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential
-      "useDynamicFee": true // if useDynamicFee is true, the default dynamic fee configuration will be 20% of minBaseFeeBps
-
+      "poolFees": {
+        "baseFee": {
+          "baseFeeMode": 2, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
+          // "feeSchedulerParam": {
+          //   "startingFeeBps": 120, // starting base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
+          //   "endingFeeBps": 120, // ending base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
+          //   "numberOfPeriod": 0, // number of periods
+          //   "totalDuration": 0 // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
+          // }
+          "rateLimiterParam": {
+            "baseFeeBps": 120, // base fee (max 50% base fee === 5000 bps)
+            "feeIncrementBps": 100, // fee increment (max fee increment = 5000 bps - baseFeeBps)
+            "referenceAmount": 1, // reference amount (not in lamports)
+            "maxLimiterDuration": 3600, // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
+            "maxFeeBps": 5000 // max 50% base fee can go to === 5000 bps
+          }
+        },
+      "dynamicFeeEnabled": true // if dynamicFeeEnabled is true and dynamicFeeConfig is null, the default dynamic fee configuration will be 20% of the base fee
       /* Optional Configuration.
        * Only used if you want to configure dynamic fee and not use the default dynamic fee configuration
        * Formula: dynamicFee = (variableFeeControl * (volatilityAccumulator * binStep)^2 + 99_999_999_999) / 100_000_000_000

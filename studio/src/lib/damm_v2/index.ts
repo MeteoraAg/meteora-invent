@@ -11,7 +11,7 @@ import {
   getPriceFromSqrtPrice,
   getSqrtPriceFromPrice,
   getTokenProgram,
-  getUnClaimReward,
+  getUnClaimLpFee,
   MAX_SQRT_PRICE,
   MIN_SQRT_PRICE,
   PoolFeesParams,
@@ -96,14 +96,7 @@ export async function createDammV2OneSidedPool(
     collectFeeMode,
   } = config.dammV2Config;
 
-  const {
-    maxBaseFeeBps,
-    minBaseFeeBps,
-    feeSchedulerMode,
-    totalDuration,
-    numberOfPeriod,
-    useDynamicFee,
-  } = poolFees;
+  const { baseFee, dynamicFeeEnabled, dynamicFeeConfig } = poolFees;
 
   let tokenAAmount = getAmountInLamports(baseAmount, baseDecimals);
   let tokenBAmount = new BN(0);
@@ -146,8 +139,7 @@ export async function createDammV2OneSidedPool(
   );
 
   let dynamicFee = null;
-  if (useDynamicFee) {
-    const dynamicFeeConfig = config.dammV2Config.poolFees.dynamicFeeConfig;
+  if (dynamicFeeEnabled) {
     if (dynamicFeeConfig) {
       dynamicFee = {
         binStep: BIN_STEP_BPS_DEFAULT,
@@ -159,20 +151,18 @@ export async function createDammV2OneSidedPool(
         maxVolatilityAccumulator: dynamicFeeConfig.maxVolatilityAccumulator,
       };
     } else {
-      dynamicFee = getDynamicFeeParams(config.dammV2Config.poolFees.minBaseFeeBps);
+      const flatFeeBps =
+        baseFee.baseFeeMode === 2
+          ? baseFee.rateLimiterParam.baseFeeBps
+          : baseFee.feeSchedulerParam.startingFeeBps;
+      dynamicFee = getDynamicFeeParams(flatFeeBps);
     }
   }
 
-  const baseFee: BaseFee = getBaseFeeParams(
-    maxBaseFeeBps,
-    minBaseFeeBps,
-    feeSchedulerMode,
-    numberOfPeriod,
-    totalDuration
-  );
+  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee, quoteDecimals, activationType);
 
   const poolFeesParams: PoolFeesParams = {
-    baseFee,
+    baseFee: baseFeeParams,
     padding: [],
     dynamicFee,
   };
@@ -320,14 +310,7 @@ export async function createDammV2BalancedPool(
     collectFeeMode,
   } = config.dammV2Config;
 
-  const {
-    maxBaseFeeBps,
-    minBaseFeeBps,
-    numberOfPeriod,
-    totalDuration,
-    feeSchedulerMode,
-    useDynamicFee,
-  } = poolFees;
+  const { baseFee, dynamicFeeEnabled, dynamicFeeConfig } = poolFees;
 
   if (!quoteAmount) {
     throw new Error('Quote amount is required for balanced pool');
@@ -392,8 +375,7 @@ export async function createDammV2BalancedPool(
   );
 
   let dynamicFee = null;
-  if (useDynamicFee) {
-    const dynamicFeeConfig = config.dammV2Config.poolFees.dynamicFeeConfig;
+  if (dynamicFeeEnabled) {
     if (dynamicFeeConfig) {
       dynamicFee = {
         binStep: BIN_STEP_BPS_DEFAULT,
@@ -405,20 +387,18 @@ export async function createDammV2BalancedPool(
         maxVolatilityAccumulator: dynamicFeeConfig.maxVolatilityAccumulator,
       };
     } else {
-      dynamicFee = getDynamicFeeParams(config.dammV2Config.poolFees.minBaseFeeBps);
+      const flatFeeBps =
+        baseFee.baseFeeMode === 2
+          ? baseFee.rateLimiterParam.baseFeeBps
+          : baseFee.feeSchedulerParam.startingFeeBps;
+      dynamicFee = getDynamicFeeParams(flatFeeBps);
     }
   }
 
-  const baseFee: BaseFee = getBaseFeeParams(
-    maxBaseFeeBps,
-    minBaseFeeBps,
-    feeSchedulerMode,
-    numberOfPeriod,
-    totalDuration
-  );
+  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee, quoteDecimals, activationType);
 
   const poolFeesParams: PoolFeesParams = {
-    baseFee,
+    baseFee: baseFeeParams,
     padding: [],
     dynamicFee,
   };
@@ -518,13 +498,13 @@ export async function splitPosition(
   const positionDataArray = [];
   for (const userPosition of userPositions) {
     const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const unclaimReward = getUnClaimReward(poolState, positionState);
+    const unclaimedLpFee = getUnClaimLpFee(poolState, positionState);
     positionDataArray.push({
       userPosition,
       positionState,
-      unclaimReward,
-      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimReward.feeTokenA),
-      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimReward.feeTokenB),
+      unclaimedLpFee,
+      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimedLpFee.feeTokenA),
+      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimedLpFee.feeTokenB),
     });
   }
 
@@ -545,7 +525,7 @@ export async function splitPosition(
 
     const positionOptions = await Promise.all(
       positionDataArray.map(async (data, index) => {
-        const { unclaimReward, totalPositionFeeA, totalPositionFeeB, positionState } = data;
+        const { unclaimedLpFee, totalPositionFeeA, totalPositionFeeB, positionState } = data;
         const positionAddress = data.userPosition.position.toString().slice(0, 8) + '...';
 
         // Calculate token amounts from liquidity using withdraw quote
@@ -563,8 +543,8 @@ export async function splitPosition(
           `  - Token B Amount: ${getAmountInTokens(withdrawQuote.outAmountB, tokenBMint.decimals)}`,
           `  - Vested Liquidity: ${positionState.vestedLiquidity.toString()}`,
           `  - Permanent Locked Liquidity: ${positionState.permanentLockedLiquidity.toString()}`,
-          `  - Unclaimed Fee A: ${getAmountInTokens(unclaimReward.feeTokenA, tokenAMint.decimals)}`,
-          `  - Unclaimed Fee B: ${getAmountInTokens(unclaimReward.feeTokenB, tokenBMint.decimals)}`,
+          `  - Unclaimed Fee A: ${getAmountInTokens(unclaimedLpFee.feeTokenA, tokenAMint.decimals)}`,
+          `  - Unclaimed Fee B: ${getAmountInTokens(unclaimedLpFee.feeTokenB, tokenBMint.decimals)}`,
           `  - Total Position Fee A: ${getAmountInTokens(totalPositionFeeA, tokenAMint.decimals)}`,
           `  - Total Position Fee B: ${getAmountInTokens(totalPositionFeeB, tokenBMint.decimals)}`,
         ].join('\n');
@@ -584,16 +564,16 @@ export async function splitPosition(
     throw new Error('No position selected');
   }
 
-  const { userPosition, positionState, unclaimReward, totalPositionFeeA, totalPositionFeeB } =
+  const { userPosition, positionState, unclaimedLpFee, totalPositionFeeA, totalPositionFeeB } =
     selectedPositionData;
 
   console.log('\n> Position Fee Information:');
   console.log(`- Position Address: ${userPosition.position.toString()}`);
   console.log(`- Total Claimed Fee A: ${positionState.metrics.totalClaimedAFee.toString()}`);
-  console.log(`- Unclaimed Fee A: ${unclaimReward.feeTokenA.toString()}`);
+  console.log(`- Unclaimed Fee A: ${unclaimedLpFee.feeTokenA.toString()}`);
   console.log(`- TOTAL POSITION FEE A: ${totalPositionFeeA.toString()}`);
   console.log(`- Total Claimed Fee B: ${positionState.metrics.totalClaimedBFee.toString()}`);
-  console.log(`- Unclaimed Fee B: ${unclaimReward.feeTokenB.toString()}`);
+  console.log(`- Unclaimed Fee B: ${unclaimedLpFee.feeTokenB.toString()}`);
   console.log(`- TOTAL POSITION FEE B: ${totalPositionFeeB.toString()}`);
 
   // CREATE THE SECOND POSITION FIRST
@@ -709,13 +689,13 @@ export async function claimPositionFee(
   const positionDataArray = [];
   for (const userPosition of userPositions) {
     const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const unclaimReward = getUnClaimReward(poolState, positionState);
+    const unclaimedLpFee = getUnClaimLpFee(poolState, positionState);
     positionDataArray.push({
       userPosition,
       positionState,
-      unclaimReward,
-      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimReward.feeTokenA),
-      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimReward.feeTokenB),
+      unclaimedLpFee,
+      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimedLpFee.feeTokenA),
+      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimedLpFee.feeTokenB),
     });
   }
 
@@ -735,13 +715,13 @@ export async function claimPositionFee(
     const tokenBMint = unpackMint(poolState.tokenBMint, tokenBMintInfo, tokenBMintInfo.owner);
 
     const positionOptions = positionDataArray.map((data, index) => {
-      const { unclaimReward, totalPositionFeeA, totalPositionFeeB } = data;
+      const { unclaimedLpFee, totalPositionFeeA, totalPositionFeeB } = data;
       const positionAddress = data.userPosition.position.toString().slice(0, 8) + '...';
 
       return [
         `Position ${index + 1} (${positionAddress})`,
-        `  - Unclaimed Fee A: ${getAmountInTokens(unclaimReward.feeTokenA, tokenAMint.decimals)}`,
-        `  - Unclaimed Fee B: ${getAmountInTokens(unclaimReward.feeTokenB, tokenBMint.decimals)}`,
+        `  - Unclaimed Fee A: ${getAmountInTokens(unclaimedLpFee.feeTokenA, tokenAMint.decimals)}`,
+        `  - Unclaimed Fee B: ${getAmountInTokens(unclaimedLpFee.feeTokenB, tokenBMint.decimals)}`,
         `  - Total Position Fee A: ${getAmountInTokens(totalPositionFeeA, tokenAMint.decimals)}`,
         `  - Total Position Fee B: ${getAmountInTokens(totalPositionFeeB, tokenBMint.decimals)}`,
       ].join('\n');
@@ -759,16 +739,16 @@ export async function claimPositionFee(
   if (!selectedPositionData) {
     throw new Error('No position selected');
   }
-  const { userPosition, positionState, unclaimReward, totalPositionFeeA, totalPositionFeeB } =
+  const { userPosition, positionState, unclaimedLpFee, totalPositionFeeA, totalPositionFeeB } =
     selectedPositionData;
 
   console.log('\n> Position Fee Information:');
   console.log(`- Position Address: ${userPosition.position.toString()}`);
   console.log(`- Total Claimed Fee A: ${positionState.metrics.totalClaimedAFee.toString()}`);
-  console.log(`- Unclaimed Fee A: ${unclaimReward.feeTokenA.toString()}`);
+  console.log(`- Unclaimed Fee A: ${unclaimedLpFee.feeTokenA.toString()}`);
   console.log(`- TOTAL POSITION FEE A: ${totalPositionFeeA.toString()}`);
   console.log(`- Total Claimed Fee B: ${positionState.metrics.totalClaimedBFee.toString()}`);
-  console.log(`- Unclaimed Fee B: ${unclaimReward.feeTokenB.toString()}`);
+  console.log(`- Unclaimed Fee B: ${unclaimedLpFee.feeTokenB.toString()}`);
   console.log(`- TOTAL POSITION FEE B: ${totalPositionFeeB.toString()}`);
 
   const claimPositionFeeTx = await cpAmmInstance.claimPositionFee({
@@ -854,11 +834,11 @@ export async function addLiquidity(
   const positionDataArray = [];
   for (const userPosition of userPositions) {
     const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const unclaimReward = getUnClaimReward(poolState, positionState);
+    const unclaimedLpFee = getUnClaimLpFee(poolState, positionState);
     positionDataArray.push({
       userPosition,
       positionState,
-      unclaimReward,
+      unclaimedLpFee,
     });
   }
 
@@ -877,8 +857,8 @@ export async function addLiquidity(
         `  - Unlocked Liquidity: ${positionState.unlockedLiquidity.toString()}`,
         `  - Vested Liquidity: ${positionState.vestedLiquidity.toString()}`,
         `  - Permanent Locked Liquidity: ${positionState.permanentLockedLiquidity.toString()}`,
-        `  - Unclaimed Fee A: ${data.unclaimReward.feeTokenA.toString()}`,
-        `  - Unclaimed Fee B: ${data.unclaimReward.feeTokenB.toString()}`,
+        `  - Unclaimed Fee A: ${data.unclaimedLpFee.feeTokenA.toString()}`,
+        `  - Unclaimed Fee B: ${data.unclaimedLpFee.feeTokenB.toString()}`,
       ].join('\n');
     });
 
@@ -1043,13 +1023,13 @@ export async function removeLiquidity(
   const positionDataArray = [];
   for (const userPosition of userPositions) {
     const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const unclaimReward = getUnClaimReward(poolState, positionState);
+    const unclaimedLpFee = getUnClaimLpFee(poolState, positionState);
     positionDataArray.push({
       userPosition,
       positionState,
-      unclaimReward,
-      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimReward.feeTokenA),
-      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimReward.feeTokenB),
+      unclaimedLpFee,
+      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimedLpFee.feeTokenA),
+      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimedLpFee.feeTokenB),
     });
   }
 
@@ -1103,16 +1083,16 @@ export async function removeLiquidity(
   if (!selectedPositionData) {
     throw new Error('No position selected');
   }
-  const { userPosition, positionState, unclaimReward, totalPositionFeeA, totalPositionFeeB } =
+  const { userPosition, positionState, unclaimedLpFee, totalPositionFeeA, totalPositionFeeB } =
     selectedPositionData;
 
   console.log('\n> Position Fee Information:');
   console.log(`- Position Address: ${userPosition.position.toString()}`);
   console.log(`- Total Claimed Fee A: ${positionState.metrics.totalClaimedAFee.toString()}`);
-  console.log(`- Unclaimed Fee A: ${unclaimReward.feeTokenA.toString()}`);
+  console.log(`- Unclaimed Fee A: ${unclaimedLpFee.feeTokenA.toString()}`);
   console.log(`- TOTAL POSITION FEE A: ${totalPositionFeeA.toString()}`);
   console.log(`- Total Claimed Fee B: ${positionState.metrics.totalClaimedBFee.toString()}`);
-  console.log(`- Unclaimed Fee B: ${unclaimReward.feeTokenB.toString()}`);
+  console.log(`- Unclaimed Fee B: ${unclaimedLpFee.feeTokenB.toString()}`);
   console.log(`- TOTAL POSITION FEE B: ${totalPositionFeeB.toString()}`);
 
   const tokenAMintInfo = await connection.getAccountInfo(poolState.tokenAMint);
@@ -1224,7 +1204,7 @@ export async function removeLiquidity(
 
   // sanity check if position can be closed (all liquidity removed and fees claimed)
   const updatedPositionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-  const updatedUnclaimReward = getUnClaimReward(poolState, updatedPositionState);
+  const updatedUnclaimedLpFee = getUnClaimLpFee(poolState, updatedPositionState);
 
   console.log(`\n> Updated position state after liquidity removal:`);
   console.log(`- Unlocked liquidity: ${updatedPositionState.unlockedLiquidity.toString()}`);
@@ -1239,7 +1219,7 @@ export async function removeLiquidity(
     !updatedPositionState.permanentLockedLiquidity.isZero();
 
   const hasUnclaimedFees =
-    !updatedUnclaimReward.feeTokenA.isZero() || !updatedUnclaimReward.feeTokenB.isZero();
+    !updatedUnclaimedLpFee.feeTokenA.isZero() || !updatedUnclaimedLpFee.feeTokenB.isZero();
 
   console.log(`\n> Position status check:`);
   console.log(`- Has remaining liquidity: ${hasRemainingLiquidity}`);
@@ -1259,8 +1239,8 @@ export async function removeLiquidity(
   // claim any remaining fees before closing position
   if (hasUnclaimedFees) {
     console.log(`\n> Found unclaimed fees, claiming before closing position:`);
-    console.log(`- Unclaimed Fee A: ${updatedUnclaimReward.feeTokenA.toString()}`);
-    console.log(`- Unclaimed Fee B: ${updatedUnclaimReward.feeTokenB.toString()}`);
+    console.log(`- Unclaimed Fee A: ${updatedUnclaimedLpFee.feeTokenA.toString()}`);
+    console.log(`- Unclaimed Fee B: ${updatedUnclaimedLpFee.feeTokenB.toString()}`);
 
     const claimPositionFeeTx = await cpAmmInstance.claimPositionFee({
       owner: wallet.publicKey,
@@ -1307,7 +1287,7 @@ export async function removeLiquidity(
 
     // verify final position state after fee claiming
     const finalPositionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const finalUnclaimReward = getUnClaimReward(poolState, finalPositionState);
+    const finalUnclaimedLpFee = getUnClaimLpFee(poolState, finalPositionState);
 
     console.log(`\n> Final position state after fee claiming:`);
     console.log(`- Unlocked liquidity: ${finalPositionState.unlockedLiquidity.toString()}`);
@@ -1315,8 +1295,8 @@ export async function removeLiquidity(
     console.log(
       `- Permanent locked liquidity: ${finalPositionState.permanentLockedLiquidity.toString()}`
     );
-    console.log(`- Unclaimed Fee A: ${finalUnclaimReward.feeTokenA.toString()}`);
-    console.log(`- Unclaimed Fee B: ${finalUnclaimReward.feeTokenB.toString()}`);
+    console.log(`- Unclaimed Fee A: ${finalUnclaimedLpFee.feeTokenA.toString()}`);
+    console.log(`- Unclaimed Fee B: ${finalUnclaimedLpFee.feeTokenB.toString()}`);
   }
 
   console.log(`\n> All liquidity removed and fees claimed. Closing position...`);
@@ -1391,13 +1371,13 @@ export async function closePosition(
   const positionDataArray = [];
   for (const userPosition of userPositions) {
     const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-    const unclaimReward = getUnClaimReward(poolState, positionState);
+    const unclaimedLpFee = getUnClaimLpFee(poolState, positionState);
     positionDataArray.push({
       userPosition,
       positionState,
-      unclaimReward,
-      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimReward.feeTokenA),
-      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimReward.feeTokenB),
+      unclaimedLpFee,
+      totalPositionFeeA: positionState.metrics.totalClaimedAFee.add(unclaimedLpFee.feeTokenA),
+      totalPositionFeeB: positionState.metrics.totalClaimedBFee.add(unclaimedLpFee.feeTokenB),
     });
   }
 
@@ -1416,8 +1396,8 @@ export async function closePosition(
         `  - Unlocked Liquidity: ${positionState.unlockedLiquidity.toString()}`,
         `  - Vested Liquidity: ${positionState.vestedLiquidity.toString()}`,
         `  - Permanent Locked Liquidity: ${positionState.permanentLockedLiquidity.toString()}`,
-        `  - Unclaimed Fee A: ${data.unclaimReward.feeTokenA.toString()}`,
-        `  - Unclaimed Fee B: ${data.unclaimReward.feeTokenB.toString()}`,
+        `  - Unclaimed Fee A: ${data.unclaimedLpFee.feeTokenA.toString()}`,
+        `  - Unclaimed Fee B: ${data.unclaimedLpFee.feeTokenB.toString()}`,
       ].join('\n');
     });
 
@@ -1436,7 +1416,7 @@ export async function closePosition(
   const { userPosition } = selectedPositionData;
 
   const currentPositionState = await cpAmmInstance.fetchPositionState(userPosition.position);
-  const currentUnclaimReward = getUnClaimReward(poolState, currentPositionState);
+  const currentUnclaimedLpFee = getUnClaimLpFee(poolState, currentPositionState);
 
   console.log(`\n> Current position state:`);
   console.log(`- Unlocked liquidity: ${currentPositionState.unlockedLiquidity.toString()}`);
@@ -1444,8 +1424,8 @@ export async function closePosition(
   console.log(
     `- Permanent locked liquidity: ${currentPositionState.permanentLockedLiquidity.toString()}`
   );
-  console.log(`- Unclaimed Fee A: ${currentUnclaimReward.feeTokenA.toString()}`);
-  console.log(`- Unclaimed Fee B: ${currentUnclaimReward.feeTokenB.toString()}`);
+  console.log(`- Unclaimed Fee A: ${currentUnclaimedLpFee.feeTokenA.toString()}`);
+  console.log(`- Unclaimed Fee B: ${currentUnclaimedLpFee.feeTokenB.toString()}`);
 
   const hasRemainingLiquidity =
     !currentPositionState.unlockedLiquidity.isZero() ||
@@ -1453,7 +1433,7 @@ export async function closePosition(
     !currentPositionState.permanentLockedLiquidity.isZero();
 
   const hasUnclaimedFees =
-    !currentUnclaimReward.feeTokenA.isZero() || !currentUnclaimReward.feeTokenB.isZero();
+    !currentUnclaimedLpFee.feeTokenA.isZero() || !currentUnclaimedLpFee.feeTokenB.isZero();
 
   if (hasRemainingLiquidity) {
     console.log(`\n> Position still has liquidity remaining. Please remove liquidity first.`);
