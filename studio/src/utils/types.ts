@@ -134,12 +134,8 @@ export interface DynamicAmmV2Config {
   minPrice: number | string | null;
   maxPrice: number | string | null;
   poolFees: {
-    maxBaseFeeBps: number;
-    minBaseFeeBps: number;
-    numberOfPeriod: number;
-    totalDuration: number;
-    feeSchedulerMode: number;
-    useDynamicFee: boolean;
+    baseFee: DammV2BaseFee;
+    dynamicFeeEnabled: boolean;
     dynamicFeeConfig: DynamicFee | null;
   };
   collectFeeMode: number;
@@ -147,6 +143,16 @@ export interface DynamicAmmV2Config {
   activationPoint: number | null;
   hasAlphaVault: boolean;
 }
+
+export type DammV2BaseFee =
+  | {
+      baseFeeMode: 0 | 1;
+      feeSchedulerParam: FeeSchedulerParams;
+    }
+  | {
+      baseFeeMode: 2;
+      rateLimiterParam: RateLimiterParams & { maxFeeBps: number };
+    };
 
 export interface DynamicFee {
   filterPeriod: number;
@@ -234,7 +240,7 @@ export type DbcConfig = MeteoraConfigBase & {
   dbcTransferPoolCreator?: DbcTransferPoolCreator | null;
 };
 
-export type BaseFee =
+export type DbcBaseFee =
   | {
       baseFeeMode: 0 | 1;
       feeSchedulerParam: FeeSchedulerParams;
@@ -272,7 +278,7 @@ export type BuildCurveBase = {
   tokenBaseDecimal: number;
   tokenQuoteDecimal: number;
   lockedVestingParam: LockedVesting;
-  baseFeeParams: BaseFee;
+  baseFeeParams: DbcBaseFee;
   dynamicFeeEnabled: boolean;
   activationType: number;
   collectFeeMode: number;

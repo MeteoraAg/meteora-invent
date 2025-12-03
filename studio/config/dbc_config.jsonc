@@ -81,8 +81,8 @@
             "rateLimiterParam": {
                 "baseFeeBps": 200, // base fee (max 99% base fee === 9900 bps)
                 "feeIncrementBps": 200, // fee increment (max fee increment = 9900 bps - baseFeeBps)
-                "referenceAmount": 0, // reference amount (not in lamports)
-                "maxLimiterDuration": 0 // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
+                "referenceAmount": 1, // reference amount (not in lamports)
+                "maxLimiterDuration": 3600 // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
             }
             */
     },
