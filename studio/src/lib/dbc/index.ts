@@ -24,7 +24,6 @@ import {
   DAMM_V2_MIGRATION_FEE_ADDRESS,
   deriveBaseKeyForLocker,
   deriveDammV1MigrationMetadataAddress,
-  deriveDammV2MigrationMetadataAddress,
   deriveDbcPoolAuthority,
   deriveEscrow,
   DynamicBondingCurveClient,
@@ -836,25 +835,6 @@ export async function migrateDammV2(
   const poolAddress = poolState.publicKey;
 
   const transactions: Transaction[] = [];
-
-  // check if migration metadata exists
-  console.log('> Checking if migration metadata exists...');
-  const migrationMetadata = deriveDammV2MigrationMetadataAddress(poolAddress);
-  console.log('> Migration metadata address:', migrationMetadata.toString());
-
-  const metadataAccount = await connection.getAccountInfo(migrationMetadata);
-  if (!metadataAccount) {
-    console.log('Creating migration metadata...');
-    const createMetadataTx = await dbcInstance.migration.createDammV2MigrationMetadata({
-      payer: wallet.publicKey,
-      virtualPool: poolAddress,
-      config: dbcConfigAddress,
-    });
-    modifyComputeUnitPriceIx(createMetadataTx, config.computeUnitPriceMicroLamports ?? 0);
-    transactions.push(createMetadataTx);
-  } else {
-    console.log('Migration metadata already exists');
-  }
 
   // check if locked vesting exists
   if (poolConfig.lockedVestingConfig.amountPerPeriod.gt(new BN(0))) {
