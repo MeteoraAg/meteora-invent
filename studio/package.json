@@ -53,7 +53,7 @@
     "@metaplex-foundation/umi-uploader-irys": "^1.4.1",
     "@meteora-ag/alpha-vault": "^1.1.14",
     "@meteora-ag/cp-amm-sdk": "^1.2.6",
-    "@meteora-ag/dlmm": "1.9.2",
+    "@meteora-ag/dlmm": "^1.9.2",
     "@meteora-ag/dynamic-amm-sdk": "^1.4.1",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.4.9",
     "@meteora-ag/dynamic-fee-sharing-sdk": "^1.0.1",
