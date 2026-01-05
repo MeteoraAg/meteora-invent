@@ -5,7 +5,7 @@
   "description": "Meteora Invent - Monorepo for studio actions and scaffold templates",
   "author": "Dann Wee <dann@raccoons.dev>",
   "license": "ISC",
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.27.0",
   "engines": {
     "node": ">=18",
     "pnpm": ">=10"
