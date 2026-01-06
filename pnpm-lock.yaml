@@ -286,8 +286,8 @@ importers:
         specifier: ^1.2.6
         version: 1.2.6(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/dlmm':
-        specifier: 1.9.2
-        version: 1.9.2(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
+        specifier: ^1.9.3
+        version: 1.9.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/dynamic-amm-sdk':
         specifier: ^1.4.1
         version: 1.4.1(@solana/buffer-layout@4.0.1)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
@@ -1558,8 +1558,8 @@ packages:
   '@meteora-ag/dlmm@1.5.0':
     resolution: {integrity: sha512-d8DwhSrSSuIPfw6+9LLu2aXylKc7tS6FTnQzZcQYlGhrKIlABn97muasizBAcgMp80AR/bKEa6qtFCoQt4pqwA==}
 
-  '@meteora-ag/dlmm@1.9.2':
-    resolution: {integrity: sha512-GZgRBu9ZvzmQ4VZDMXJQE+Svn/Q4rHvY3+B6NIjaIiTtI2wevzPoPX2T1tDxGlXv0h1epcGVG1+zagYD6GoJpg==}
+  '@meteora-ag/dlmm@1.9.3':
+    resolution: {integrity: sha512-Dh8kGY0ls3VQmfAUiKUnJMtCA9KS6yDjzBvyB9T08lWKiP/yYEN2ymVdqvY9fgNrTZWyMb5rfA2GBq4CkaMRXA==}
 
   '@meteora-ag/dynamic-amm-sdk@1.4.1':
     resolution: {integrity: sha512-BBHcgC4MWcQi5KqkbXaoV8aCcS03d8JQiQ+4rIidSJPgDYzLqoylD9xjQOIMXGr8dM46qawPVoFPNXrm8ZciQA==}
@@ -11455,7 +11455,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@meteora-ag/dlmm@1.9.2(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
+  '@meteora-ag/dlmm@1.9.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': 0.31.0(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@coral-xyz/borsh': 0.31.0(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10))
@@ -11610,7 +11610,7 @@ snapshots:
     dependencies:
       '@coral-xyz/anchor': 0.31.1(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/cp-amm-sdk': 1.1.0(@types/node@24.5.2)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(jiti@2.4.2)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.9.2)(utf-8-validate@5.0.10)(yaml@2.8.1)
-      '@meteora-ag/dlmm': 1.9.2(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
+      '@meteora-ag/dlmm': 1.9.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/spl-token': 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
       bn.js: 5.2.2
