@@ -272,22 +272,30 @@ export type LockedVesting = {
   cliffDurationFromMigrationTime: number;
 };
 
+export type LiquidityVestingInfoParams = {
+  vestingPercentage: number;
+  bpsPerPeriod: number;
+  numberOfPeriods: number;
+  cliffDurationFromMigrationTime: number;
+  totalDuration: number;
+};
+
 export type BuildCurveBase = {
   totalTokenSupply: number;
   migrationOption: number;
   tokenBaseDecimal: number;
   tokenQuoteDecimal: number;
-  lockedVestingParam: LockedVesting;
+  lockedVestingParams: LockedVesting;
   baseFeeParams: DbcBaseFee;
   dynamicFeeEnabled: boolean;
   activationType: number;
   collectFeeMode: number;
   migrationFeeOption: number;
   tokenType: number;
-  partnerLpPercentage: number;
-  creatorLpPercentage: number;
-  partnerLockedLpPercentage: number;
-  creatorLockedLpPercentage: number;
+  partnerLiquidityPercentage: number;
+  creatorLiquidityPercentage: number;
+  partnerPermanentLockedLiquidityPercentage: number;
+  creatorPermanentLockedLiquidityPercentage: number;
   creatorTradingFeePercentage: number;
   leftover: number;
   tokenUpdateAuthority: number;
@@ -297,6 +305,9 @@ export type BuildCurveBase = {
   };
   leftoverReceiver: string;
   feeClaimer: string;
+  poolCreationFee?: number; // in SOL lamports
+  partnerLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
+  creatorLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
 };
 
 export type BuildCurve = BuildCurveBase & {

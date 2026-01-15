@@ -28,6 +28,7 @@ import {
   deriveEscrow,
   DynamicBondingCurveClient,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import BN from 'bn.js';
 import { uploadTokenMetadata } from '../../helpers/metadata';
 
@@ -75,6 +76,15 @@ export async function createDbcConfig(
   const configKeypair = Keypair.generate();
   console.log(`> Generated config keypair: ${configKeypair.publicKey.toString()}`);
 
+  // Convert poolCreationFee from SOL to lamports
+  const poolCreationFeeInLamports = config.dbcConfig.poolCreationFee
+    ? new BN(Math.floor(config.dbcConfig.poolCreationFee * LAMPORTS_PER_SOL))
+    : new BN(0);
+
+  if (config.dbcConfig.poolCreationFee && config.dbcConfig.poolCreationFee > 0) {
+    console.log(`> Pool creation fee: ${config.dbcConfig.poolCreationFee} SOL (${poolCreationFeeInLamports.toString()} lamports)`);
+  }
+
   const createConfigTx = await dbcInstance.partner.createConfig({
     config: configKeypair.publicKey,
     quoteMint,
@@ -82,6 +92,7 @@ export async function createDbcConfig(
     leftoverReceiver: new PublicKey(config.dbcConfig.leftoverReceiver),
     payer: wallet.publicKey,
     ...curveConfig,
+    poolCreationFee: poolCreationFeeInLamports,
   });
 
   modifyComputeUnitPriceIx(createConfigTx as any, config.computeUnitPriceMicroLamports ?? 0);
