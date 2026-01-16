@@ -82,7 +82,9 @@ export async function createDbcConfig(
     : new BN(0);
 
   if (config.dbcConfig.poolCreationFee && config.dbcConfig.poolCreationFee > 0) {
-    console.log(`> Pool creation fee: ${config.dbcConfig.poolCreationFee} SOL (${poolCreationFeeInLamports.toString()} lamports)`);
+    console.log(
+      `> Pool creation fee: ${config.dbcConfig.poolCreationFee} SOL (${poolCreationFeeInLamports.toString()} lamports)`
+    );
   }
 
   const createConfigTx = await dbcInstance.partner.createConfig({
@@ -619,8 +621,8 @@ export async function migrateDammV1(
   // if creator and partner are the same, combine the amounts and do a single claim
   const transactionLabels: string[] = [];
   if (isCreatorSameAsPartner) {
-    const totalClaimableLp = dammv1MigrationMetadata.creatorLp.add(
-      dammv1MigrationMetadata.partnerLp
+    const totalClaimableLp = dammv1MigrationMetadata.creatorLiquidity.add(
+      dammv1MigrationMetadata.partnerLiquidity
     );
     const hasClaimableLp = totalClaimableLp.gt(new BN(0));
     const bothNotClaimed =
@@ -646,7 +648,7 @@ export async function migrateDammV1(
   } else {
     if (
       dammv1MigrationMetadata.creatorClaimStatus === 0 &&
-      dammv1MigrationMetadata.creatorLp.gt(new BN(0))
+      dammv1MigrationMetadata.creatorLiquidity.gt(new BN(0))
     ) {
       console.log('> Claiming Creator DAMM V1 LP tokens...');
       const claimCreatorLpTx = await dbcInstance.migration.claimDammV1LpToken({
@@ -664,7 +666,7 @@ export async function migrateDammV1(
 
     if (
       dammv1MigrationMetadata.partnerClaimStatus === 0 &&
-      dammv1MigrationMetadata.partnerLp.gt(new BN(0))
+      dammv1MigrationMetadata.partnerLiquidity.gt(new BN(0))
     ) {
       console.log('> Claiming Partner DAMM V1 LP tokens...');
       const claimPartnerLpTx = await dbcInstance.migration.claimDammV1LpToken({
@@ -683,8 +685,8 @@ export async function migrateDammV1(
 
   // if creator and partner are the same, combine the amounts and do a single lock
   if (isCreatorSameAsPartner) {
-    const totalLockedLp = dammv1MigrationMetadata.creatorLockedLp.add(
-      dammv1MigrationMetadata.partnerLockedLp
+    const totalLockedLp = dammv1MigrationMetadata.creatorLockedLiquidity.add(
+      dammv1MigrationMetadata.partnerLockedLiquidity
     );
     const hasLockedLp = totalLockedLp.gt(new BN(0));
     const bothNotLocked =
@@ -710,7 +712,7 @@ export async function migrateDammV1(
   } else {
     if (
       dammv1MigrationMetadata.creatorLockedStatus === 0 &&
-      dammv1MigrationMetadata.creatorLockedLp.gt(new BN(0))
+      dammv1MigrationMetadata.creatorLockedLiquidity.gt(new BN(0))
     ) {
       console.log('> Locking Creator DAMM V1 LP tokens...');
       const lockCreatorLpTx = await dbcInstance.migration.lockDammV1LpToken({
@@ -728,7 +730,7 @@ export async function migrateDammV1(
 
     if (
       dammv1MigrationMetadata.partnerLockedStatus === 0 &&
-      dammv1MigrationMetadata.partnerLockedLp.gt(new BN(0))
+      dammv1MigrationMetadata.partnerLockedLiquidity.gt(new BN(0))
     ) {
       console.log('> Locking Partner DAMM V1 LP tokens...');
       const lockPartnerLpTx = await dbcInstance.migration.lockDammV1LpToken({

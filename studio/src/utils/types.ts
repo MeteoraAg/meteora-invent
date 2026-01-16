@@ -305,7 +305,7 @@ export type BuildCurveBase = {
   };
   leftoverReceiver: string;
   feeClaimer: string;
-  poolCreationFee?: number; // in SOL lamports
+  poolCreationFee: number; // in SOL lamports
   partnerLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
   creatorLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
 };
