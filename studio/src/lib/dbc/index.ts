@@ -1,6 +1,7 @@
 import {
   Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
   Transaction,
@@ -28,7 +29,6 @@ import {
   deriveEscrow,
   DynamicBondingCurveClient,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import BN from 'bn.js';
 import { uploadTokenMetadata } from '../../helpers/metadata';
 
