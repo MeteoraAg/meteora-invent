@@ -56,7 +56,7 @@
     "@meteora-ag/cp-amm-sdk": "^1.2.6",
     "@meteora-ag/dlmm": "^1.9.3",
     "@meteora-ag/dynamic-amm-sdk": "^1.4.1",
-    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.4.9",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.0",
     "@meteora-ag/dynamic-fee-sharing-sdk": "^1.0.1",
     "@meteora-ag/farming-sdk": "^1.0.18",
     "@meteora-ag/m3m3": "^1.0.10",

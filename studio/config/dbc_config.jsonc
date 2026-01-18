@@ -61,7 +61,7 @@
     "migrationOption": 1, // 0 - Migrate to DAMM v1 | 1 - Migrate to DAMM v2
     "tokenBaseDecimal": 6, // token base decimal
     "tokenQuoteDecimal": 9, // token quote decimal
-    "lockedVestingParam": {
+    "lockedVestingParams": {
       "totalLockedVestingAmount": 0, // total locked vesting amount (not in lamports)
       "numberOfVestingPeriod": 0, // number of vesting period
       "cliffUnlockAmount": 0, // cliff unlock amount (not in lamports)
@@ -91,10 +91,20 @@
     "collectFeeMode": 0, // 0 - Quote Token | 1 - Output Token
     "migrationFeeOption": 3, // 0 - LP Fee 0.25% | 1 - LP Fee 0.3% | 2 - LP Fee 1% | 3 - LP Fee 2% | 4 - LP Fee 4% | 5 - LP Fee 6%
     "tokenType": 0, // 0 - SPL | 1 - Token 2022
-    "partnerLpPercentage": 50, // Partner claimable LP (withdrawable LP once pool migrates)
-    "creatorLpPercentage": 50, // Creator claimable LP (withdrawable LP once pool migrates)
-    "partnerLockedLpPercentage": 0, // Partner locked LP (permanently locked LP once pool migrates)
-    "creatorLockedLpPercentage": 0, // Creator locked LP (permanently locked LP once pool migrates)
+    /* LP Distribution (must total 100%)
+     * IMPORTANT: At least 10% of LP must remain locked/vesting for at least 1 day post-migration.
+     *
+     * For DAMM v1: partnerPermanentLockedLiquidityPercentage + creatorPermanentLockedLiquidityPercentage >= 10%
+     *
+     * For DAMM v2: 3 options to achieve 10% locked/vesting:
+     *   Option 1 (Permanent Only): Set creator + partner permanent locked percentages >= 10% (LP locked forever)
+     *   Option 2 (Vesting Only): Use creator + partner vestingInfoParams with cliffDurationFromMigrationTime >= 86400 (1 day)
+     *   Option 3 (Combination): Mix permanent + vesting to reach 10% (5% permenant + 5% vesting >= 1 day)
+     */
+    "partnerLiquidityPercentage": 50, // Partner claimable LP (withdrawable LP once pool migrates)
+    "creatorLiquidityPercentage": 40, // Creator claimable LP (withdrawable LP once pool migrates)
+    "partnerPermanentLockedLiquidityPercentage": 5, // Partner locked LP (permanently locked LP once pool migrates) - counts toward 10% requirement
+    "creatorPermanentLockedLiquidityPercentage": 5, // Creator locked LP (permanently locked LP once pool migrates) - counts toward 10% requirement
     "creatorTradingFeePercentage": 50, // Bonding curve trading fee sharing (0% to 100%) - 0% means all trading fees go to the partner
     "leftover": 0, // leftover tokens in the bonding curve (claimable once pool migrates)
     "tokenUpdateAuthority": 1, // 0 - CreatorUpdateAuthority | 1 - Immutable | 2 - PartnerUpdateAuthority | 3 - CreatorUpdateAndMintAuthority | 4 - PartnerUpdateAndMintAuthority
@@ -108,6 +118,34 @@
     //   "dynamicFee": 0, // 0: Disabled, 1: Enabled
     //   "poolFeeBps": 0 // The pool fee in basis points. Minimum 10, Maximum 1000 bps.
     // },
+
+    /* Pool Creation Fee
+     * Fee charged to token creators when they create a pool using this config.
+     * Partner claims 90% via claimPartnerPoolCreationFee(), Meteora claims 10%.
+     * Set to 0 for no fee, or between 0.001 SOL and 100 SOL.
+     */
+    "poolCreationFee": 0, // Pool creation fee in SOL (e.g., 0.1 for 0.1 SOL)
+
+    /* LP Vesting (DAMM v2 only)
+     * Optional vesting schedule for partner/creator LP tokens after migration.
+     * Only applicable when migrationOption = 1 (DAMM v2).
+     * Note: At least 10% of LP must remain locked/vesting for at least 1 day post-migration.
+     */
+    // "partnerLiquidityVestingInfoParams": {
+    //   "vestingPercentage": 50,                // % of non-permanent LP to vest (0-100)
+    //   "bpsPerPeriod": 100,                    // BPS released per period (100 = 1%)
+    //   "numberOfPeriods": 100,                 // Total vesting periods
+    //   "cliffDurationFromMigrationTime": 86400, // Cliff delay in seconds (86400 = 1 day)
+    //   "totalDuration": 2592000                // Total vesting duration in seconds (30 days)
+    // },
+    // "creatorLiquidityVestingInfoParams": {
+    //   "vestingPercentage": 50,
+    //   "bpsPerPeriod": 100,
+    //   "numberOfPeriods": 100,
+    //   "cliffDurationFromMigrationTime": 86400,
+    //   "totalDuration": 2592000
+    // },
+
     "leftoverReceiver": "YOUR_LEFTOVER_RECEIVER_ADDRESS", // leftover receiver address
     "feeClaimer": "YOUR_FEE_CLAIMER_ADDRESS" // fee claimer address
   },
