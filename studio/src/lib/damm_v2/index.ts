@@ -795,6 +795,159 @@ export async function claimPositionFee(
 }
 
 /**
+ * Refresh vesting to unlock available liquidity
+ * @param config - The DAMM V2 config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet to use for the transaction
+ * @param poolAddress - The pool address
+ */
+export async function refreshVesting(
+  config: DammV2Config,
+  connection: Connection,
+  wallet: Wallet,
+  poolAddress: PublicKey
+) {
+  if (!poolAddress) {
+    throw new Error('Pool address is required');
+  }
+
+  console.log('\n> Refreshing vesting...');
+
+  const cpAmmInstance = new CpAmm(connection);
+
+  const userPositions = await cpAmmInstance.getUserPositionByPool(poolAddress, wallet.publicKey);
+
+  if (userPositions.length === 0) {
+    console.log('> No position found');
+    return;
+  }
+
+  console.log(`\n> Pool address: ${poolAddress.toString()}`);
+  console.log(`\n> Found ${userPositions.length} position(s) in this pool`);
+
+  const positionDataArray = [];
+  for (const userPosition of userPositions) {
+    const positionState = await cpAmmInstance.fetchPositionState(userPosition.position);
+    const vestings = await cpAmmInstance.getAllVestingsByPosition(userPosition.position);
+    positionDataArray.push({
+      userPosition,
+      positionState,
+      vestings,
+    });
+  }
+
+  let selectedPositionData;
+
+  if (userPositions.length === 1) {
+    selectedPositionData = positionDataArray[0];
+    console.log('> Only one position found, refreshing vesting for that position...');
+  } else {
+    const positionOptions = positionDataArray.map((data, index) => {
+      const { positionState, vestings } = data;
+      const positionAddress = data.userPosition.position.toString().slice(0, 8) + '...';
+
+      return [
+        `Position ${index + 1} (${positionAddress})`,
+        `  - Unlocked Liquidity: ${positionState.unlockedLiquidity.toString()}`,
+        `  - Vested Liquidity: ${positionState.vestedLiquidity.toString()}`,
+        `  - Permanent Locked Liquidity: ${positionState.permanentLockedLiquidity.toString()}`,
+        `  - Vesting Accounts: ${vestings.length}`,
+      ].join('\n');
+    });
+
+    const selectedIndex = await promptForSelection(
+      positionOptions,
+      'Which position would you like to refresh vesting for?'
+    );
+
+    selectedPositionData = positionDataArray[selectedIndex];
+    console.log(`\n> Selected position ${selectedIndex + 1} for refreshing vesting...`);
+  }
+
+  if (!selectedPositionData) {
+    throw new Error('No position selected');
+  }
+  const { userPosition, positionState, vestings } = selectedPositionData;
+
+  console.log('\n> Position Vesting Information:');
+  console.log(`- Position Address: ${userPosition.position.toString()}`);
+  console.log(`- Unlocked Liquidity: ${positionState.unlockedLiquidity.toString()}`);
+  console.log(`- Vested Liquidity: ${positionState.vestedLiquidity.toString()}`);
+  console.log(`- Permanent Locked Liquidity: ${positionState.permanentLockedLiquidity.toString()}`);
+  console.log(`- Number of Vesting Accounts: ${vestings.length}`);
+
+  if (vestings.length === 0) {
+    console.log('\n> No vesting accounts found for this position. Nothing to refresh.');
+    return;
+  }
+
+  console.log('\n> Vesting Accounts:');
+  for (const [i, vesting] of vestings.entries()) {
+    console.log(`  Vesting ${i + 1}:`);
+    console.log(`    - Address: ${vesting.publicKey.toString()}`);
+    console.log(`    - Cliff Unlock Liquidity: ${vesting.account.cliffUnlockLiquidity.toString()}`);
+    console.log(`    - Liquidity Per Period: ${vesting.account.liquidityPerPeriod.toString()}`);
+    console.log(`    - Cliff Point: ${vesting.account.cliffPoint.toString()}`);
+    console.log(`    - Number of Periods: ${vesting.account.numberOfPeriod.toString()}`);
+    console.log(
+      `    - Total Released Liquidity: ${vesting.account.totalReleasedLiquidity.toString()}`
+    );
+  }
+
+  const refreshVestingTx = await cpAmmInstance.refreshVesting({
+    owner: wallet.publicKey,
+    position: userPosition.position,
+    positionNftAccount: userPosition.positionNftAccount,
+    pool: poolAddress,
+    vestingAccounts: vestings.map((v) => v.publicKey),
+  });
+
+  modifyComputeUnitPriceIx(refreshVestingTx, config.computeUnitPriceMicroLamports ?? 0);
+
+  if (config.dryRun) {
+    console.log(`\n> Simulating refresh vesting transaction...`);
+    await runSimulateTransaction(connection, [wallet.payer], wallet.publicKey, [refreshVestingTx]);
+    console.log('> Refresh vesting simulation successful');
+  } else {
+    console.log(`\n>> Sending refresh vesting transaction...`);
+
+    const refreshVestingTxHash = await sendAndConfirmTransaction(
+      connection,
+      refreshVestingTx,
+      [wallet.payer],
+      {
+        commitment: connection.commitment,
+        maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
+      }
+    ).catch((err) => {
+      console.error(`Failed to refresh vesting:`, err);
+      throw err;
+    });
+
+    console.log(`>>> Vesting refreshed successfully with tx hash: ${refreshVestingTxHash}`);
+
+    const updatedPositionState = await cpAmmInstance.fetchPositionState(userPosition.position);
+    console.log('\n> Updated Position State:');
+    console.log(`- Unlocked Liquidity: ${updatedPositionState.unlockedLiquidity.toString()}`);
+    console.log(`- Vested Liquidity: ${updatedPositionState.vestedLiquidity.toString()}`);
+    console.log(
+      `- Permanent Locked Liquidity: ${updatedPositionState.permanentLockedLiquidity.toString()}`
+    );
+
+    const liquidityUnlocked = updatedPositionState.unlockedLiquidity.sub(
+      positionState.unlockedLiquidity
+    );
+    if (liquidityUnlocked.gtn(0)) {
+      console.log(`\n> Successfully unlocked ${liquidityUnlocked.toString()} liquidity units!`);
+    } else {
+      console.log(
+        '\n> No additional liquidity was unlocked. The vesting schedule may not have progressed yet.'
+      );
+    }
+  }
+}
+
+/**
  * Add liquidity to a position
  * @param config - The DAMM V2 config
  * @param connection - The connection to the network
