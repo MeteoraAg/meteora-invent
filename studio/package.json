@@ -21,6 +21,7 @@
     "damm-v2-claim-position-fee": "tsx src/actions/damm_v2/claim_position_fee.ts",
     "damm-v2-add-liquidity": "tsx src/actions/damm_v2/add_liquidity.ts",
     "damm-v2-remove-liquidity": "tsx src/actions/damm_v2/remove_liquidity.ts",
+    "damm-v2-refresh-vesting": "tsx src/actions/damm_v2/refresh_vesting.ts",
     "damm-v2-close-position": "tsx src/actions/damm_v2/close_position.ts",
     "damm-v1-create-pool": "tsx src/actions/damm_v1/create_pool.ts",
     "damm-v1-lock-liquidity": "tsx src/actions/damm_v1/lock_liquidity.ts",

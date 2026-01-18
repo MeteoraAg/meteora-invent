@@ -236,6 +236,15 @@ command to remove the liquidity and close the position.
 pnpm studio damm-v2-remove-liquidity --poolAddress <YOUR_POOL_ADDRESS>
 ```
 
+##### Refresh Vesting
+
+If you already have an existing position in a DAMM v2 pool with vested liquidity, you can run the
+following command to refresh the vesting of the position if the vesting of the LP has already ended.
+
+```bash
+pnpm studio damm-v2-refresh-vesting --poolAddress <YOUR_POOL_ADDRESS>
+```
+
 ##### Close Position
 
 If you already have an existing position in a DAMM v2 pool without liquidity, you can run the
@@ -475,6 +484,7 @@ meteora-invent/
     │   │   │   ├── close_position.ts
     │   │   │   ├── create_balanced_pool.ts
     │   │   │   ├── create_one_sided_pool.ts
+    │   │   │   ├── refresh_vesting.ts
     │   │   │   ├── remove_liquidity.ts
     │   │   │   └── split_position.ts
     │   │   ├── dbc
