@@ -882,8 +882,7 @@ export async function refreshVesting(
   }
 
   console.log('\n> Vesting Accounts:');
-  for (let i = 0; i < vestings.length; i++) {
-    const vesting = vestings[i];
+  for (const [i, vesting] of vestings.entries()) {
     console.log(`  Vesting ${i + 1}:`);
     console.log(`    - Address: ${vesting.publicKey.toString()}`);
     console.log(`    - Cliff Unlock Liquidity: ${vesting.account.cliffUnlockLiquidity.toString()}`);
