@@ -52,14 +52,26 @@ export async function createDbcConfig(
 
   let curveConfig: ConfigParameters | null = null;
 
+  // TODO: Remove 'as any' casts below after upgrading SDK to 1.5.2
+  const enableFirstSwapWithMinFee = config.dbcConfig.enableFirstSwapWithMinFee ?? false;
+
   if (config.dbcConfig.buildCurveMode === 0) {
-    curveConfig = buildCurve(config.dbcConfig);
+    curveConfig = buildCurve({ ...config.dbcConfig, enableFirstSwapWithMinFee } as any);
   } else if (config.dbcConfig.buildCurveMode === 1) {
-    curveConfig = buildCurveWithMarketCap(config.dbcConfig);
+    curveConfig = buildCurveWithMarketCap({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    } as any);
   } else if (config.dbcConfig.buildCurveMode === 2) {
-    curveConfig = buildCurveWithTwoSegments(config.dbcConfig);
+    curveConfig = buildCurveWithTwoSegments({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    } as any);
   } else if (config.dbcConfig.buildCurveMode === 3) {
-    curveConfig = buildCurveWithLiquidityWeights(config.dbcConfig);
+    curveConfig = buildCurveWithLiquidityWeights({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    } as any);
   } else {
     throw new Error(
       `Unsupported DBC build curve mode: ${(config.dbcConfig as any).buildCurveMode}`

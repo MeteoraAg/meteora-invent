@@ -280,6 +280,13 @@ export type LiquidityVestingInfoParams = {
   totalDuration: number;
 };
 
+export type MigratedPoolMarketCapFeeSchedulerConfigParams = {
+  endingBaseFeeBps: number;
+  numberOfPeriod: number;
+  sqrtPriceStepBps: number;
+  schedulerExpirationDuration: number;
+};
+
 export type BuildCurveBase = {
   totalTokenSupply: number;
   migrationOption: number;
@@ -308,6 +315,9 @@ export type BuildCurveBase = {
   poolCreationFee: number; // in SOL lamports
   partnerLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
   creatorLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
+  migratedPoolBaseFeeMode?: number; // 0 - FeeTimeSchedulerLinear | 1 - FeeTimeSchedulerExponential | 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
+  migratedPoolMarketCapFeeSchedulerParams?: MigratedPoolMarketCapFeeSchedulerConfigParams; // Only for migratedPoolBaseFeeMode 3 or 4 (DAMM v2 only)
+  enableFirstSwapWithMinFee?: boolean; // If true, first swap uses minimum fee (useful for creator bundled buys)
 };
 
 export type BuildCurve = BuildCurveBase & {

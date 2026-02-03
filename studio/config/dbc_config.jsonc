@@ -118,6 +118,18 @@
     //   "dynamicFee": 0, // 0: Disabled, 1: Enabled
     //   "poolFeeBps": 0 // The pool fee in basis points. Minimum 10, Maximum 1000 bps.
     // },
+    "migratedPoolBaseFeeMode": 0, // 0 - FeeTimeSchedulerLinear (default) | 1 - FeeTimeSchedulerExponential | 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (only for DAMM v2)
+    "enableFirstSwapWithMinFee": false, // If true, the first swap on the pool will use the minimum fee instead of the starting fee (useful for creator bundled buys)
+
+    /* Only use the following parameters for migratedPoolBaseFeeMode: 3 (FeeMarketCapSchedulerLinear) or 4 (FeeMarketCapSchedulerExponential)
+     * These parameters configure the fee reduction based on price movement (market cap growth) for the post-graduation DAMM v2 pool.
+     */
+    //  "migratedPoolMarketCapFeeSchedulerParams": {
+    //    "endingBaseFeeBps": 50, // The ending (minimum) base fee in basis points
+    //    "numberOfPeriod": 100, // The total number of fee reduction periods
+    //    "sqrtPriceStepBps": 100, // The sqrt price increase (in bps) required to advance one period
+    //    "schedulerExpirationDuration": 86400 // The maximum duration (seconds) after which the scheduler expires and defaults to minimum fee
+    //  },
 
     /* Pool Creation Fee
      * Fee charged to token creators when they create a pool using this config.
