@@ -234,6 +234,8 @@ export type DbcConfig = MeteoraConfigBase & {
     | (BuildCurveWithMarketCap & { buildCurveMode: 1 })
     | (BuildCurveWithTwoSegments & { buildCurveMode: 2 })
     | (BuildCurveWithLiquidityWeights & { buildCurveMode: 3 })
+    | (BuildCurveWithMidPrice & { buildCurveMode: 4 })
+    | (BuildCurveWithCustomSqrtPrices & { buildCurveMode: 5 })
     | null;
   dbcPool?: DbcPool | null;
   dbcSwap?: DbcSwap | null;
@@ -315,7 +317,7 @@ export type BuildCurveBase = {
   poolCreationFee: number; // in SOL lamports
   partnerLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
   creatorLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
-  migratedPoolBaseFeeMode?: number; // 0 - FeeTimeSchedulerLinear | 1 - FeeTimeSchedulerExponential | 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
+  migratedPoolBaseFeeMode?: 3 | 4; // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
   migratedPoolMarketCapFeeSchedulerParams?: MigratedPoolMarketCapFeeSchedulerConfigParams; // Only for migratedPoolBaseFeeMode 3 or 4 (DAMM v2 only)
   enableFirstSwapWithMinFee?: boolean; // If true, first swap uses minimum fee (useful for creator bundled buys)
 };
@@ -340,6 +342,18 @@ export type BuildCurveWithLiquidityWeights = BuildCurveBase & {
   initialMarketCap: number;
   migrationMarketCap: number;
   liquidityWeights: number[];
+};
+
+export type BuildCurveWithMidPrice = BuildCurveBase & {
+  initialMarketCap: number;
+  migrationMarketCap: number;
+  midPrice: number;
+  percentageSupplyOnMigration: number;
+};
+
+export type BuildCurveWithCustomSqrtPrices = BuildCurveBase & {
+  sqrtPrices: BN[];
+  liquidityWeights?: number[];
 };
 
 export type DbcPool = {

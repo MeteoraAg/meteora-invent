@@ -23,7 +23,7 @@
    * 2. dbc-create-pool (if there is no --config flag indicated in the command)
    */
   "dbcConfig": {
-    "buildCurveMode": 0, // 0 - buildCurve | 1 - buildCurveWithMarketCap | 2 - buildCurveWithTwoSegments | 3 - buildCurveWithLiquidityWeights
+    "buildCurveMode": 0, // 0 - buildCurve | 1 - buildCurveWithMarketCap | 2 - buildCurveWithTwoSegments | 3 - buildCurveWithLiquidityWeights | 4 - buildCurveWithMidPrice | 5 - buildCurveWithCustomSqrtPrices
 
     /* Only use the following parameters for buildCurveMode: 0 (buildCurve)
      * 1. percentageSupplyOnMigration
@@ -56,6 +56,24 @@
     // "initialMarketCap": 20, // the market cap of the DBC token pool when the pool is created specified in terms of quoteMint (not in lamports)
     // "migrationMarketCap": 600, // the market cap of the DBC token pool when the pool graduates specified in terms of quoteMint (not in lamports)
     // "liquidityWeights": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // a array of 16 liquidity weights for each liquidity segment in the curve
+
+    /* Only use the following parameters for buildCurveMode: 4 (buildCurveWithMidPrice)
+     * 1. initialMarketCap
+     * 2. migrationMarketCap
+     * 3. midPrice
+     * 4. percentageSupplyOnMigration
+     */
+    // "initialMarketCap": 20, // the market cap of the DBC token pool when the pool is created specified in terms of quoteMint (not in lamports)
+    // "migrationMarketCap": 600, // the market cap of the DBC token pool when the pool graduates specified in terms of quoteMint (not in lamports)
+    // "midPrice": 0.001, // the mid-point price of the curve in terms of quoteMint
+    // "percentageSupplyOnMigration": 20, // percentage of total token supply to be migrated
+
+    /* Only use the following parameters for buildCurveMode: 5 (buildCurveWithCustomSqrtPrices)
+     * 1. sqrtPrices - array of custom sqrt prices (must be in ascending order, at least 2 elements)
+     * 2. liquidityWeights - optional weights for each segment (length must be sqrtPrices.length - 1)
+     */
+    // "sqrtPrices": [], // array of custom sqrt prices (ascending order). First = starting price (pMin), Last = migration price (pMax)
+    // "liquidityWeights": [1, 2, 3], // optional: weights for each segment. If omitted, liquidity is distributed evenly
 
     "totalTokenSupply": 1000000000, // total token supply (not in lamports)
     "migrationOption": 1, // 0 - Migrate to DAMM v1 | 1 - Migrate to DAMM v2
@@ -118,7 +136,7 @@
     //   "dynamicFee": 0, // 0: Disabled, 1: Enabled
     //   "poolFeeBps": 0 // The pool fee in basis points. Minimum 10, Maximum 1000 bps.
     // },
-    "migratedPoolBaseFeeMode": 0, // 0 - FeeTimeSchedulerLinear (default) | 1 - FeeTimeSchedulerExponential | 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (only for DAMM v2)
+    "migratedPoolBaseFeeMode": 3, // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (only for DAMM v2)
     "enableFirstSwapWithMinFee": false, // If true, the first swap on the pool will use the minimum fee instead of the starting fee (useful for creator bundled buys)
 
     /* Only use the following parameters for migratedPoolBaseFeeMode: 3 (FeeMarketCapSchedulerLinear) or 4 (FeeMarketCapSchedulerExponential)
