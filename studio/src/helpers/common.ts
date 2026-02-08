@@ -160,18 +160,13 @@ export async function createDammV2Config(
   const configParameters = {
     poolFees: {
       baseFee: {
-        // BaseFeeParameters serialized as 30-byte Borsh layout:
-        data: (() => {
-          const buf = Buffer.alloc(30);
-          buf.writeBigUInt64LE(BigInt(cliffFeeNumerator.toString()), 0); // [0..8) cliffFeeNumerator (u64)
-          buf.writeUInt16LE(0, 8); // [8..10) numberOfPeriod (u16)
-          buf.writeBigUInt64LE(BigInt(0), 10); // [10..18) periodFrequency (u64)
-          buf.writeBigUInt64LE(BigInt(0), 18); // [18..26) reductionFactor (u64)
-          buf.writeUInt8(0, 26); // [26] feeSchedulerMode (u8)
-          // [27..30) padding
-          return Array.from(buf);
-        })(),
+        cliffFeeNumerator,
+        numberOfPeriod: 0,
+        periodFrequency: new BN(0),
+        reductionFactor: new BN(0),
+        feeSchedulerMode: 0,
       },
+      padding: [0, 0, 0],
       dynamicFee: dynamicFeeParams,
     },
     sqrtMinPrice: MIN_SQRT_PRICE,
@@ -186,8 +181,7 @@ export async function createDammV2Config(
     .createConfig(new BN(0), configParameters)
     .accountsPartial({
       config,
-      operator: payer.publicKey,
-      signer: payer.publicKey,
+      admin: payer.publicKey,
     })
     .transaction();
 
