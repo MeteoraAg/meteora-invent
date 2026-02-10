@@ -10,7 +10,12 @@ import {
   DAMM_V2_PROGRAM_ID,
   getDynamicFeeParams,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
-import { MAX_SQRT_PRICE, MIN_SQRT_PRICE } from '@meteora-ag/cp-amm-sdk';
+import {
+  BaseFeeMode,
+  encodeFeeTimeSchedulerParams,
+  MAX_SQRT_PRICE,
+  MIN_SQRT_PRICE,
+} from '@meteora-ag/cp-amm-sdk';
 
 export function getAmountInLamports(amount: number | string, decimals: number): BN {
   const amountD = new Decimal(amount);
@@ -157,16 +162,19 @@ export async function createDammV2Config(
     DAMM_V2_PROGRAM_ID
   );
 
+  const baseFeeData = encodeFeeTimeSchedulerParams(
+    cliffFeeNumerator,
+    0, // numberOfPeriod
+    new BN(0), // periodFrequency
+    new BN(0), // reductionFactor
+    BaseFeeMode.FeeTimeSchedulerLinear
+  );
+
   const configParameters = {
     poolFees: {
       baseFee: {
-        cliffFeeNumerator,
-        numberOfPeriod: 0,
-        periodFrequency: new BN(0),
-        reductionFactor: new BN(0),
-        feeSchedulerMode: 0,
+        data: Array.from(baseFeeData),
       },
-      padding: [0, 0, 0],
       dynamicFee: dynamicFeeParams,
     },
     sqrtMinPrice: MIN_SQRT_PRICE,
@@ -181,7 +189,9 @@ export async function createDammV2Config(
     .createConfig(new BN(0), configParameters)
     .accountsPartial({
       config,
-      admin: payer.publicKey,
+      operator: payer.publicKey,
+      signer: payer.publicKey,
+      payer: payer.publicKey,
     })
     .transaction();
 

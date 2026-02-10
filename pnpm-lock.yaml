@@ -283,8 +283,8 @@ importers:
         specifier: ^1.1.14
         version: 1.1.14(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/cp-amm-sdk':
-        specifier: ^1.2.6
-        version: 1.2.6(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
+        specifier: ^1.3.3
+        version: 1.3.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/dlmm':
         specifier: ^1.9.3
         version: 1.9.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
@@ -1552,8 +1552,8 @@ packages:
   '@meteora-ag/cp-amm-sdk@1.1.0':
     resolution: {integrity: sha512-CFYSGLgSSTL5oDSrL5bx+oCi51rkvfuFXdMVDEZmnljlnyt2vxbrzRCkCTzxN7ABCYjuCvkLoVrT1JiBh39k2A==}
 
-  '@meteora-ag/cp-amm-sdk@1.2.6':
-    resolution: {integrity: sha512-EYNk6/6/AwMAyFCwA9ZG1svJfUOM8cn8mpg/un/PkImuNSrbRlN9Apiw+mRiwLvrEiCjSVUCDyGJofr/eX5TFQ==}
+  '@meteora-ag/cp-amm-sdk@1.3.3':
+    resolution: {integrity: sha512-C3ZX0fybGqqxvhq2sxJZIIsgyKVP+QpGFbl4OHyEBP/C88AU0/+1Nhof/64McRQxvPCgINE956e8ts4Z0UhPug==}
 
   '@meteora-ag/dlmm@1.5.0':
     resolution: {integrity: sha512-d8DwhSrSSuIPfw6+9LLu2aXylKc7tS6FTnQzZcQYlGhrKIlABn97muasizBAcgMp80AR/bKEa6qtFCoQt4pqwA==}
@@ -11370,7 +11370,7 @@ snapshots:
     dependencies:
       '@cora-xyz/anchor-0.28.0': '@coral-xyz/anchor@0.28.0(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)'
       '@coral-xyz/anchor': 0.31.1(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
-      '@meteora-ag/cp-amm-sdk': 1.2.6(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
+      '@meteora-ag/cp-amm-sdk': 1.3.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/dlmm': 1.5.0(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@meteora-ag/dynamic-amm-sdk': 1.4.1(@solana/buffer-layout@4.0.1)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/buffer-layout': 4.0.1
@@ -11422,12 +11422,13 @@ snapshots:
       - utf-8-validate
       - yaml
 
-  '@meteora-ag/cp-amm-sdk@1.2.6(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
+  '@meteora-ag/cp-amm-sdk@1.3.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': 0.31.1(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/spl-token': 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@types/bn.js': 5.2.0
+      bn.js: 5.2.2
       chain: 0.4.2
       decimal.js: 10.6.0
       invariant: 2.2.4

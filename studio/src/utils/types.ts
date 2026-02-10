@@ -147,11 +147,15 @@ export interface DynamicAmmV2Config {
 export type DammV2BaseFee =
   | {
       baseFeeMode: 0 | 1;
-      feeSchedulerParam: FeeSchedulerParams;
+      feeTimeSchedulerParam: FeeSchedulerParams;
     }
   | {
       baseFeeMode: 2;
       rateLimiterParam: RateLimiterParams & { maxFeeBps: number };
+    }
+  | {
+      baseFeeMode: 3 | 4;
+      feeMarketCapSchedulerParam: FeeMarketCapSchedulerParams;
     };
 
 export interface DynamicFee {
@@ -166,6 +170,7 @@ export interface SplitPositionConfig {
   newPositionOwner: string;
   unlockedLiquidityPercentage: number;
   permanentLockedLiquidityPercentage: number;
+  innerVestingLiquidityPercentage: number;
   feeAPercentage: number;
   feeBPercentage: number;
   reward0Percentage: number;
@@ -264,6 +269,14 @@ export type RateLimiterParams = {
   feeIncrementBps: number;
   referenceAmount: number;
   maxLimiterDuration: number;
+};
+
+export type FeeMarketCapSchedulerParams = {
+  startingFeeBps: number;
+  endingFeeBps: number;
+  numberOfPeriod: number;
+  sqrtPriceStepBps: number;
+  schedulerExpirationDuration: number;
 };
 
 export type LockedVesting = {

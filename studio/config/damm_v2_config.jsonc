@@ -66,8 +66,8 @@
     "maxPrice": null, // max price (in terms of quote/base price) - NOTE: null would use the MAX_SQRT_PRICE for the DAMM v2 balanced pool
     "poolFees": {
       "baseFee": {
-        "baseFeeMode": 2, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
-        // "feeSchedulerParam": {
+        "baseFeeMode": 2, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter | 3 - Fee Market Cap Scheduler: Linear | 4 - Fee Market Cap Scheduler: Exponential
+        // "feeTimeSchedulerParam": {
         //   "startingFeeBps": 120, // starting base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
         //   "endingFeeBps": 120, // ending base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
         //   "numberOfPeriod": 0, // number of periods
@@ -80,6 +80,13 @@
           "maxLimiterDuration": 3600, // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
           "maxFeeBps": 5000 // max 50% base fee can go to === 5000 bps
         }
+        // "feeMarketCapSchedulerParam": {
+        //   "startingFeeBps": 500, // starting base fee (in basis points)
+        //   "endingFeeBps": 50, // ending base fee (in basis points)
+        //   "numberOfPeriod": 100, // number of fee reduction periods
+        //   "sqrtPriceStepBps": 100, // sqrt price increase (in bps) required to advance one period
+        //   "schedulerExpirationDuration": 86400 // maximum duration (seconds) after which scheduler expires and defaults to ending fee
+        // }
       },
       "dynamicFeeEnabled": true // if dynamicFeeEnabled is true and dynamicFeeConfig is null, the default dynamic fee configuration will be 20% of the base fee
       /* Optional Configuration.
@@ -115,6 +122,7 @@
     "newPositionOwner": "YOUR_NEW_POSITION_OWNER_ADDRESS", // this is the address that will receive the new DAMM v2 NFT position
     "unlockedLiquidityPercentage": 50, // this is the percentage of unlocked liquidity that will be split and transferred to the newPositionOwner's position
     "permanentLockedLiquidityPercentage": 50, // this is the percentage of permanent locked liquidity that will be split and transferred to the newPositionOwner's position
+    "innerVestingLiquidityPercentage": 50, // this is the percentage of inner vesting liquidity that will be split and transferred to the newPositionOwner's position
     "feeAPercentage": 50, // this is the percentage of unclaimed fee that will be transferred to the newPositionOwner's position
     "feeBPercentage": 50, // this is the percentage of unclaimed fee that will be transferred to the newPositionOwner's position
     "reward0Percentage": 50, // this is the percentage of unclaimed reward that will be transferred to the newPositionOwner's position

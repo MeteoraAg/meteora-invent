@@ -87,7 +87,7 @@
       "cliffDurationFromMigrationTime": 0 // cliff duration from migration time (in seconds)
     },
     "baseFeeParams": {
-      "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential
+      "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
       "feeSchedulerParam": {
         "startingFeeBps": 100, // starting fee (max 99% fee === 9900 bps)
         "endingFeeBps": 100, // ending fee (minimum 0.01% fee === 1 bps)
