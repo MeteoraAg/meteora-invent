@@ -18,7 +18,7 @@ import {
 } from '@meteora-ag/cp-amm-sdk';
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import { Connection, Keypair, PublicKey, sendAndConfirmTransaction } from '@solana/web3.js';
-import { DammV2Config } from '../../utils/types';
+import { DammV2BaseFee, DammV2Config } from '../../utils/types';
 import {
   getAmountInLamports,
   getDecimalizedAmount,
@@ -151,10 +151,16 @@ export async function createDammV2OneSidedPool(
         maxVolatilityAccumulator: dynamicFeeConfig.maxVolatilityAccumulator,
       };
     } else {
-      const flatFeeBps =
-        baseFee.baseFeeMode === 2
-          ? baseFee.rateLimiterParam.baseFeeBps
-          : baseFee.feeSchedulerParam.startingFeeBps;
+      let flatFeeBps: number;
+      if (baseFee.baseFeeMode === 2) {
+        flatFeeBps = baseFee.rateLimiterParam.baseFeeBps;
+      } else if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
+        flatFeeBps = baseFee.feeMarketCapSchedulerParam.startingFeeBps;
+      } else if (baseFee.baseFeeMode === 0 || baseFee.baseFeeMode === 1) {
+        flatFeeBps = baseFee.feeTimeSchedulerParam.startingFeeBps;
+      } else {
+        throw new Error(`Unknown baseFeeMode: ${(baseFee as DammV2BaseFee).baseFeeMode}`);
+      }
       dynamicFee = getDynamicFeeParams(flatFeeBps);
     }
   }
@@ -387,10 +393,16 @@ export async function createDammV2BalancedPool(
         maxVolatilityAccumulator: dynamicFeeConfig.maxVolatilityAccumulator,
       };
     } else {
-      const flatFeeBps =
-        baseFee.baseFeeMode === 2
-          ? baseFee.rateLimiterParam.baseFeeBps
-          : baseFee.feeSchedulerParam.startingFeeBps;
+      let flatFeeBps: number;
+      if (baseFee.baseFeeMode === 2) {
+        flatFeeBps = baseFee.rateLimiterParam.baseFeeBps;
+      } else if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
+        flatFeeBps = baseFee.feeMarketCapSchedulerParam.startingFeeBps;
+      } else if (baseFee.baseFeeMode === 0 || baseFee.baseFeeMode === 1) {
+        flatFeeBps = baseFee.feeTimeSchedulerParam.startingFeeBps;
+      } else {
+        throw new Error(`Unknown baseFeeMode: ${(baseFee as DammV2BaseFee).baseFeeMode}`);
+      }
       dynamicFee = getDynamicFeeParams(flatFeeBps);
     }
   }
@@ -427,7 +439,7 @@ export async function createDammV2BalancedPool(
     collectFeeMode: collectFeeMode,
     activationPoint: activationPoint ? new BN(activationPoint) : null,
     tokenAProgram: baseTokenProgram,
-    tokenBProgram: TOKEN_PROGRAM_ID,
+    tokenBProgram: quoteTokenProgram,
   });
 
   modifyComputeUnitPriceIx(initCustomizePoolTx, config.computeUnitPriceMicroLamports ?? 0);
@@ -621,6 +633,7 @@ export async function splitPosition(
     secondPositionNftAccount: secondPosition.positionNftAccount,
     unlockedLiquidityPercentage: config.splitPosition.unlockedLiquidityPercentage,
     permanentLockedLiquidityPercentage: config.splitPosition.permanentLockedLiquidityPercentage,
+    innerVestingLiquidityPercentage: config.splitPosition.innerVestingLiquidityPercentage,
     feeAPercentage: config.splitPosition.feeAPercentage,
     feeBPercentage: config.splitPosition.feeBPercentage,
     reward0Percentage: config.splitPosition.reward0Percentage,
@@ -885,12 +898,18 @@ export async function refreshVesting(
   for (const [i, vesting] of vestings.entries()) {
     console.log(`  Vesting ${i + 1}:`);
     console.log(`    - Address: ${vesting.publicKey.toString()}`);
-    console.log(`    - Cliff Unlock Liquidity: ${vesting.account.cliffUnlockLiquidity.toString()}`);
-    console.log(`    - Liquidity Per Period: ${vesting.account.liquidityPerPeriod.toString()}`);
-    console.log(`    - Cliff Point: ${vesting.account.cliffPoint.toString()}`);
-    console.log(`    - Number of Periods: ${vesting.account.numberOfPeriod.toString()}`);
     console.log(
-      `    - Total Released Liquidity: ${vesting.account.totalReleasedLiquidity.toString()}`
+      `    - Cliff Unlock Liquidity: ${vesting.account.innerVesting.cliffUnlockLiquidity.toString()}`
+    );
+    console.log(
+      `    - Liquidity Per Period: ${vesting.account.innerVesting.liquidityPerPeriod.toString()}`
+    );
+    console.log(`    - Cliff Point: ${vesting.account.innerVesting.cliffPoint.toString()}`);
+    console.log(
+      `    - Number of Periods: ${vesting.account.innerVesting.numberOfPeriod.toString()}`
+    );
+    console.log(
+      `    - Total Released Liquidity: ${vesting.account.innerVesting.totalReleasedLiquidity.toString()}`
     );
   }
 

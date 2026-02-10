@@ -16,8 +16,10 @@ import {
 import { DEFAULT_SEND_TX_MAX_RETRIES, LOCALNET_RPC_URL } from '../../utils/constants';
 import {
   buildCurve,
+  buildCurveWithCustomSqrtPrices,
   buildCurveWithLiquidityWeights,
   buildCurveWithMarketCap,
+  buildCurveWithMidPrice,
   buildCurveWithTwoSegments,
   ConfigParameters,
   DAMM_V1_MIGRATION_FEE_ADDRESS,
@@ -52,14 +54,35 @@ export async function createDbcConfig(
 
   let curveConfig: ConfigParameters | null = null;
 
+  const enableFirstSwapWithMinFee = config.dbcConfig.enableFirstSwapWithMinFee ?? false;
+
   if (config.dbcConfig.buildCurveMode === 0) {
-    curveConfig = buildCurve(config.dbcConfig);
+    curveConfig = buildCurve({ ...config.dbcConfig, enableFirstSwapWithMinFee });
   } else if (config.dbcConfig.buildCurveMode === 1) {
-    curveConfig = buildCurveWithMarketCap(config.dbcConfig);
+    curveConfig = buildCurveWithMarketCap({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    });
   } else if (config.dbcConfig.buildCurveMode === 2) {
-    curveConfig = buildCurveWithTwoSegments(config.dbcConfig);
+    curveConfig = buildCurveWithTwoSegments({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    });
   } else if (config.dbcConfig.buildCurveMode === 3) {
-    curveConfig = buildCurveWithLiquidityWeights(config.dbcConfig);
+    curveConfig = buildCurveWithLiquidityWeights({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    });
+  } else if (config.dbcConfig.buildCurveMode === 4) {
+    curveConfig = buildCurveWithMidPrice({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    });
+  } else if (config.dbcConfig.buildCurveMode === 5) {
+    curveConfig = buildCurveWithCustomSqrtPrices({
+      ...config.dbcConfig,
+      enableFirstSwapWithMinFee,
+    });
   } else {
     throw new Error(
       `Unsupported DBC build curve mode: ${(config.dbcConfig as any).buildCurveMode}`
@@ -392,6 +415,7 @@ export async function swap(
     amountIn,
     hasReferral: config.dbcSwap.referralTokenAccount !== '',
     currentPoint: new BN(currentPoint),
+    eligibleForFirstSwapWithMinFee: false,
   });
 
   const swapTx = await dbcInstance.pool.swap({
