@@ -898,10 +898,16 @@ export async function refreshVesting(
   for (const [i, vesting] of vestings.entries()) {
     console.log(`  Vesting ${i + 1}:`);
     console.log(`    - Address: ${vesting.publicKey.toString()}`);
-    console.log(`    - Cliff Unlock Liquidity: ${vesting.account.innerVesting.cliffUnlockLiquidity.toString()}`);
-    console.log(`    - Liquidity Per Period: ${vesting.account.innerVesting.liquidityPerPeriod.toString()}`);
+    console.log(
+      `    - Cliff Unlock Liquidity: ${vesting.account.innerVesting.cliffUnlockLiquidity.toString()}`
+    );
+    console.log(
+      `    - Liquidity Per Period: ${vesting.account.innerVesting.liquidityPerPeriod.toString()}`
+    );
     console.log(`    - Cliff Point: ${vesting.account.innerVesting.cliffPoint.toString()}`);
-    console.log(`    - Number of Periods: ${vesting.account.innerVesting.numberOfPeriod.toString()}`);
+    console.log(
+      `    - Number of Periods: ${vesting.account.innerVesting.numberOfPeriod.toString()}`
+    );
     console.log(
       `    - Total Released Liquidity: ${vesting.account.innerVesting.totalReleasedLiquidity.toString()}`
     );
