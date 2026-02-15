@@ -93,13 +93,38 @@ function validateDbcConfig(config: DbcConfig) {
     throw new Error('DBC configuration is required but not provided.');
   }
 
-  if (
-    config.dbcConfig.buildCurveMode !== 0 &&
-    config.dbcConfig.buildCurveMode !== 1 &&
-    config.dbcConfig.buildCurveMode !== 2 &&
-    config.dbcConfig.buildCurveMode !== 3
-  ) {
-    throw new Error(`Build curve mode isn't supported.`);
+  const validModes = [0, 1, 2, 3, 4, 5];
+  if (!validModes.includes(config.dbcConfig.buildCurveMode)) {
+    throw new Error(
+      `Build curve mode ${config.dbcConfig.buildCurveMode} isn't supported. Valid modes: 0 (buildCurve), 1 (buildCurveWithMarketCap), 2 (buildCurveWithTwoSegments), 3 (buildCurveWithLiquidityWeights), 4 (buildCurveWithMidPrice), 5 (buildCurveWithCustomSqrtPrices).`
+    );
+  }
+
+  // Validate required nested groups exist
+  if (!config.dbcConfig.token) {
+    throw new Error('DBC configuration is missing the "token" section.');
+  }
+  if (!config.dbcConfig.fee) {
+    throw new Error('DBC configuration is missing the "fee" section.');
+  }
+  if (!config.dbcConfig.migration) {
+    throw new Error('DBC configuration is missing the "migration" section.');
+  }
+  if (!config.dbcConfig.liquidityDistribution) {
+    throw new Error('DBC configuration is missing the "liquidityDistribution" section.');
+  }
+  if (!config.dbcConfig.lockedVesting) {
+    throw new Error('DBC configuration is missing the "lockedVesting" section.');
+  }
+
+  // Validate marketCapFeeSchedulerParams requires poolFeeBps
+  const migratedPoolFee = config.dbcConfig.migration.migratedPoolFee;
+  if (migratedPoolFee?.marketCapFeeSchedulerParams) {
+    if (!migratedPoolFee.poolFeeBps || migratedPoolFee.poolFeeBps <= 0) {
+      throw new Error(
+        'When marketCapFeeSchedulerParams is configured, migratedPoolFee.poolFeeBps is required and must be greater than 0.'
+      );
+    }
   }
 }
 

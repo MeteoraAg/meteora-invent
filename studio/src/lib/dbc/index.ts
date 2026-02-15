@@ -21,6 +21,7 @@ import {
   buildCurveWithMarketCap,
   buildCurveWithMidPrice,
   buildCurveWithTwoSegments,
+  getSqrtPriceFromPrice,
   ConfigParameters,
   DAMM_V1_MIGRATION_FEE_ADDRESS,
   DAMM_V2_MIGRATION_FEE_ADDRESS,
@@ -54,35 +55,32 @@ export async function createDbcConfig(
 
   let curveConfig: ConfigParameters | null = null;
 
-  const enableFirstSwapWithMinFee = config.dbcConfig.enableFirstSwapWithMinFee ?? false;
+  // Destructure out fields not needed by buildCurve* functions
+  const { buildCurveMode, leftoverReceiver, feeClaimer, ...buildCurveParams } = config.dbcConfig;
 
-  if (config.dbcConfig.buildCurveMode === 0) {
-    curveConfig = buildCurve({ ...config.dbcConfig, enableFirstSwapWithMinFee });
-  } else if (config.dbcConfig.buildCurveMode === 1) {
-    curveConfig = buildCurveWithMarketCap({
-      ...config.dbcConfig,
-      enableFirstSwapWithMinFee,
-    });
-  } else if (config.dbcConfig.buildCurveMode === 2) {
-    curveConfig = buildCurveWithTwoSegments({
-      ...config.dbcConfig,
-      enableFirstSwapWithMinFee,
-    });
-  } else if (config.dbcConfig.buildCurveMode === 3) {
-    curveConfig = buildCurveWithLiquidityWeights({
-      ...config.dbcConfig,
-      enableFirstSwapWithMinFee,
-    });
-  } else if (config.dbcConfig.buildCurveMode === 4) {
-    curveConfig = buildCurveWithMidPrice({
-      ...config.dbcConfig,
-      enableFirstSwapWithMinFee,
-    });
-  } else if (config.dbcConfig.buildCurveMode === 5) {
-    curveConfig = buildCurveWithCustomSqrtPrices({
-      ...config.dbcConfig,
-      enableFirstSwapWithMinFee,
-    });
+  if (buildCurveMode === 0) {
+    curveConfig = buildCurve(buildCurveParams as any);
+  } else if (buildCurveMode === 1) {
+    curveConfig = buildCurveWithMarketCap(buildCurveParams as any);
+  } else if (buildCurveMode === 2) {
+    curveConfig = buildCurveWithTwoSegments(buildCurveParams as any);
+  } else if (buildCurveMode === 3) {
+    curveConfig = buildCurveWithLiquidityWeights(buildCurveParams as any);
+  } else if (buildCurveMode === 4) {
+    curveConfig = buildCurveWithMidPrice(buildCurveParams as any);
+  } else if (buildCurveMode === 5) {
+    const { prices, ...restParams } = buildCurveParams as any;
+    if (!prices || !Array.isArray(prices) || prices.length < 2) {
+      throw new Error(
+        'prices array must have at least 2 elements for buildCurveWithCustomSqrtPrices'
+      );
+    }
+    const tokenBaseDecimal = restParams.token?.tokenBaseDecimal ?? 6;
+    const tokenQuoteDecimal = restParams.token?.tokenQuoteDecimal ?? 9;
+    const sqrtPrices = prices.map((price: number) =>
+      getSqrtPriceFromPrice(String(price), tokenBaseDecimal, tokenQuoteDecimal)
+    );
+    curveConfig = buildCurveWithCustomSqrtPrices({ ...restParams, sqrtPrices });
   } else {
     throw new Error(
       `Unsupported DBC build curve mode: ${(config.dbcConfig as any).buildCurveMode}`
@@ -101,8 +99,8 @@ export async function createDbcConfig(
   const createConfigTx = await dbcInstance.partner.createConfig({
     config: configKeypair.publicKey,
     quoteMint,
-    feeClaimer: new PublicKey(config.dbcConfig.feeClaimer),
-    leftoverReceiver: new PublicKey(config.dbcConfig.leftoverReceiver),
+    feeClaimer: new PublicKey(feeClaimer),
+    leftoverReceiver: new PublicKey(leftoverReceiver),
     payer: wallet.publicKey,
     ...curveConfig,
   });
@@ -230,7 +228,7 @@ export async function createDbcPool(
       symbol: config.dbcPool.symbol,
       uri: metadataUri,
       payer: wallet.publicKey,
-      poolCreator: wallet.publicKey,
+      poolCreator: new PublicKey(config.dbcPool.creator),
     });
 
     modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);

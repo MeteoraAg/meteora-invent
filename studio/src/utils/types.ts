@@ -302,37 +302,60 @@ export type MigratedPoolMarketCapFeeSchedulerConfigParams = {
   schedulerExpirationDuration: number;
 };
 
-export type BuildCurveBase = {
+export type DbcTokenConfig = {
   totalTokenSupply: number;
-  migrationOption: number;
   tokenBaseDecimal: number;
   tokenQuoteDecimal: number;
-  lockedVestingParams: LockedVesting;
+  tokenType: number;
+  tokenUpdateAuthority: number;
+  leftover: number;
+};
+
+export type DbcFeeConfig = {
   baseFeeParams: DbcBaseFee;
   dynamicFeeEnabled: boolean;
-  activationType: number;
   collectFeeMode: number;
-  migrationFeeOption: number;
-  tokenType: number;
-  partnerLiquidityPercentage: number;
-  creatorLiquidityPercentage: number;
-  partnerPermanentLockedLiquidityPercentage: number;
-  creatorPermanentLockedLiquidityPercentage: number;
   creatorTradingFeePercentage: number;
-  leftover: number;
-  tokenUpdateAuthority: number;
+  poolCreationFee: number; // in SOL
+  enableFirstSwapWithMinFee?: boolean; // If true, first swap uses minimum fee (useful for creator bundled buys)
+};
+
+export type DbcMigratedPoolFeeConfig = {
+  collectFeeMode: number; // 0 - Quote Token | 1 - Output Token
+  dynamicFee: number; // 0: Disabled, 1: Enabled
+  poolFeeBps: number; // The pool fee in basis points. Required when marketCapFeeSchedulerParams is configured.
+  baseFeeMode?: 3 | 4; // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
+  marketCapFeeSchedulerParams?: MigratedPoolMarketCapFeeSchedulerConfigParams;
+};
+
+export type DbcMigrationConfig = {
+  migrationOption: number;
+  migrationFeeOption: number;
   migrationFee: {
     feePercentage: number;
     creatorFeePercentage: number;
   };
-  leftoverReceiver: string;
-  feeClaimer: string;
-  poolCreationFee: number; // in SOL lamports
+  migratedPoolFee?: DbcMigratedPoolFeeConfig; // DAMM v2 only, for Customizable (6) or marketCapFeeScheduler
+};
+
+export type DbcLiquidityDistributionConfig = {
+  partnerLiquidityPercentage: number;
+  creatorLiquidityPercentage: number;
+  partnerPermanentLockedLiquidityPercentage: number;
+  creatorPermanentLockedLiquidityPercentage: number;
   partnerLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
   creatorLiquidityVestingInfoParams?: LiquidityVestingInfoParams; // DAMM v2 only
-  migratedPoolBaseFeeMode?: 3 | 4; // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
-  migratedPoolMarketCapFeeSchedulerParams?: MigratedPoolMarketCapFeeSchedulerConfigParams; // Only for migratedPoolBaseFeeMode 3 or 4 (DAMM v2 only)
-  enableFirstSwapWithMinFee?: boolean; // If true, first swap uses minimum fee (useful for creator bundled buys)
+};
+
+export type BuildCurveBase = {
+  token: DbcTokenConfig;
+  fee: DbcFeeConfig;
+  migration: DbcMigrationConfig;
+  liquidityDistribution: DbcLiquidityDistributionConfig;
+  lockedVesting: LockedVesting;
+  activationType: number;
+  leftoverReceiver: string;
+  feeClaimer: string;
 };
 
 export type BuildCurve = BuildCurveBase & {
@@ -365,7 +388,7 @@ export type BuildCurveWithMidPrice = BuildCurveBase & {
 };
 
 export type BuildCurveWithCustomSqrtPrices = BuildCurveBase & {
-  sqrtPrices: BN[];
+  prices: number[];
   liquidityWeights?: number[];
 };
 

@@ -535,6 +535,295 @@ export const CONFIG_SCHEMA = {
       },
       required: ['enabled'],
     },
+    dbcConfig: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        buildCurveMode: {
+          type: 'number',
+          enum: [0, 1, 2, 3, 4, 5],
+        },
+        // Mode 0 (buildCurve) params
+        percentageSupplyOnMigration: { type: 'number' },
+        migrationQuoteThreshold: { type: 'number' },
+        // Mode 1, 2, 3, 4 params
+        initialMarketCap: { type: 'number' },
+        migrationMarketCap: { type: 'number' },
+        // Mode 3, 5 params
+        liquidityWeights: {
+          type: 'array',
+          items: { type: 'number' },
+        },
+        // Mode 4 params
+        midPrice: { type: 'number' },
+        // Mode 5 params
+        prices: {
+          type: 'array',
+          items: { type: 'number' },
+        },
+        // Token configuration
+        token: {
+          type: 'object',
+          properties: {
+            totalTokenSupply: { type: 'number' },
+            tokenBaseDecimal: { type: 'number' },
+            tokenQuoteDecimal: { type: 'number' },
+            tokenType: { type: 'number', enum: [0, 1] },
+            tokenUpdateAuthority: { type: 'number', enum: [0, 1, 2, 3, 4] },
+            leftover: { type: 'number' },
+          },
+          required: [
+            'totalTokenSupply',
+            'tokenBaseDecimal',
+            'tokenQuoteDecimal',
+            'tokenType',
+            'tokenUpdateAuthority',
+            'leftover',
+          ],
+          additionalProperties: false,
+        },
+        // Fee configuration
+        fee: {
+          type: 'object',
+          properties: {
+            baseFeeParams: {
+              type: 'object',
+              properties: {
+                baseFeeMode: { type: 'number', enum: [0, 1, 2] },
+                feeSchedulerParam: {
+                  type: 'object',
+                  nullable: true,
+                  properties: {
+                    startingFeeBps: { type: 'number' },
+                    endingFeeBps: { type: 'number' },
+                    numberOfPeriod: { type: 'number' },
+                    totalDuration: { type: 'number' },
+                  },
+                  required: ['startingFeeBps', 'endingFeeBps', 'numberOfPeriod', 'totalDuration'],
+                  additionalProperties: false,
+                },
+                rateLimiterParam: {
+                  type: 'object',
+                  nullable: true,
+                  properties: {
+                    baseFeeBps: { type: 'number' },
+                    feeIncrementBps: { type: 'number' },
+                    referenceAmount: { type: 'number' },
+                    maxLimiterDuration: { type: 'number' },
+                  },
+                  required: [
+                    'baseFeeBps',
+                    'feeIncrementBps',
+                    'referenceAmount',
+                    'maxLimiterDuration',
+                  ],
+                  additionalProperties: false,
+                },
+              },
+              required: ['baseFeeMode'],
+              additionalProperties: false,
+            },
+            dynamicFeeEnabled: { type: 'boolean' },
+            collectFeeMode: { type: 'number', enum: [0, 1] },
+            creatorTradingFeePercentage: { type: 'number' },
+            poolCreationFee: { type: 'number' },
+            enableFirstSwapWithMinFee: { type: 'boolean' },
+          },
+          required: [
+            'baseFeeParams',
+            'dynamicFeeEnabled',
+            'collectFeeMode',
+            'creatorTradingFeePercentage',
+            'poolCreationFee',
+          ],
+          additionalProperties: false,
+        },
+        // Migration configuration
+        migration: {
+          type: 'object',
+          properties: {
+            migrationOption: { type: 'number', enum: [0, 1] },
+            migrationFeeOption: { type: 'number', enum: [0, 1, 2, 3, 4, 5, 6] },
+            migrationFee: {
+              type: 'object',
+              properties: {
+                feePercentage: { type: 'number' },
+                creatorFeePercentage: { type: 'number' },
+              },
+              required: ['feePercentage', 'creatorFeePercentage'],
+              additionalProperties: false,
+            },
+            migratedPoolFee: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                collectFeeMode: { type: 'number', enum: [0, 1] },
+                dynamicFee: { type: 'number', enum: [0, 1] },
+                poolFeeBps: { type: 'number' },
+                baseFeeMode: { type: 'number', enum: [3, 4] },
+                marketCapFeeSchedulerParams: {
+                  type: 'object',
+                  nullable: true,
+                  properties: {
+                    endingBaseFeeBps: { type: 'number' },
+                    numberOfPeriod: { type: 'number' },
+                    sqrtPriceStepBps: { type: 'number' },
+                    schedulerExpirationDuration: { type: 'number' },
+                  },
+                  required: [
+                    'endingBaseFeeBps',
+                    'numberOfPeriod',
+                    'sqrtPriceStepBps',
+                    'schedulerExpirationDuration',
+                  ],
+                  additionalProperties: false,
+                },
+              },
+              required: ['collectFeeMode', 'dynamicFee', 'poolFeeBps'],
+              additionalProperties: false,
+            },
+          },
+          required: ['migrationOption', 'migrationFeeOption', 'migrationFee'],
+          additionalProperties: false,
+        },
+        // Liquidity distribution configuration
+        liquidityDistribution: {
+          type: 'object',
+          properties: {
+            partnerLiquidityPercentage: { type: 'number' },
+            creatorLiquidityPercentage: { type: 'number' },
+            partnerPermanentLockedLiquidityPercentage: { type: 'number' },
+            creatorPermanentLockedLiquidityPercentage: { type: 'number' },
+            partnerLiquidityVestingInfoParams: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                vestingPercentage: { type: 'number' },
+                bpsPerPeriod: { type: 'number' },
+                numberOfPeriods: { type: 'number' },
+                cliffDurationFromMigrationTime: { type: 'number' },
+                totalDuration: { type: 'number' },
+              },
+              required: [
+                'vestingPercentage',
+                'bpsPerPeriod',
+                'numberOfPeriods',
+                'cliffDurationFromMigrationTime',
+                'totalDuration',
+              ],
+              additionalProperties: false,
+            },
+            creatorLiquidityVestingInfoParams: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                vestingPercentage: { type: 'number' },
+                bpsPerPeriod: { type: 'number' },
+                numberOfPeriods: { type: 'number' },
+                cliffDurationFromMigrationTime: { type: 'number' },
+                totalDuration: { type: 'number' },
+              },
+              required: [
+                'vestingPercentage',
+                'bpsPerPeriod',
+                'numberOfPeriods',
+                'cliffDurationFromMigrationTime',
+                'totalDuration',
+              ],
+              additionalProperties: false,
+            },
+          },
+          required: [
+            'partnerLiquidityPercentage',
+            'creatorLiquidityPercentage',
+            'partnerPermanentLockedLiquidityPercentage',
+            'creatorPermanentLockedLiquidityPercentage',
+          ],
+          additionalProperties: false,
+        },
+        // Locked vesting configuration
+        lockedVesting: {
+          type: 'object',
+          properties: {
+            totalLockedVestingAmount: { type: 'number' },
+            numberOfVestingPeriod: { type: 'number' },
+            cliffUnlockAmount: { type: 'number' },
+            totalVestingDuration: { type: 'number' },
+            cliffDurationFromMigrationTime: { type: 'number' },
+          },
+          required: [
+            'totalLockedVestingAmount',
+            'numberOfVestingPeriod',
+            'cliffUnlockAmount',
+            'totalVestingDuration',
+            'cliffDurationFromMigrationTime',
+          ],
+          additionalProperties: false,
+        },
+        activationType: { type: 'number', enum: [0, 1] },
+        leftoverReceiver: { type: 'string' },
+        feeClaimer: { type: 'string' },
+      },
+      required: [
+        'buildCurveMode',
+        'token',
+        'fee',
+        'migration',
+        'liquidityDistribution',
+        'lockedVesting',
+        'activationType',
+        'leftoverReceiver',
+        'feeClaimer',
+      ],
+      additionalProperties: false,
+    },
+    dbcPool: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        baseMintKeypairFilepath: { type: 'string' },
+        creator: { type: 'string' },
+        name: { type: 'string' },
+        symbol: { type: 'string' },
+        metadata: {
+          type: 'object',
+          properties: {
+            uri: { type: 'string' },
+            image: { type: 'string' },
+            description: { type: 'string' },
+            website: { type: 'string' },
+            twitter: { type: 'string' },
+            telegram: { type: 'string' },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ['creator', 'name', 'symbol', 'metadata'],
+      additionalProperties: false,
+    },
+    dbcSwap: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amountIn: { type: 'number' },
+        slippageBps: { type: 'number' },
+        swapBaseForQuote: { type: 'boolean' },
+        referralTokenAccount: {
+          anyOf: [{ type: 'string' }, { type: 'null' }],
+        },
+      },
+      required: ['amountIn', 'slippageBps', 'swapBaseForQuote'],
+      additionalProperties: false,
+    },
+    dbcTransferPoolCreator: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        newCreator: { type: 'string' },
+      },
+      required: ['newCreator'],
+      additionalProperties: false,
+    },
   },
   required: ['rpcUrl', 'dryRun', 'keypairFilePath', 'computeUnitPriceMicroLamports'],
   additionalProperties: true,
