@@ -126,8 +126,8 @@ importers:
         specifier: ^0.2.3
         version: 0.2.3(a9df66b8b8dbf9dc5fedf71ea6d83f21)
       '@meteora-ag/dynamic-bonding-curve-sdk':
-        specifier: ^1.5.2
-        version: 1.5.2(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
+        specifier: ^1.5.3
+        version: 1.5.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
       '@solana/spl-token':
         specifier: ^0.4.14
         version: 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
@@ -1565,11 +1565,6 @@ packages:
     resolution: {integrity: sha512-BBHcgC4MWcQi5KqkbXaoV8aCcS03d8JQiQ+4rIidSJPgDYzLqoylD9xjQOIMXGr8dM46qawPVoFPNXrm8ZciQA==}
     peerDependencies:
       '@solana/buffer-layout': ^3 || ^4
-
-  '@meteora-ag/dynamic-bonding-curve-sdk@1.5.2':
-    resolution: {integrity: sha512-cEzeWwyNsKFNEsWLDPF6qxRaePqH5ALuPJEtVaY1UJFGhJm/op0xcqTlxhVDllFjpH98Bbc95Qh9ETlS18IxzQ==}
-    peerDependencies:
-      typescript: ^5
 
   '@meteora-ag/dynamic-bonding-curve-sdk@1.5.3':
     resolution: {integrity: sha512-/zQfZ3LGJGICIvUkIygrFVblWYZFwyN6VMJtG7PW7YDjgRwpW02ifCEAjQP0Gxa0RUtE3bAsXmUjIG97VFM9gw==}
@@ -11506,20 +11501,6 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - supports-color
       - typescript
-      - utf-8-validate
-
-  '@meteora-ag/dynamic-bonding-curve-sdk@1.5.2(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': 0.31.1(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
-      '@solana/spl-token': 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)
-      '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)
-      bn.js: 5.2.2
-      decimal.js: 10.6.0
-      typescript: 5.9.2
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
       - utf-8-validate
 
   '@meteora-ag/dynamic-bonding-curve-sdk@1.5.3(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.2)(utf-8-validate@5.0.10)':
