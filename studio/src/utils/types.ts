@@ -388,7 +388,7 @@ export type BuildCurveWithMidPrice = BuildCurveBase & {
 };
 
 export type BuildCurveWithCustomSqrtPrices = BuildCurveBase & {
-  sqrtPrices: BN[];
+  prices: number[];
   liquidityWeights?: number[];
 };
 

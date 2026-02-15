@@ -69,10 +69,10 @@
     // "percentageSupplyOnMigration": 20, // percentage of total token supply to be migrated
 
     /* Only use the following parameters for buildCurveMode: 5 (buildCurveWithCustomSqrtPrices)
-     * 1. sqrtPrices - array of custom sqrt prices (must be in ascending order, at least 2 elements)
-     * 2. liquidityWeights - optional weights for each segment (length must be sqrtPrices.length - 1)
+     * 1. prices - array of decimal prices in ascending order (at least 2 elements).
+     * 2. liquidityWeights - optional weights for each segment (length must be prices.length - 1)
      */
-    // "sqrtPrices": [], // array of custom sqrt prices (ascending order). First = starting price (pMin), Last = migration price (pMax)
+    // "prices": [0.00001, 0.0005, 0.001, 0.01], // array of decimal prices (ascending order). First = starting price, Last = migration price
     // "liquidityWeights": [1, 2, 3], // optional: weights for each segment. If omitted, liquidity is distributed evenly
 
     /* Token Configuration */
@@ -190,8 +190,8 @@
 
     "activationType": 1, // 0 - Slot | 1 - Timestamp
 
-    "leftoverReceiver": "Dc85YcHkAWs62ndssWcGN5V4xYaQzPzgUDiRGtvnZas6", // leftover receiver address
-    "feeClaimer": "Dc85YcHkAWs62ndssWcGN5V4xYaQzPzgUDiRGtvnZas6" // fee claimer address
+    "leftoverReceiver": "YOUR_LEFTOVER_RECEIVER_ADDRESS", // leftover receiver address
+    "feeClaimer": "YOUR_FEE_CLAIMER_ADDRESS" // fee claimer address
   },
 
   /* dbcPool is only used in the following actions:
@@ -199,9 +199,9 @@
    */
   "dbcPool": {
     // "baseMintKeypairFilepath": "./mint-keypair.json", // optional base mint keypair file path
-    "creator": "Dc85YcHkAWs62ndssWcGN5V4xYaQzPzgUDiRGtvnZas6", // creator address
-    "name": "test", // token name
-    "symbol": "test", // token symbol
+    "creator": "YOUR_CREATOR_ADDRESS", // creator address
+    "name": "TOKEN_NAME", // token name
+    "symbol": "TOKEN_SYMBOL", // token symbol
     "metadata": {
       // "uri": "https://gateway.irys.xyz/123456789", // if you already have a metadata URI created, you can specify it here
 
@@ -209,7 +209,7 @@
        * This will create an image uri and a new metadata uri and upload everything to Irys
        */
       "image": "./data/image/test-token.jpg", // this can be a URL of the image address (e.g. https://example.com/token-image.png) or the image file path (e.g. ./data/image/test-token.jpg)
-      "description": "test", // token description
+      "description": "TOKEN_DESCRIPTION", // token description
       "website": "https://example.com", // project website
       "twitter": "https://x.com/yourproject", // twitter URL
       "telegram": "https://t.me/yourproject" // telegram URL

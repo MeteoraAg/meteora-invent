@@ -557,9 +557,9 @@ export const CONFIG_SCHEMA = {
         // Mode 4 params
         midPrice: { type: 'number' },
         // Mode 5 params
-        sqrtPrices: {
+        prices: {
           type: 'array',
-          items: { anyOf: [{ type: 'number' }, { type: 'string' }] },
+          items: { type: 'number' },
         },
         // Token configuration
         token: {

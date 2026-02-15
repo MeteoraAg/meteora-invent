@@ -21,6 +21,7 @@ import {
   buildCurveWithMarketCap,
   buildCurveWithMidPrice,
   buildCurveWithTwoSegments,
+  getSqrtPriceFromPrice,
   ConfigParameters,
   DAMM_V1_MIGRATION_FEE_ADDRESS,
   DAMM_V2_MIGRATION_FEE_ADDRESS,
@@ -68,7 +69,18 @@ export async function createDbcConfig(
   } else if (buildCurveMode === 4) {
     curveConfig = buildCurveWithMidPrice(buildCurveParams as any);
   } else if (buildCurveMode === 5) {
-    curveConfig = buildCurveWithCustomSqrtPrices(buildCurveParams as any);
+    const { prices, ...restParams } = buildCurveParams as any;
+    if (!prices || !Array.isArray(prices) || prices.length < 2) {
+      throw new Error(
+        'prices array must have at least 2 elements for buildCurveWithCustomSqrtPrices'
+      );
+    }
+    const tokenBaseDecimal = restParams.token?.tokenBaseDecimal ?? 6;
+    const tokenQuoteDecimal = restParams.token?.tokenQuoteDecimal ?? 9;
+    const sqrtPrices = prices.map((price: number) =>
+      getSqrtPriceFromPrice(String(price), tokenBaseDecimal, tokenQuoteDecimal)
+    );
+    curveConfig = buildCurveWithCustomSqrtPrices({ ...restParams, sqrtPrices });
   } else {
     throw new Error(
       `Unsupported DBC build curve mode: ${(config.dbcConfig as any).buildCurveMode}`
