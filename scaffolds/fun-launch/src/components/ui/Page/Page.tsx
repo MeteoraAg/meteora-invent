@@ -20,7 +20,12 @@ const Page: React.FC<React.PropsWithChildren<IProps>> = ({
     >
       <Header />
       {/* Full-width content with a modest gutter around it */}
-      <div className={cn('flex flex-1 flex-col items-center px-2 pt-3 pb-8 md:px-4', containerClassName)}>
+      <div
+        className={cn(
+          'flex flex-1 flex-col items-center px-2 pt-3 pb-8 md:px-4',
+          containerClassName
+        )}
+      >
         <div className="flex w-full flex-1 flex-col">{children}</div>
       </div>
     </div>
