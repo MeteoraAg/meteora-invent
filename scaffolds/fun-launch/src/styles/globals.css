@@ -2,29 +2,123 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens
+ *
+ * All values are RGB triplets so Tailwind can apply alpha modifiers,
+ * e.g. `bg-primary/10` -> rgb(var(--primary) / 0.1).
+ *
+ * The `neutral` and `primary` scales are *inverted* between themes:
+ * in dark mode, `neutral-950` is the darkest surface; in light mode it is
+ * the lightest. This lets every component keep a single set of classes
+ * (e.g. `bg-neutral-900 text-neutral-200`) and remain readable in both themes.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --background: 251 252 254;
+  --foreground: 15 23 42;
+
+  --neutral-50: 15 23 42;
+  --neutral-100: 29 41 61;
+  --neutral-200: 49 65 88;
+  --neutral-300: 69 85 108;
+  --neutral-400: 98 116 142;
+  --neutral-500: 123 139 163;
+  --neutral-600: 144 161 185;
+  --neutral-700: 202 213 226;
+  --neutral-750: 216 224 234;
+  --neutral-800: 226 232 240;
+  --neutral-850: 234 239 245;
+  --neutral-900: 241 245 249;
+  --neutral-925: 246 248 251;
+  --neutral-950: 255 255 255;
+
+  --primary: 77 124 15;
+  --primary-200: 77 124 15;
+  --primary-300: 63 98 18;
+  --primary-400: 101 163 13;
+  --primary-500: 132 204 22;
+  --primary-600: 163 230 53;
+  --primary-700: 190 242 100;
+  --primary-800: 236 252 203;
+  --primary-900: 242 253 217;
+  --primary-950: 247 254 231;
+
+  --emerald: 0 162 114;
+  --rose: 224 30 104;
+  --amber: 225 113 0;
+
+  /* Jupiter Plugin color theme (comma-separated RGB, per Jupiter docs) */
+  --jupiter-plugin-primary: 77, 124, 15;
+  --jupiter-plugin-background: 255, 255, 255;
+  --jupiter-plugin-primaryText: 15, 23, 42;
+  --jupiter-plugin-warning: 225, 113, 0;
+  --jupiter-plugin-interactive: 226, 232, 240;
+  --jupiter-plugin-module: 246, 248, 251;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+.dark {
+  color-scheme: dark;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: 5 7 10;
+  --foreground: 248 250 252;
+
+  --neutral-50: 248 250 252;
+  --neutral-100: 241 245 249;
+  --neutral-200: 226 232 240;
+  --neutral-300: 202 213 226;
+  --neutral-400: 144 161 185;
+  --neutral-500: 103 119 142;
+  --neutral-600: 73 86 104;
+  --neutral-700: 49 65 88;
+  --neutral-750: 37 52 70;
+  --neutral-800: 33 42 54;
+  --neutral-850: 25 36 46;
+  --neutral-900: 21 30 40;
+  --neutral-925: 17 25 34;
+  --neutral-950: 11 14 19;
+
+  --primary: 199 242 132;
+  --primary-200: 199 242 132;
+  --primary-300: 161 197 110;
+  --primary-400: 105 132 83;
+  --primary-500: 65 83 55;
+  --primary-600: 46 60 44;
+  --primary-700: 27 38 33;
+  --primary-800: 21 31 32;
+  --primary-900: 18 26 28;
+  --primary-950: 12 20 24;
+
+  --emerald: 60 227 171;
+  --rose: 242 54 116;
+  --amber: 255 185 0;
+
+  /* Jupiter Plugin color theme (comma-separated RGB, per Jupiter docs) */
+  --jupiter-plugin-primary: 199, 242, 132;
+  --jupiter-plugin-background: 11, 14, 19;
+  --jupiter-plugin-primaryText: 248, 250, 252;
+  --jupiter-plugin-warning: 255, 185, 0;
+  --jupiter-plugin-interactive: 33, 42, 54;
+  --jupiter-plugin-module: 17, 25, 34;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
+
+::selection {
+  background-color: rgb(var(--primary) / 0.25);
 }
 
 /* Scrollbar */
@@ -32,18 +126,15 @@ body {
   height: 0.35rem;
   width: 0.35rem;
 }
-body::-webkit-scrollbar-track-piece {
-  background-color: #1c2936;
-}
 ::-webkit-scrollbar-track-piece {
   background-color: transparent;
 }
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background-color: #6b7280;
+  background-color: rgb(var(--neutral-700));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #9ca3af;
+  background-color: rgb(var(--neutral-600));
 }
 ::-webkit-scrollbar-corner {
   background-color: transparent;

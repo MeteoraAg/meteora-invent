@@ -1,7 +1,6 @@
 {
   "extends": "@meteora-invent/config/typescript/base",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@meteora-invent/config/*": ["./packages/config/*"],
       "@meteora-invent/studio": ["./studio"],
@@ -16,7 +15,8 @@
     "allowJs": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noUnusedLocals": false,

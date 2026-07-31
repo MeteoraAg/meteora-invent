@@ -155,6 +155,15 @@ pnpm studio dlmm-seed-liquidity-single-bin --baseMint <YOUR_BASE_MINT_ADDRESS>
 
 # Set DLMM Pool Status
 pnpm studio dlmm-set-pool-status --poolAddress <YOUR_POOL_ADDRESS>
+
+# Place a Limit Order (side/bins from placeLimitOrder in dlmm_config.jsonc)
+pnpm studio dlmm-place-limit-order --poolAddress <YOUR_POOL_ADDRESS>
+
+# List Open Limit Orders
+pnpm studio dlmm-get-limit-orders --poolAddress <YOUR_POOL_ADDRESS>
+
+# Cancel a Limit Order (omit --limitOrder and set cancelLimitOrder.cancelAll to cancel all)
+pnpm studio dlmm-cancel-limit-order --poolAddress <YOUR_POOL_ADDRESS> --limitOrder <YOUR_LIMIT_ORDER_ADDRESS>
 ```
 
 ### Alpha Vault - Yield Strategies
@@ -243,7 +252,7 @@ All configurations are in `studio/config/`:
     "creatorPermanentLockedLiquidityPercentage": 0, // Creator permanently locked LP
     "creatorTradingFeePercentage": 0, // Creator fee share (0-100%)
     "leftover": 0, // Leftover tokens (claimable after migration)
-    "tokenUpdateAuthority": 1 // 0: Creator | 1: Immutable | 2: Partner | etc.
+    "tokenAuthorityOption": 1 // 0: Creator | 1: Immutable | 2: Partner | etc.
   },
   
   "dbcPool": {

@@ -14,16 +14,16 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "bn.js": "^5.2.2",
+    "bn.js": "^5.2.5",
     "decimal.js": "^10.6.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/eslintrc": "^3.3.6",
     "@meteora-invent/config-eslint": "workspace:*",
     "@meteora-invent/config-prettier": "workspace:*",
     "@meteora-invent/config-typescript": "workspace:*",
-    "@types/bn.js": "^5.1.5",
-    "eslint": "^9.36.0",
-    "typescript": "^5.9.2"
+    "@types/bn.js": "^5.2.0",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,9 +1,11 @@
 import { CSSProperties, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocalStorage } from 'react-use';
 
+import { useTheme } from 'next-themes';
+
 import { createDataFeed } from './datafeed';
 import { formatChartPrice, getPrecisionTickSizeText } from './formatter';
-import { CHART_BG_COLOR, CHART_GRID_LINE_COLOR } from './constants';
+import { CHART_THEME_COLORS } from './constants';
 import { ChartConfig, DEFAULT_CHART_CONFIG } from './config';
 import { FAVORITE_INTERVALS } from './intervals';
 import { loadChartState, saveChartState } from './chartstate';
@@ -112,6 +114,9 @@ const DISABLED_FEATURES: ChartingLibraryWidgetOptions['disabled_features'] = [
 
 export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt }) => {
   const isMobile = useMobile();
+  const { resolvedTheme } = useTheme();
+  const chartTheme = resolvedTheme === 'light' ? 'light' : 'dark';
+  const chartColors = CHART_THEME_COLORS[chartTheme];
   const [chartConfig, setChartConfig] = useLocalStorage<ChartConfig>(
     'chart_config',
     DEFAULT_CHART_CONFIG
@@ -164,17 +169,24 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
     return tokenInfo ? `${tokenInfo.symbol.toUpperCase()}/USD` : undefined;
   }, [tokenInfo]);
 
-  // Set up widget on first mount
+  // Set up widget on first mount and rebuild it when the theme changes
   useEffect(() => {
     if (!symbol) {
       console.error('createWidget: missing symbol, breaking: ', { symbol });
       return;
     }
 
+    let disposed = false;
+    setIsLoaded(false);
+    setIsDataReady(false);
+
     const initializeWidget = async () => {
       try {
         // First, ensure TradingView script is loaded
         const tv = await loadTvLibrary();
+        if (disposed) {
+          return;
+        }
 
         const disabledFeatures = [...DISABLED_FEATURES];
         // Prevent TV from preventing to scroll the page on mobile
@@ -190,7 +202,7 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
           interval: (chartConfig?.lastInterval ?? '15') as ResolutionString, // 15 minutes
           locale: 'en',
           container: htmlId,
-          theme: 'dark',
+          theme: chartTheme,
           autosize: true,
           auto_save_delay: 1,
           custom_css_url: `${TRADING_VIEW_DOMAIN}/tv/css/tokenchart.css`,
@@ -199,16 +211,16 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
             'chartEventsSourceProperties.breaks.visible': false,
             'paneProperties.legendProperties.showSeriesTitle': true,
             'paneProperties.backgroundType': 'solid',
-            'paneProperties.background': CHART_BG_COLOR,
+            'paneProperties.background': chartColors.bg,
             'scalesProperties.fontSize': isMobile ? 7 : 12,
           },
           overrides: {
             'mainSeriesProperties.highLowAvgPrice.highLowPriceLabelsVisible': true,
             'mainSeriesProperties.highLowAvgPrice.highLowPriceLinesVisible': true,
             'paneProperties.vertGridProperties.style': 2, // dashed
-            'paneProperties.vertGridProperties.color': CHART_GRID_LINE_COLOR, // neutral-850
+            'paneProperties.vertGridProperties.color': chartColors.grid, // neutral-850
             'paneProperties.horzGridProperties.style': 2, // dashed
-            'paneProperties.horzGridProperties.color': CHART_GRID_LINE_COLOR, // neutral-850
+            'paneProperties.horzGridProperties.color': chartColors.grid, // neutral-850
           },
           width: '100%' as any, // Ignore this typing, this fills to container
           height: '100%' as any, // Ignore this typing, this fills to container
@@ -328,11 +340,11 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
             'mainSeriesProperties.highLowAvgPrice.highLowPriceLabelsVisible': true,
             'mainSeriesProperties.highLowAvgPrice.highLowPriceLinesVisible': true,
             'paneProperties.vertGridProperties.style': 2, // dashed
-            'paneProperties.vertGridProperties.color': CHART_GRID_LINE_COLOR, // neutral-850
+            'paneProperties.vertGridProperties.color': chartColors.grid, // neutral-850
             'paneProperties.horzGridProperties.style': 2, // dashed
-            'paneProperties.horzGridProperties.color': CHART_GRID_LINE_COLOR, // neutral-850
+            'paneProperties.horzGridProperties.color': chartColors.grid, // neutral-850
             'paneProperties.backgroundType': 'solid',
-            'paneProperties.background': CHART_BG_COLOR,
+            'paneProperties.background': chartColors.bg,
             'mainSeriesProperties.statusViewStyle.symbolTextSource': 'description', // display token symbol, jup.ag in chart
           });
 
@@ -383,19 +395,24 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
 
           setIsLoaded(true);
         });
-
-        return () => {
-          widget.remove();
-          widgetRef.current = null;
-        };
       } catch (error) {
         console.error('Failed to initialize TradingView widget:', error);
         return;
       }
     };
     initializeWidget();
+
+    return () => {
+      disposed = true;
+      try {
+        widgetRef.current?.remove();
+      } catch {
+        // widget may already be disposed
+      }
+      widgetRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol]);
+  }, [symbol, chartTheme]);
 
   function updateButtonTitles(config: ChartConfig) {
     if (!priceMcapTogglerRef.current) {
@@ -404,9 +421,9 @@ export const TokenChart: React.FC<ChartProps> = memo(({ renderingId, style, opt 
 
     // Price/mcap toggle
     if (config.chartType === 'mcap') {
-      priceMcapTogglerRef.current.innerHTML = 'Price / <span style="color:#c7f284">Mcap</span>';
+      priceMcapTogglerRef.current.innerHTML = `Price / <span style="color:${chartColors.accent}">Mcap</span>`;
     } else {
-      priceMcapTogglerRef.current.innerHTML = '<span style="color:#c7f284">Price</span> / Mcap';
+      priceMcapTogglerRef.current.innerHTML = `<span style="color:${chartColors.accent}">Price</span> / Mcap`;
     }
 
     // Show dev trades toggle

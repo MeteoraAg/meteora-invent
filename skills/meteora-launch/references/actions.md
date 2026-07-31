@@ -1,12 +1,12 @@
 # Meteora Invent — Full Action Reference
 
-All 27 studio actions documented with parameters, outputs, and usage notes.
+All 30 studio actions documented with parameters, outputs, and usage notes.
 
 ## Contents
 
 - [Setup Actions](#setup-actions) — `generate-keypair`, `airdrop-sol`, `start-test-validator`
-- [DBC Actions](#dbc-dynamic-bonding-curve-actions) — `dbc-create-config/pool`, `dbc-swap`, `dbc-claim-trading-fee`, `dbc-migrate-to-damm-v1/v2`, `dbc-transfer-pool-creator`
-- [DLMM Actions](#dlmm-dynamic-liquidity-market-maker-actions) — `dlmm-create-pool`, `dlmm-seed-liquidity-lfg/single-bin`, `dlmm-set-pool-status`
+- [DBC Actions](#dbc-dynamic-bonding-curve-actions) — `dbc-create-config/pool` (with or without transfer hook), `dbc-swap`, `dbc-claim-trading-fee`, `dbc-migrate-to-damm-v1/v2`, `dbc-transfer-pool-creator`
+- [DLMM Actions](#dlmm-dynamic-liquidity-market-maker-actions) — `dlmm-create-pool`, `dlmm-seed-liquidity-lfg/single-bin`, `dlmm-set-pool-status`, `dlmm-place-limit-order`, `dlmm-get-limit-orders`, `dlmm-cancel-limit-order`
 - [DAMM v2 Actions](#damm-v2-actions) — create balanced/one-sided, add/remove liquidity, claim fee, split/close position, refresh vesting
 - [DAMM v1 Actions](#damm-v1-actions) — create pool, lock liquidity, stake2earn farm
 - [Alpha Vault Actions](#alpha-vault-actions) — `alpha-vault-create`
@@ -71,25 +71,36 @@ pnpm studio dbc-create-config
 pnpm studio dbc-create-config --config studio/config/dbc_config.jsonc
 ```
 
-**Key Config Fields:**
+**Key Config Fields (`dbcConfig` block):**
 ```jsonc
 {
-  "quoteMint": "So11111111111111111111111111111111111111112", // Quote token (SOL default)
-  "feeClaimer": "YOUR_FEE_CLAIMER_PUBKEY",
+  "buildCurveMode": 0,             // 0=buildCurve | 1=marketCap | 2=twoSegments | 3=liquidityWeights | 4=midPrice | 5=customSqrtPrices
+  "percentageSupplyOnMigration": 20,
+  "migrationQuoteThreshold": 10,   // in quote tokens, not lamports
+  "token": {
+    "totalTokenSupply": 1000000000,
+    "tokenBaseDecimal": 6,
+    "tokenQuoteDecimal": 9,
+    "tokenType": 0,                // 0=SPL Token, 1=Token 2022
+    "tokenAuthorityOption": 1,     // 0=CreatorUpdate | 1=Immutable | 2=PartnerUpdate | 3=CreatorUpdateAndMint | 4=PartnerUpdateAndMint (3/4 need a transfer hook config)
+    "leftover": 0
+  },
+  "fee": { "baseFeeParams": { /* fee scheduler or rate limiter */ }, "collectFeeMode": 0 },
+  "migration": { "migrationOption": 1, "migrationFeeOption": 3, "migrationFee": { /* ... */ } },
+  "liquidityDistribution": { /* partner/creator LP split, must total 100 */ },
+  "lockedVesting": { /* optional token vesting */ },
+  "activationType": 1,
   "leftoverReceiver": "YOUR_RECEIVER_PUBKEY",
-  "migrationFeeOption": 0,      // 0-7: different fee tiers for DAMM migration
-  "migrationOption": 0,          // 0=DAMM v1, 1=DAMM v2
-  "tokenType": 0,                // 0=SPL, 1=Token 2022
-  "partnerLpPercentage": 50,     // Partner LP allocation on migration
-  "creatorLpPercentage": 50,     // Creator LP allocation on migration
-  "partnerLockedLpPercentage": 0,
-  "creatorLockedLpPercentage": 0,
-  "collectFeeMode": 0,           // 0=quote only, 1=both tokens
-  "migrationQuoteThreshold": "1000000000", // lamports triggering migration
-  "sqrtStartPrice": "...",       // Starting sqrt price (u128)
-  "curve": [...]                 // Price curve points
+  "feeClaimer": "YOUR_FEE_CLAIMER_PUBKEY"
+  // "transferHookProgram": "HOOK_PROGRAM_PUBKEY" // Token 2022 transfer hook launch (requires tokenType: 1)
 }
 ```
+
+**Transfer hook launches:** setting `transferHookProgram` creates the config with
+`createConfigWithTransferHook`, so every token launched on it is a Token 2022 mint that
+executes the hook program on each transfer. The market-cap fee scheduler for migrated pools
+(`migration.migratedPoolFee.marketCapFeeSchedulerParams`) now takes `priceMultiple` (ending
+market cap over starting market cap) instead of `sqrtPriceStepBps`.
 
 **Output:** Config account pubkey logged. Save for use in pool creation.
 
@@ -116,6 +127,11 @@ pnpm studio dbc-create-pool --config studio/config/dbc_config.jsonc
 3. Seeds initial liquidity from config
 4. Sets fee scheduler (if configured)
 
+**Transfer hook pools:** when the target config was created with a transfer hook, set
+`dbcPool.transferHookProgram` to the same hook program — the pool is then created with
+`createPoolWithTransferHook`. When `dbc-create-pool` creates the config in the same run,
+`dbcConfig.transferHookProgram` is used automatically.
+
 **Output:** Base mint address + pool address logged.
 
 **⚠️ Required SOL:** ~0.05 SOL for account rent + fees
@@ -129,15 +145,18 @@ Buy or sell tokens on the bonding curve.
 pnpm studio dbc-swap --baseMint <MINT_ADDRESS>
 ```
 
-**Key Config Fields:**
+**Key Config Fields (`dbcSwap` block):**
 ```jsonc
 {
-  "inAmount": "1000000000",     // Amount in lamports/smallest unit
-  "minimumAmountOut": "0",      // Slippage protection
+  "amountIn": 1.03,             // in token units: quote token when buying, base token when selling
+  "slippageBps": 100,           // slippage tolerance in bps
   "swapBaseForQuote": false,    // false=buy base token, true=sell base token
   "referralTokenAccount": null  // Optional referral
 }
 ```
+
+Pools whose base mint carries a transfer hook are detected automatically and swapped through
+`swap2WithTransferHook`.
 
 ---
 
@@ -149,8 +168,11 @@ pnpm studio dbc-claim-trading-fee --baseMint <MINT_ADDRESS>
 ```
 
 **Requirements:**
-- Must be called by `feeClaimer` set in the config account
+- Must be called by the pool creator and/or the `feeClaimer` set in the config account
 - Fees accumulate automatically with every swap
+
+Pools whose base mint carries a transfer hook are claimed through the transfer-hook-aware
+`claimCreatorTradingFee2` / `claimPartnerTradingFee2` endpoints automatically.
 
 **Output:** Fee amounts claimed logged.
 
@@ -214,18 +236,20 @@ pnpm studio dlmm-create-pool --baseMint <MINT_ADDRESS>
 pnpm studio dlmm-create-pool --config studio/config/dlmm_config.jsonc
 ```
 
-**Key Config Fields:**
+**Key Config Fields (`dlmmConfig` block):**
 ```jsonc
 {
   "quoteMint": "So11111111111111111111111111111111111111112",
-  "binStep": 10,               // Price step per bin (in bps, e.g. 10 = 0.1%)
-  "baseFactor": 10000,         // Base fee factor
+  "binStep": 25,               // Price step per bin (in bps, e.g. 25 = 0.25%)
   "feeBps": 100,               // Base fee in bps (100 = 1%)
   "initialPrice": 0.001,       // Starting price in quote token
-  "priceRoundingUp": true,
-  "activationType": 0,         // 0=slot, 1=timestamp
+  "priceRounding": "up",       // "up" | "down" bin ID rounding
+  "activationType": 1,         // 0=slot, 1=timestamp
   "activationPoint": null,     // null=immediate
+  "creatorPoolOnOffControl": true,
   "hasAlphaVault": false       // Set true if adding Alpha Vault after
+  // "concreteFunctionType": 0, // 0=LimitOrder (default, pool accepts limit orders) | 1=LiquidityMining
+  // "collectFeeMode": 0        // 0=InputOnly (default) | 1=OnlyY
 }
 ```
 
@@ -274,10 +298,77 @@ Enable or disable trading on a DLMM pool.
 pnpm studio dlmm-set-pool-status --poolAddress <POOL_ADDRESS>
 ```
 
-**Key Config Fields:**
+**Key Config Fields (`setDlmmPoolStatus` block):**
 ```jsonc
 {
-  "poolStatus": 0   // 0=enabled, 1=disabled
+  "enabled": true   // true=enable trading, false=disable trading
+}
+```
+
+---
+
+### `dlmm-place-limit-order`
+Place a limit order on a DLMM pool. The order deposits into one or more bins (max 50) and
+fills as the market price crosses them.
+
+```bash
+pnpm studio dlmm-place-limit-order --poolAddress <POOL_ADDRESS>
+```
+
+**Flags:**
+| Flag | Type | Description |
+|------|------|-------------|
+| `--poolAddress` | pubkey | DLMM pool to place the order on (required) |
+
+**Key Config Fields (`placeLimitOrder` block):**
+```jsonc
+{
+  "side": "bid",         // "ask"=sell base token above the active bin, "bid"=buy with quote token below it
+  "bins": [
+    { "price": 1.2, "amount": 100 }  // amount in token units: base for "ask", quote for "bid"
+  ]
+}
+```
+
+**Requirements:**
+- Pool must support limit orders (created with `concreteFunctionType: 0`, the default)
+- Bin prices are converted to bin IDs using the pool's bin step
+
+**Output:** Limit order account address + rent quote logged. Save the address for cancelling.
+
+---
+
+### `dlmm-get-limit-orders`
+List all open limit orders owned by the wallet on a DLMM pool, with per-bin fill status.
+
+```bash
+pnpm studio dlmm-get-limit-orders --poolAddress <POOL_ADDRESS>
+```
+
+**Output:** For each order: deposit totals, unfilled/filled/swapped amounts, fees earned,
+withdrawable amounts, and per-bin status (`NotFilled` | `PartialFilled` | `Fulfilled`).
+
+---
+
+### `dlmm-cancel-limit-order`
+Cancel limit orders and withdraw unfilled deposits, filled proceeds, and earned fees. The
+order account is closed and rent refunded in the same transaction.
+
+```bash
+pnpm studio dlmm-cancel-limit-order --poolAddress <POOL_ADDRESS> --limitOrder <ORDER_ADDRESS>
+pnpm studio dlmm-cancel-limit-order --poolAddress <POOL_ADDRESS>   # cancels all (requires cancelAll: true)
+```
+
+**Flags:**
+| Flag | Type | Description |
+|------|------|-------------|
+| `--poolAddress` | pubkey | DLMM pool the order lives on (required) |
+| `--limitOrder` | pubkey | Specific order to cancel (optional) |
+
+**Key Config Fields (`cancelLimitOrder` block):**
+```jsonc
+{
+  "cancelAll": false   // when true and no --limitOrder flag, cancels every open order on the pool
 }
 ```
 
@@ -556,6 +647,9 @@ pnpm studio presale-vault-create --baseMint <MINT_ADDRESS>
 | DLMM: Seed LFG | `dlmm-seed-liquidity-lfg` | 0.01 | Any |
 | DLMM: Seed single bin | `dlmm-seed-liquidity-single-bin` | 0.01 | Any |
 | DLMM: Set status | `dlmm-set-pool-status` | 0.001 | Any |
+| DLMM: Place limit order | `dlmm-place-limit-order` | 0.01 | Any |
+| DLMM: List limit orders | `dlmm-get-limit-orders` | 0 | Any |
+| DLMM: Cancel limit order | `dlmm-cancel-limit-order` | 0.001 | Any |
 | DAMM v2: Balanced pool | `damm-v2-create-balanced-pool` | 0.05 | Any |
 | DAMM v2: One-sided pool | `damm-v2-create-one-sided-pool` | 0.05 | Any |
 | DAMM v2: Add liquidity | `damm-v2-add-liquidity` | 0.01 | Any |

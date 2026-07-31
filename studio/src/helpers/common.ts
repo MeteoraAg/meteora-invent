@@ -1,17 +1,15 @@
 import { SOL_TOKEN_DECIMALS } from '../utils/constants';
 import Decimal from 'decimal.js';
 import BN from 'bn.js';
-import { Signer, PublicKey, Connection, Keypair } from '@solana/web3.js';
+import { Signer, PublicKey, Connection, Keypair, sendAndConfirmTransaction } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
 import { AllocationByAmount, LockLiquidityAllocation } from '../utils/types';
-import {
-  ActivationType,
-  createDammV2Program,
-  DAMM_V2_PROGRAM_ID,
-  getDynamicFeeParams,
-} from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { ActivationType, getDynamicFeeParams } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import {
   BaseFeeMode,
+  CpAmm,
+  deriveConfigAddress,
+  deriveOperatorAddress,
   encodeFeeTimeSchedulerParams,
   MAX_SQRT_PRICE,
   MIN_SQRT_PRICE,
@@ -132,7 +130,7 @@ export async function createDammV2Config(
   poolCreatorAuthority: PublicKey,
   migrationFeeOption: number
 ): Promise<PublicKey> {
-  const program = createDammV2Program(connection);
+  const program = new CpAmm(connection)._program;
 
   let baseFeeBps = 100;
   let cliffFeeNumerator = new BN(10000000);
@@ -157,10 +155,26 @@ export async function createDammV2Config(
   }
   const dynamicFeeParams = getDynamicFeeParams(baseFeeBps);
 
-  const [config] = PublicKey.findProgramAddressSync(
-    [Buffer.from('config'), new BN(0).toBuffer('le', 8)],
-    DAMM_V2_PROGRAM_ID
-  );
+  const config = deriveConfigAddress(new BN(0));
+
+  // The create_config instruction requires an operator account whitelisted for config creation
+  const operator = deriveOperatorAddress(payer.publicKey);
+  const operatorAccount = await connection.getAccountInfo(operator);
+  if (!operatorAccount) {
+    const createConfigKeyPermission = new BN(1);
+    const createOperatorTx = await program.methods
+      .createOperatorAccount(createConfigKeyPermission)
+      .accountsPartial({
+        operator,
+        whitelistedAddress: payer.publicKey,
+        signer: payer.publicKey,
+        payer: payer.publicKey,
+      })
+      .transaction();
+    await sendAndConfirmTransaction(connection, createOperatorTx, [payer], {
+      commitment: connection.commitment,
+    });
+  }
 
   const baseFeeData = encodeFeeTimeSchedulerParams(
     cliffFeeNumerator,
@@ -175,6 +189,8 @@ export async function createDammV2Config(
       baseFee: {
         data: Array.from(baseFeeData),
       },
+      compoundingFeeBps: 0,
+      padding: 0,
       dynamicFee: dynamicFeeParams,
     },
     sqrtMinPrice: MIN_SQRT_PRICE,
@@ -189,16 +205,15 @@ export async function createDammV2Config(
     .createConfig(new BN(0), configParameters)
     .accountsPartial({
       config,
-      operator: payer.publicKey,
+      operator,
       signer: payer.publicKey,
       payer: payer.publicKey,
     })
     .transaction();
 
-  const { blockhash } = await connection.getLatestBlockhash();
-  transaction.recentBlockhash = blockhash;
-  transaction.sign(payer);
-  await connection.sendRawTransaction(transaction.serialize());
+  await sendAndConfirmTransaction(connection, transaction, [payer], {
+    commitment: connection.commitment,
+  });
 
   return config;
 }

@@ -8,6 +8,7 @@ export interface CliArguments {
   network?: string | undefined;
   baseMint?: string | undefined;
   poolAddress?: string | undefined;
+  limitOrder?: string | undefined;
   airdrop?: boolean | undefined;
   help?: boolean | undefined;
 }
@@ -192,6 +193,8 @@ export type DlmmConfig = MeteoraConfigBase & {
   lfgSeedLiquidity: LfgSeedLiquidityConfig | null;
   singleBinSeedLiquidity: SingleBinSeedLiquidityConfig | null;
   setDlmmPoolStatus: SetDlmmPoolStatusConfig | null;
+  placeLimitOrder?: DlmmPlaceLimitOrderConfig | null;
+  cancelLimitOrder?: DlmmCancelLimitOrderConfig | null;
 };
 
 export interface DynamicLmmConfig {
@@ -204,6 +207,10 @@ export interface DynamicLmmConfig {
   hasAlphaVault: boolean;
   // Allow creator to turn on/off the pool
   creatorPoolOnOffControl: boolean;
+  // 0 - LimitOrder | 1 - LiquidityMining (defaults to LimitOrder when omitted)
+  concreteFunctionType?: number;
+  // 0 - InputOnly | 1 - OnlyY (defaults to InputOnly when omitted)
+  collectFeeMode?: number;
 }
 
 export interface LfgSeedLiquidityConfig {
@@ -231,6 +238,24 @@ export interface SingleBinSeedLiquidityConfig {
 
 export interface SetDlmmPoolStatusConfig {
   enabled: boolean;
+}
+
+export interface DlmmLimitOrderBinConfig {
+  // price in quote token per base token
+  price: number;
+  // amount in token units: base token for "ask" orders, quote token for "bid" orders
+  amount: number | string;
+}
+
+export interface DlmmPlaceLimitOrderConfig {
+  // "ask" sells the base token above the active bin, "bid" buys with the quote token below it
+  side: 'ask' | 'bid';
+  bins: DlmmLimitOrderBinConfig[];
+}
+
+export interface DlmmCancelLimitOrderConfig {
+  // when true and no --limitOrder flag is passed, cancels every open order on the pool
+  cancelAll: boolean;
 }
 /* DBC */
 
@@ -276,7 +301,8 @@ export type FeeMarketCapSchedulerParams = {
   startingFeeBps: number;
   endingFeeBps: number;
   numberOfPeriod: number;
-  sqrtPriceStepBps: number;
+  // ratio of ending market cap over starting market cap, must be greater than 1
+  priceMultiple: number;
   schedulerExpirationDuration: number;
 };
 
@@ -299,7 +325,8 @@ export type LiquidityVestingInfoParams = {
 export type MigratedPoolMarketCapFeeSchedulerConfigParams = {
   endingBaseFeeBps: number;
   numberOfPeriod: number;
-  sqrtPriceStepBps: number;
+  // ratio of ending market cap over starting market cap, must be greater than 1
+  priceMultiple: number;
   schedulerExpirationDuration: number;
 };
 
@@ -308,7 +335,7 @@ export type DbcTokenConfig = {
   tokenBaseDecimal: number;
   tokenQuoteDecimal: number;
   tokenType: number;
-  tokenUpdateAuthority: number;
+  tokenAuthorityOption: number;
   leftover: number;
 };
 
@@ -322,9 +349,10 @@ export type DbcFeeConfig = {
 };
 
 export type DbcMigratedPoolFeeConfig = {
-  collectFeeMode: number; // 0 - Quote Token | 1 - Output Token
+  collectFeeMode: number; // 0 - Quote Token | 1 - Output Token | 2 - Compounding
   dynamicFee: number; // 0: Disabled, 1: Enabled
   poolFeeBps: number; // The pool fee in basis points. Required when marketCapFeeSchedulerParams is configured.
+  compoundingFeeBps?: number; // Portion of trading fees compounded back into liquidity (collectFeeMode 2 only)
   baseFeeMode?: 3 | 4; // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (DAMM v2 only)
   marketCapFeeSchedulerParams?: MigratedPoolMarketCapFeeSchedulerConfigParams;
 };
@@ -357,6 +385,8 @@ export type BuildCurveBase = {
   activationType: number;
   leftoverReceiver: string;
   feeClaimer: string;
+  // Token2022 transfer hook program for the base mint; requires token.tokenType 1 (Token2022)
+  transferHookProgram?: string | null;
 };
 
 export type BuildCurve = BuildCurveBase & {
@@ -399,6 +429,8 @@ export type DbcPool = {
   name: string;
   symbol: string;
   metadata: TokenMetadata;
+  // Required when the target config was created with a transfer hook; must match the config's hook program
+  transferHookProgram?: string | null;
 };
 
 export type DbcSwap = {

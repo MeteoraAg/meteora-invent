@@ -7,16 +7,14 @@ import { PropsWithChildren } from 'react';
 const Explore = () => {
   return (
     <ExploreContext>
-      <div className="py-8">
-        <ExploreGrid className="flex-1" />
-      </div>
+      <ExploreGrid className="flex-1" />
     </ExploreContext>
   );
 };
 
 const ExploreContext = ({ children }: PropsWithChildren) => {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-1 flex-col">
       <ExploreMsgHandler />
 
       <ExploreProvider>

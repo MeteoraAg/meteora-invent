@@ -80,8 +80,8 @@
       "totalTokenSupply": 1000000000, // total token supply (not in lamports)
       "tokenBaseDecimal": 6, // token base decimal
       "tokenQuoteDecimal": 9, // token quote decimal
-      "tokenType": 0, // 0 - SPL | 1 - Token 2022
-      "tokenUpdateAuthority": 1, // 0 - CreatorUpdateAuthority | 1 - Immutable | 2 - PartnerUpdateAuthority | 3 - CreatorUpdateAndMintAuthority | 4 - PartnerUpdateAndMintAuthority
+      "tokenType": 0, // 0 - SPL Token | 1 - Token 2022
+      "tokenAuthorityOption": 1, // 0 - CreatorUpdateAuthority | 1 - Immutable | 2 - PartnerUpdateAuthority | 3 - CreatorUpdateAndMintAuthority | 4 - PartnerUpdateAndMintAuthority (3 and 4 are only allowed for transfer hook configs)
       "leftover": 0 // leftover tokens in the bonding curve (claimable once pool migrates)
     },
 
@@ -130,14 +130,15 @@
        * Note: When marketCapFeeSchedulerParams is configured, the SDK will automatically set migrationFeeOption to Customizable (6).
        */
       // "migratedPoolFee": {
-      //   "collectFeeMode": 0, // 0 - Quote Token | 1 - Output Token
+      //   "collectFeeMode": 0, // 0 - Quote Token | 1 - Output Token | 2 - Compounding
       //   "dynamicFee": 0, // 0: Disabled, 1: Enabled
       //   "poolFeeBps": 100, // The pool fee in basis points. Minimum 10, Maximum 1000 bps. Required when marketCapFeeSchedulerParams is configured.
+      //   "compoundingFeeBps": 5000, // Portion of trading fees compounded back into pool liquidity (0 to 10000 bps). Only for collectFeeMode: 2 (Compounding)
       //   "baseFeeMode": 3, // 3 - FeeMarketCapSchedulerLinear | 4 - FeeMarketCapSchedulerExponential (only for DAMM v2)
       //   "marketCapFeeSchedulerParams": {
       //     "endingBaseFeeBps": 50, // The ending (minimum) base fee in basis points
       //     "numberOfPeriod": 100, // The total number of fee reduction periods
-      //     "sqrtPriceStepBps": 100, // The sqrt price increase (in bps) required to advance one period
+      //     "priceMultiple": 1000, // The ratio of ending market cap over starting market cap, must be greater than 1
       //     "schedulerExpirationDuration": 86400 // The maximum duration (seconds) after which the scheduler expires and defaults to minimum fee
       //   }
       // }
@@ -192,6 +193,13 @@
 
     "leftoverReceiver": "YOUR_LEFTOVER_RECEIVER_ADDRESS", // leftover receiver address
     "feeClaimer": "YOUR_FEE_CLAIMER_ADDRESS" // fee claimer address
+
+    /* Transfer Hook Launch (Token 2022 only)
+     * Set transferHookProgram to launch tokens whose base mint executes a transfer hook program on every transfer.
+     * Requires token.tokenType: 1 (Token 2022). The config is created with createConfigWithTransferHook and
+     * pools on it must be created with the same transferHookProgram (see dbcPool.transferHookProgram).
+     */
+    // "transferHookProgram": "YOUR_TRANSFER_HOOK_PROGRAM_ADDRESS"
   },
 
   /* dbcPool is only used in the following actions:
@@ -202,6 +210,8 @@
     "creator": "YOUR_CREATOR_ADDRESS", // creator address
     "name": "TOKEN_NAME", // token name
     "symbol": "TOKEN_SYMBOL", // token symbol
+    // "transferHookProgram": "YOUR_TRANSFER_HOOK_PROGRAM_ADDRESS", // required when the target config was created with a transfer hook; must match the config's hook program
+
     "metadata": {
       // "uri": "https://gateway.irys.xyz/123456789", // if you already have a metadata URI created, you can specify it here
 

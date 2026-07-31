@@ -1,8 +1,9 @@
-import { TokenInfo } from '@solana/spl-token-registry';
 import { createContext, useContext } from 'react';
 import { Asset } from '../Explore/types';
 
-export type TokenIconInfo = Pick<TokenInfo, 'logoURI' | 'symbol'> & {
+export type TokenIconInfo = {
+  readonly logoURI?: string;
+  readonly symbol: string;
   launchpad?: Asset['launchpad'];
 };
 

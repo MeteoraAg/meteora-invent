@@ -7,7 +7,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
   "engines": {
-    "node": ">=18",
+    "node": ">=22.12",
     "pnpm": ">=10"
   },
   "scripts": {
@@ -31,14 +31,14 @@
     "syncpack:fix": "syncpack fix-mismatches"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "eslint": "^9.36.0",
+    "@types/node": "^24.13.3",
+    "eslint": "^9.39.5",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.0",
-    "prettier": "^3.6.2",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.6",
     "syncpack": "^13.0.4",
-    "turbo": "^2.5.8",
-    "typescript": "^5.9.2"
+    "turbo": "^2.10.7",
+    "typescript": "^5.9.3"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -48,5 +48,27 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "@ledgerhq/errors": "6.22.0",
+      "protobufjs@7": "^7.6.5",
+      "lodash": "^4.18.0",
+      "minimatch@9": "^9.0.7",
+      "postcss@8": "^8.5.25",
+      "sharp@0.34": "^0.35.0",
+      "ws@8": "^8.21.0",
+      "uuid@8": "^11.1.1",
+      "uuid@9": "^11.1.1",
+      "bn.js@5": "^5.2.5",
+      "node-fetch@2": "^2.7.0"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-3gc7-fjrx-p6mg",
+        "GHSA-848j-6mx2-7j84",
+        "GHSA-mh99-v99m-4gvg"
+      ]
+    }
   }
 }

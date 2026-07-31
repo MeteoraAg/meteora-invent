@@ -44,9 +44,7 @@ type StreamAssetPricesResponse = {
 };
 
 export type StreamResponse =
-  | StreamUpdatesResponse
-  | StreamActionsResponse
-  | StreamAssetPricesResponse;
+  StreamUpdatesResponse | StreamActionsResponse | StreamAssetPricesResponse;
 
 export function createRequest(req: StreamRequest): string {
   return JSON.stringify(req);

@@ -84,7 +84,7 @@
         //   "startingFeeBps": 500, // starting base fee (in basis points)
         //   "endingFeeBps": 50, // ending base fee (in basis points)
         //   "numberOfPeriod": 100, // number of fee reduction periods
-        //   "sqrtPriceStepBps": 100, // sqrt price increase (in bps) required to advance one period
+        //   "priceMultiple": 1000, // ratio of ending market cap over starting market cap, must be greater than 1
         //   "schedulerExpirationDuration": 86400 // maximum duration (seconds) after which scheduler expires and defaults to ending fee
         // }
       },

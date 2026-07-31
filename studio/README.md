@@ -183,6 +183,24 @@ pnpm dlmm-seed-liquidity-single-bin --config ./config/dlmm_config.jsonc
 pnpm dlmm-set-pool-status --config ./config/dlmm_config.jsonc
 ```
 
+**Place a Limit Order**
+
+```bash
+pnpm dlmm-place-limit-order --poolAddress <POOL_ADDRESS>
+```
+
+**List Open Limit Orders**
+
+```bash
+pnpm dlmm-get-limit-orders --poolAddress <POOL_ADDRESS>
+```
+
+**Cancel a Limit Order**
+
+```bash
+pnpm dlmm-cancel-limit-order --poolAddress <POOL_ADDRESS> --limitOrder <LIMIT_ORDER_ADDRESS>
+```
+
 ### DAMM v2 Actions
 
 **Create a Balanced Constant Product Pool**

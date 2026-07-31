@@ -1,11 +1,11 @@
 import { Html, Head, Main, NextScript } from 'next/document';
-import Script from 'next/script';
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="en" suppressHydrationWarning>
       <Head>
-        <Script src="https://terminal.jup.ag/main-v4.js" />
+        {/* Jupiter Plugin, see https://dev.jup.ag/docs/tool-kits/plugin */}
+        <script src="https://plugin.jup.ag/plugin-v1.js" data-preload defer />
       </Head>
       <body className="antialiased">
         <Main />

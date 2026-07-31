@@ -59,6 +59,9 @@ export function parseCliArguments(): CliArguments {
       poolAddress: {
         type: 'string',
       },
+      limitOrder: {
+        type: 'string',
+      },
       airdrop: {
         type: 'boolean',
       },

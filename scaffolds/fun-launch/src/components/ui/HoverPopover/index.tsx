@@ -99,7 +99,7 @@ const HoverPopoverContent = forwardRef<
           ref={ref}
           {...props}
           className={cn(
-            'z-50 w-full max-w-[360px] rounded-lg bg-black p-2 text-xs text-white outline-none',
+            'z-50 w-full max-w-[360px] rounded-lg border border-neutral-800 bg-neutral-925 p-2 text-xs text-neutral-100 shadow-xl outline-none',
             className
           )}
           onMouseEnter={retainOnContentHover ? handleMouseEnter : undefined}

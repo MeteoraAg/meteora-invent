@@ -36,125 +36,89 @@
       "cache": false,
       "outputs": []
     },
-    "damm-v1-create-constant-product-pool": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-create-pool": {
+      "cache": false
     },
-    "damm-v1-create-memecoin-pool": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-seed-liquidity-lfg": {
+      "cache": false
     },
-    "damm-v1-create-stable-pool": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-seed-liquidity-single-bin": {
+      "cache": false
     },
-    "damm-v1-get-configs": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "dlmm-set-pool-status": {
+      "cache": false
     },
-    "damm-v1-create-position": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-place-limit-order": {
+      "cache": false
     },
-    "damm-v1-withdraw-liquidity": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-get-limit-orders": {
+      "cache": false
     },
-    "damm-v1-claim-locked-fees": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dlmm-cancel-limit-order": {
+      "cache": false
     },
-    "damm-v1-get-locked-fees": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "damm-v2-create-balanced-pool": {
+      "cache": false
     },
-    "damm-v2-get-position-fees": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "damm-v2-create-one-sided-pool": {
+      "cache": false
     },
-    "damm-v2-claim-position-fees": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v2-split-position": {
+      "cache": false
     },
-    "damm-v2-create-pool": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v2-claim-position-fee": {
+      "cache": false
     },
-    "damm-v2-get-configs": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "damm-v2-add-liquidity": {
+      "cache": false
     },
-    "damm-v2-lock-position": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v2-remove-liquidity": {
+      "cache": false
     },
-    "damm-v2-create-position": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v2-refresh-vesting": {
+      "cache": false
     },
-    "damm-v2-get-positions": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "damm-v2-close-position": {
+      "cache": false
     },
-    "damm-v2-withdraw-liquidity": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v1-create-pool": {
+      "cache": false
     },
-    "dlmm-create-balanced-position": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v1-lock-liquidity": {
+      "cache": false
     },
-    "dlmm-create-imbalanced-position": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v1-create-stake2earn-farm": {
+      "cache": false
     },
-    "dlmm-get-active-bin": {
-      "cache": false,
-      "env": ["RPC_URL"]
-    },
-    "dlmm-get-positions-list": {
-      "cache": false,
-      "env": ["RPC_URL"]
-    },
-    "dlmm-add-balanced-liquidity": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
-    },
-    "dlmm-add-imbalanced-liquidity": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
-    },
-    "dbc-quick-launch": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "damm-v1-lock-liquidity-stake2earn": {
+      "cache": false
     },
     "dbc-create-config": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+      "cache": false
     },
-    "dbc-create-partner-metadata": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dbc-create-pool": {
+      "cache": false
     },
-    "dbc-simulate-curve": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "dbc-claim-trading-fee": {
+      "cache": false
     },
     "dbc-migrate-to-damm-v1": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+      "cache": false
     },
     "dbc-migrate-to-damm-v2": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+      "cache": false
     },
-    "dbc-swap-buy": {
-      "cache": false,
-      "env": ["RPC_URL", "WALLET_PRIVATE_KEY"]
+    "dbc-swap": {
+      "cache": false
     },
-    "dbc-swap-quote": {
-      "cache": false,
-      "env": ["RPC_URL"]
+    "dbc-transfer-pool-creator": {
+      "cache": false
+    },
+    "alpha-vault-create": {
+      "cache": false
+    },
+    "presale-vault-create": {
+      "cache": false
     }
   }
 }

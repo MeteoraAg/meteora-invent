@@ -1,6 +1,6 @@
 @keyframes flash {
   from {
-    background-color: rgba(199, 242, 132, 0.5);
+    background-color: rgb(var(--primary) / 0.5);
   }
   to {
     background-color: inherit;

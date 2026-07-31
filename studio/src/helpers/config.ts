@@ -376,6 +376,16 @@ export const CONFIG_SCHEMA = {
         creatorPoolOnOffControl: {
           type: 'boolean',
         },
+        concreteFunctionType: {
+          type: 'number',
+          enum: [0, 1],
+          nullable: true,
+        },
+        collectFeeMode: {
+          type: 'number',
+          enum: [0, 1],
+          nullable: true,
+        },
       },
       required: [
         'binStep',
@@ -538,6 +548,40 @@ export const CONFIG_SCHEMA = {
       },
       required: ['enabled'],
     },
+    placeLimitOrder: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        side: { enum: ['ask', 'bid'] },
+        bins: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 50,
+          items: {
+            type: 'object',
+            properties: {
+              price: { type: 'number' },
+              amount: {
+                anyOf: [{ type: 'number' }, { type: 'string' }],
+              },
+            },
+            required: ['price', 'amount'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['side', 'bins'],
+      additionalProperties: false,
+    },
+    cancelLimitOrder: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        cancelAll: { type: 'boolean' },
+      },
+      required: ['cancelAll'],
+      additionalProperties: false,
+    },
     dbcConfig: {
       type: 'object',
       nullable: true,
@@ -572,7 +616,7 @@ export const CONFIG_SCHEMA = {
             tokenBaseDecimal: { type: 'number' },
             tokenQuoteDecimal: { type: 'number' },
             tokenType: { type: 'number', enum: [0, 1] },
-            tokenUpdateAuthority: { type: 'number', enum: [0, 1, 2, 3, 4] },
+            tokenAuthorityOption: { type: 'number', enum: [0, 1, 2, 3, 4] },
             leftover: { type: 'number' },
           },
           required: [
@@ -580,7 +624,7 @@ export const CONFIG_SCHEMA = {
             'tokenBaseDecimal',
             'tokenQuoteDecimal',
             'tokenType',
-            'tokenUpdateAuthority',
+            'tokenAuthorityOption',
             'leftover',
           ],
           additionalProperties: false,
@@ -660,9 +704,10 @@ export const CONFIG_SCHEMA = {
               type: 'object',
               nullable: true,
               properties: {
-                collectFeeMode: { type: 'number', enum: [0, 1] },
+                collectFeeMode: { type: 'number', enum: [0, 1, 2] },
                 dynamicFee: { type: 'number', enum: [0, 1] },
                 poolFeeBps: { type: 'number' },
+                compoundingFeeBps: { type: 'number', nullable: true },
                 baseFeeMode: { type: 'number', enum: [3, 4] },
                 marketCapFeeSchedulerParams: {
                   type: 'object',
@@ -670,13 +715,13 @@ export const CONFIG_SCHEMA = {
                   properties: {
                     endingBaseFeeBps: { type: 'number' },
                     numberOfPeriod: { type: 'number' },
-                    sqrtPriceStepBps: { type: 'number' },
+                    priceMultiple: { type: 'number' },
                     schedulerExpirationDuration: { type: 'number' },
                   },
                   required: [
                     'endingBaseFeeBps',
                     'numberOfPeriod',
-                    'sqrtPriceStepBps',
+                    'priceMultiple',
                     'schedulerExpirationDuration',
                   ],
                   additionalProperties: false,
@@ -766,6 +811,7 @@ export const CONFIG_SCHEMA = {
         activationType: { type: 'number', enum: [0, 1] },
         leftoverReceiver: { type: 'string' },
         feeClaimer: { type: 'string' },
+        transferHookProgram: { type: 'string', nullable: true },
       },
       required: [
         'buildCurveMode',
@@ -788,6 +834,7 @@ export const CONFIG_SCHEMA = {
         creator: { type: 'string' },
         name: { type: 'string' },
         symbol: { type: 'string' },
+        transferHookProgram: { type: 'string', nullable: true },
         metadata: {
           type: 'object',
           properties: {

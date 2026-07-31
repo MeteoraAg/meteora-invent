@@ -1,7 +1,6 @@
 {
   "extends": "@meteora-invent/config/typescript/nextjs",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
