@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
+import { buttonVariants } from './ui/button';
 
 type CreatePoolButtonProps = {
   className?: string;
@@ -8,11 +8,13 @@ type CreatePoolButtonProps = {
 
 export const CreatePoolButton = ({ className }: CreatePoolButtonProps) => {
   return (
-    <Button>
-      <Link href="/create-pool" className="flex items-center gap-1">
-        <span className="iconify ph--rocket-bold w-4 h-4" />
-        <span>Create Pool</span>
-      </Link>
-    </Button>
+    <Link
+      href="/create-pool"
+      className={cn(buttonVariants({ variant: 'outline' }), className)}
+    >
+      <span className="iconify ph--rocket-bold h-4 w-4" />
+      <span className="hidden sm:inline">Create Pool</span>
+      <span className="sm:hidden">Create</span>
+    </Link>
   );
 };

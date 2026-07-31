@@ -13,7 +13,7 @@ export const TokenDetails: React.FC = () => {
       <TokenMetrics key={`token-metrics-${tokenId}`} />
       <BondingCurve key={`bonding-curve-${tokenId}`} className="px-2.5" />
 
-      <div className="flex flex-col divide-y divide-neutral-850 border-neutral-850">
+      <div className="flex flex-col gap-y-3">
         <TokenDescription />
         <Checklist />
       </div>

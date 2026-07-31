@@ -45,7 +45,9 @@ export const LaunchpadIndicator: React.FC<LaunchpadIndicatorProps> = ({ launchpa
     <div
       className={cn(
         'absolute -bottom-px -right-1',
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-full border bg-neutral-950 p-0.5',
+        // Fixed dark chip in both themes: the launchpad brand icons are drawn
+        // with white fills and are illegible on a light background
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[#0b0e13] p-0.5',
         className
       )}
       style={{ borderColor: config.borderColor }}

@@ -14,18 +14,14 @@ const Page: React.FC<React.PropsWithChildren<IProps>> = ({
   return (
     <div
       className={cn(
-        'flex min-h-screen flex-col justify-between bg-black text-white',
+        'flex min-h-screen flex-col justify-between bg-background text-foreground',
         pageClassName
       )}
     >
       <Header />
-      <div
-        className={cn(
-          'flex flex-1 flex-col items-center px-1 md:px-3 pt-4 pb-16',
-          containerClassName
-        )}
-      >
-        <div className="lg:max-w-7xl w-full">{children}</div>
+      {/* Full-width content with a modest gutter around it */}
+      <div className={cn('flex flex-1 flex-col items-center px-2 pt-3 pb-8 md:px-4', containerClassName)}>
+        <div className="flex w-full flex-1 flex-col">{children}</div>
       </div>
     </div>
   );

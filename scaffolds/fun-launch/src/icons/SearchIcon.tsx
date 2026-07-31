@@ -6,7 +6,7 @@ const SearchIcon: React.FC<IconProps> = ({ width = 16, height = 16, className, .
   return (
     <svg
       // TODO: refactor, this should really be in the consumer
-      className={cn('flex items-center fill-current text-white/[0.15]', className)}
+      className={cn('flex items-center fill-current text-foreground/15', className)}
       width={width}
       height={height}
       viewBox="0 0 18 18"

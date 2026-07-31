@@ -28,7 +28,7 @@ const ExploreGrid = ({ className }: ExploreGridProps) => {
   return (
     <div
       className={cn(
-        'grid grid-cols-1 border-neutral-850 max-lg:grid-rows-[auto_1fr] lg:grid-cols-3 lg:border xl:overflow-hidden rounded-xl',
+        'grid grid-cols-1 border-neutral-850 max-lg:grid-rows-[auto_1fr] lg:grid-cols-3 lg:border xl:overflow-hidden lg:rounded-xl',
         className
       )}
     >

@@ -55,36 +55,36 @@ export const TokenPageWithContext = () => {
     <Page>
       <TokenPageMsgHandler />
 
-      <div className="max-h-screen">
-        <div className="flex mb-4 rounded-lg border border-neutral-700 p-3">
+      {/* On lg+ the page fits the viewport exactly (100vh minus 64px header,
+          12px top gutter and 32px bottom gutter) and panels scroll internally */}
+      <div className="flex flex-col lg:h-[calc(100vh-108px)]">
+        <div className="mb-4 flex shrink-0 rounded-lg border border-neutral-700 p-3">
           <TokenHeader className="max-sm:order-1" />
         </div>
 
-        <div className="w-full h-full flex flex-col md:flex-row gap-4">
-          <div className="flex flex-col gap-4 mb-8 max-sm:w-full lg:min-w-[400px] max-sm:order-3">
+        <div className="flex w-full flex-col gap-4 md:flex-row lg:min-h-0 lg:flex-1">
+          <div className="flex flex-col gap-4 max-lg:mb-8 max-sm:w-full max-sm:order-3 lg:min-w-[400px] lg:overflow-y-auto">
             <TokenDetails />
             <div>
               <SwapWidget />
             </div>
           </div>
 
-          <div className={'border-neutral-850 w-full max-sm:order-2'}>
-            <TokenStats key={`token-stats-${poolId}`} />
+          <div className="flex w-full flex-col border-neutral-850 max-sm:order-2 lg:min-h-0">
+            <div className="shrink-0">
+              <TokenStats key={`token-stats-${poolId}`} />
+            </div>
 
-            <div className="flex flex-col h-[300px] lg:h-[500px] w-full">
+            {/* Chart caps at 500px but shrinks on short screens so the tables keep room */}
+            <div className="flex h-[300px] w-full shrink-0 flex-col lg:h-[min(500px,55vh)]">
               <TokenChartProvider>
                 <TokenChart />
               </TokenChartProvider>
             </div>
 
-            {/* Height 0 makes the element not contribute to height sizing */}
-            {/* Min height 100% makes the element fill height */}
-
-            <TokenBottomPanel className="flex h-0 min-h-full flex-col overflow-hidden" />
-
-            {/* <div className="flex flex-1 flex-col overflow-hidden mt-4 h-[300px] lg:h-[500px] max-sm:order-4">
-              <TxnsTab />
-            </div> */}
+            {/* Mobile: one screen tall; lg+: fills the space left under the chart.
+                Both ways the txns/holders tables scroll internally. */}
+            <TokenBottomPanel className="flex flex-col overflow-hidden max-lg:h-screen lg:min-h-0 lg:flex-1" />
           </div>
         </div>
       </div>
