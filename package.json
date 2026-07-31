@@ -7,7 +7,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
   "engines": {
-    "node": ">=18",
+    "node": ">=22.12",
     "pnpm": ">=10"
   },
   "scripts": {
