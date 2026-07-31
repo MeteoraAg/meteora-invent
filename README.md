@@ -2,13 +2,6 @@
 
 A toolkit consisting of everything you need to invent innovative token launches on Meteora.
 
-## Metsumi
-
-Meet Metsumi, your personal launch assistant engineered to help you launch anything and do any
-action on Meteora programs with just a few configurations and CLI commands.
-
-![Metsumi](./assets/metsumi/metsumi-1.webp)
-
 ## 📋 Table of Contents
 
 - [🚀 Getting Started](#-getting-started)
@@ -23,7 +16,7 @@ action on Meteora programs with just a few configurations and CLI commands.
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
+- Node.js >= 22.12.0
 - pnpm >= 10.0.0
 
 ### Clone the repository
@@ -156,6 +149,40 @@ or disable trading for the DLMM pool.
 
 ```bash
 pnpm studio dlmm-set-pool-status --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Place a Limit Order
+
+Configure `placeLimitOrder` in `dlmm_config.jsonc` file and run the following command to place a
+limit order on the DLMM pool. The order deposits into one or more bins (max 50) and fills as the
+market price crosses them.
+
+**Note:** The pool must have been created with the limit order function type
+(`concreteFunctionType: 0`, the default).
+
+```bash
+pnpm studio dlmm-place-limit-order --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Get Limit Orders
+
+Run the following command to list all open limit orders owned by your wallet on the DLMM pool,
+including per-bin fill status, fees earned, and withdrawable amounts.
+
+```bash
+pnpm studio dlmm-get-limit-orders --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Cancel a Limit Order
+
+Run the following command to cancel a limit order. Cancelling withdraws unfilled deposits, filled
+proceeds, and earned fees, then closes the order account and refunds its rent.
+
+**Note:** Omit the `--limitOrder` flag and set `cancelLimitOrder.cancelAll` to `true` in
+`dlmm_config.jsonc` to cancel every open order on the pool.
+
+```bash
+pnpm studio dlmm-cancel-limit-order --poolAddress <YOUR_POOL_ADDRESS> --limitOrder <YOUR_LIMIT_ORDER_ADDRESS>
 ```
 
 ---
@@ -314,6 +341,11 @@ Configure `dbcConfig` in `dbc_config.jsonc` file and run the following command t
 config key. This config key is used to create the DBC pool and contains all the settings for the
 pre-graduation and post-graduation pools.
 
+**Note:** To launch Token 2022 tokens with a transfer hook, set `token.tokenType` to `1` and
+`transferHookProgram` in `dbcConfig`. The config is then created with
+`createConfigWithTransferHook` and every token launched on it executes the hook program on each
+transfer.
+
 ```bash
 pnpm studio dbc-create-config
 ```
@@ -321,6 +353,10 @@ pnpm studio dbc-create-config
 ##### Create a DBC Pool
 
 Configure `dbcPool` in `dbc_config.jsonc` file and run the following command to create the DBC pool.
+
+**Note:** When the target config was created with a transfer hook, set
+`dbcPool.transferHookProgram` to the same hook program so the pool is created with
+`createPoolWithTransferHook`.
 
 _If you don't have a DBC config key, you can run the following command and the config key + pool
 will be created together._
@@ -339,7 +375,8 @@ pnpm studio dbc-create-pool --config <YOUR_DBC_CONFIG_KEY>
 ##### Claim Trading Fees
 
 If you already have an existing DBC pool with accumulated fees, you can run the following command
-with the `--baseMint` flag to claim the fees.
+with the `--baseMint` flag to claim the fees. Pools whose base mint carries a transfer hook are
+claimed through the transfer-hook-aware instructions automatically.
 
 ```bash
 pnpm studio dbc-claim-trading-fee --baseMint <YOUR_BASE_MINT_ADDRESS>
@@ -368,7 +405,8 @@ pnpm studio dbc-migrate-to-damm-v2 --baseMint <YOUR_BASE_MINT_ADDRESS>
 ##### Swap (Buy/Sell)
 
 Configure `dbcSwap` in `dbc_config.jsonc` file and run the following command to swap in the DBC
-pool.
+pool. Pools whose base mint carries a transfer hook are swapped through the transfer-hook-aware
+instruction automatically.
 
 ```bash
 pnpm studio dbc-swap --baseMint <YOUR_BASE_MINT_ADDRESS>
