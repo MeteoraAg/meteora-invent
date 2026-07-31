@@ -8,7 +8,11 @@ import {
 import { Wallet } from '@coral-xyz/anchor';
 import { createPermissionlessDlmmPool } from '../../lib/dlmm';
 import { AlphaVaultConfig } from '../../utils/types';
-import { DEFAULT_COMMITMENT_LEVEL, DLMM_PROGRAM_IDS } from '../../utils/constants';
+import {
+  DEFAULT_COMMITMENT_LEVEL,
+  DLMM_PROGRAM_IDS,
+  LOCALNET_RPC_URL,
+} from '../../utils/constants';
 import { deriveCustomizablePermissionlessLbPair } from '@meteora-ag/dlmm';
 import { createAlphaVault } from '../../lib/alpha_vault';
 import { createCheckedConnection } from '../../helpers/connection';
@@ -52,13 +56,21 @@ async function main() {
   console.log(`- Using base token mint ${baseMint.toString()}`);
   console.log(`- Using quote token mint ${quoteMint.toString()}`);
 
+  const opts =
+    config.rpcUrl === LOCALNET_RPC_URL
+      ? {
+          cluster: 'localhost' as const,
+          programId: new PublicKey(DLMM_PROGRAM_IDS.localhost),
+        }
+      : undefined;
+
   if (config.dlmmConfig) {
-    await createPermissionlessDlmmPool(config, connection, wallet, baseMint, quoteMint);
+    await createPermissionlessDlmmPool(config, connection, wallet, baseMint, quoteMint, opts);
 
     if (config.dlmmConfig.hasAlphaVault && config.alphaVault) {
       console.log('\n> Alpha vault is enabled, creating alpha vault automatically...');
 
-      const dlmmProgramId = new PublicKey(DLMM_PROGRAM_IDS['mainnet-beta']);
+      const dlmmProgramId = opts?.programId ?? new PublicKey(DLMM_PROGRAM_IDS['mainnet-beta']);
       const [poolKey] = deriveCustomizablePermissionlessLbPair(baseMint, quoteMint, dlmmProgramId);
 
       const alphaVaultConfig: AlphaVaultConfig = {

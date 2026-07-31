@@ -857,8 +857,7 @@ export interface ActionDescriptionWithCallback extends ActionDescription {
   action: (a?: ActionDescription) => void;
 }
 export interface ActionOptions
-  extends Partial<Omit<ActionState, 'actionId'>>,
-    Pick<ActionState, 'actionId'> {
+  extends Partial<Omit<ActionState, 'actionId'>>, Pick<ActionState, 'actionId'> {
   /**
    * A function which will be called when an action should be executed (e.g. when a user clicks on the item).
    */
@@ -3705,8 +3704,9 @@ export interface ContextMenuPosition {
 /**
  * Options for creating an anchored drawing.
  */
-export interface CreateAnchoredShapeOptions<TOverrides extends object>
-  extends CreateShapeOptionsBase<TOverrides> {
+export interface CreateAnchoredShapeOptions<
+  TOverrides extends object,
+> extends CreateShapeOptionsBase<TOverrides> {
   /**
    * A drawing to create;
    */
@@ -3759,8 +3759,9 @@ export interface CreateHTMLButtonOptions {
 /**
  * Options for creating a multipoint drawing.
  */
-export interface CreateMultipointShapeOptions<TOverrides extends object>
-  extends CreateShapeOptionsBase<TOverrides> {
+export interface CreateMultipointShapeOptions<
+  TOverrides extends object,
+> extends CreateShapeOptionsBase<TOverrides> {
   /**
    * A drawing to create.
    */
@@ -3772,8 +3773,9 @@ export interface CreateMultipointShapeOptions<TOverrides extends object>
 /**
  * Options for creating a drawing.
  */
-export interface CreateShapeOptions<TOverrides extends object>
-  extends CreateShapeOptionsBase<TOverrides> {
+export interface CreateShapeOptions<
+  TOverrides extends object,
+> extends CreateShapeOptionsBase<TOverrides> {
   /**
    * A drawing to create.
    */
@@ -14523,8 +14525,7 @@ export interface StudyBooleanInputInfo extends StudyInputBaseInfo {
  * A description of a border colorer plot.
  */
 export interface StudyCandleBorderColorerPlotInfo
-  extends StudyPalettedPlotInfo,
-    StudyTargetedPlotInfo {
+  extends StudyPalettedPlotInfo, StudyTargetedPlotInfo {
   /** @inheritDoc */
   readonly type: StudyPlotType.CandleBorderColorer;
 }
@@ -14532,8 +14533,7 @@ export interface StudyCandleBorderColorerPlotInfo
  * A description of a wick colorer plot.
  */
 export interface StudyCandleWickColorerPlotInfo
-  extends StudyPalettedPlotInfo,
-    StudyTargetedPlotInfo {
+  extends StudyPalettedPlotInfo, StudyTargetedPlotInfo {
   /** @inheritDoc */
   readonly type: StudyPlotType.CandleWickColorer;
 }
@@ -15940,11 +15940,10 @@ export interface TradingQuotes {
   /** Whether quotes are can not be shorted */
   isNotShortable?: boolean;
 }
-export interface TradingTerminalWidgetOptions
-  extends Omit<
-    ChartingLibraryWidgetOptions,
-    'enabled_features' | 'disabled_features' | 'favorites'
-  > {
+export interface TradingTerminalWidgetOptions extends Omit<
+  ChartingLibraryWidgetOptions,
+  'enabled_features' | 'disabled_features' | 'favorites'
+> {
   /**
    * The array containing names of features that should be disabled by default. `Feature` means part of the functionality of the chart (part of the UI/UX). Supported features are listed [here](https://www.tradingview.com/charting-library-docs/latest/customization/Featuresets).
    *
@@ -17438,10 +17437,7 @@ export type ErrorCallback = (reason: string) => void;
  * Description of each field of exported data from the chart
  */
 export type FieldDescriptor =
-  | TimeFieldDescriptor
-  | UserTimeFieldDescriptor
-  | SeriesFieldDescriptor
-  | StudyFieldDescriptor;
+  TimeFieldDescriptor | UserTimeFieldDescriptor | SeriesFieldDescriptor | StudyFieldDescriptor;
 export type FinancialPeriod = 'FY' | 'FQ' | 'FH' | 'TTM';
 export type FormatterName = Nominal<string, 'FormatterName'>;
 export type GetMarksCallback<T> = (marks: T[]) => void;
@@ -17482,8 +17478,7 @@ export type IPineStudyResultSimple =
   | IProjectionStudyResult
   | INonSeriesStudyResult;
 export type IPineStudyResultTypes<TPineStudyResultSimple> =
-  | TPineStudyResultSimple
-  | PineStudyResultComposite<TPineStudyResultSimple>;
+  TPineStudyResultSimple | PineStudyResultComposite<TPineStudyResultSimple>;
 export type IProjectionBar =
   | [number, number, number, number, number, number]
   | [number, number, number, number, number, number, number];
@@ -17503,8 +17498,7 @@ export type ISeriesStudyResult = [
  */
 export type InputFieldValidator = (value: any) => InputFieldValidatorResult;
 export type InputFieldValidatorResult =
-  | PositiveBaseInputFieldValidatorResult
-  | NegativeBaseInputFieldValidatorResult;
+  PositiveBaseInputFieldValidatorResult | NegativeBaseInputFieldValidatorResult;
 export type LanguageCode =
   | 'ar'
   | 'zh'
@@ -17656,10 +17650,7 @@ export type SeriesFormatterFactory = (
  */
 export type SeriesPriceScale = 'new-left' | 'new-right' | 'no-scale' | EntityId;
 export type SeriesStatusViewSymbolTextSource =
-  | 'ticker'
-  | 'description'
-  | 'ticker-and-description'
-  | 'long-description';
+  'ticker' | 'description' | 'ticker-and-description' | 'long-description';
 export type ServerTimeCallback = (serverTime: number) => void;
 /**
  * A time range to set. The end `to` value is optional.
@@ -17674,19 +17665,11 @@ export type ShapePoint = StickedPoint | PricedPoint | TimePoint;
 export type ShapesGroupId = Nominal<string, 'ShapesGroupId'>;
 export type SingleChartLayoutType = 's';
 export type StudyAvailableConstSources =
-  | 'open'
-  | 'high'
-  | 'low'
-  | 'close'
-  | 'hl2'
-  | 'hlc3'
-  | 'ohlc4'
-  | 'hlcc4';
+  'open' | 'high' | 'low' | 'close' | 'hl2' | 'hlc3' | 'ohlc4' | 'hlcc4';
 /** An event related to a study. */
 export type StudyEventType = 'remove' | 'price_scale_changed' | 'paste_study';
 export type StudyFilledAreaStyle =
-  | StudyFilledAreaSolidColorStyle
-  | StudyFilledAreaGradientColorStyle;
+  StudyFilledAreaSolidColorStyle | StudyFilledAreaGradientColorStyle;
 export type StudyInputId = Nominal<string, 'StudyInputId'>;
 export type StudyInputInfo =
   | StudyBooleanInputInfo
@@ -17711,12 +17694,10 @@ export type StudyMetaInfo = DeepWriteable<RawStudyMetaInformation> & {
   id: string;
 };
 export type StudyOhlcPlotPreferences =
-  | StudyOhlcPlotBarsStylePreferences
-  | StudyOhlcPlotCandlesStylePreferences;
+  StudyOhlcPlotBarsStylePreferences | StudyOhlcPlotCandlesStylePreferences;
 export type StudyOverrideValueType = string | number | boolean;
 export type StudyPlotDisplayMode =
-  | Nominal<number, 'StudyPlotDisplayTarget'>
-  | StudyPlotDisplayTarget;
+  Nominal<number, 'StudyPlotDisplayTarget'> | StudyPlotDisplayTarget;
 export type StudyPlotInfo = StudyPlotInformation;
 /**
  * A description of a study plot.
@@ -17950,20 +17931,14 @@ export type TimezoneId = CustomTimezones | 'Etc/UTC' | 'exchange';
  */
 export type TradableSolutions = ChangeAccountSolution | ChangeSymbolSolution | OpenUrlSolution;
 export type TradingDialogCustomField =
-  | CheckboxFieldMetaInfo
-  | TextWithCheckboxFieldMetaInfo
-  | CustomComboBoxMetaInfo;
+  CheckboxFieldMetaInfo | TextWithCheckboxFieldMetaInfo | CustomComboBoxMetaInfo;
 /**
  * Chart type names for use within the `favourites` widget constructor option. This type is for Trading Terminal, if you are looking for the Charting Library type then please see {@link ChartTypeFavorites}.
  *
  * See {@link Favorites} for the widget constructor option where you can define these favorites, and {@link TradingTerminalWidgetOptions.favorites} for the Widget Constructor option.
  */
 export type TradingTerminalChartTypeFavorites =
-  | ChartTypeFavorites
-  | 'Renko'
-  | 'Kagi'
-  | 'Point & figure'
-  | 'Line Break';
+  ChartTypeFavorites | 'Renko' | 'Kagi' | 'Point & figure' | 'Line Break';
 /** This is the list of all featuresets that work on Trading Terminal (which is an extension of Charting Library) */
 export type TradingTerminalFeatureset =
   | ChartingLibraryFeatureset

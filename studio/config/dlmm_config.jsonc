@@ -67,6 +67,8 @@
     "priceRounding": "up", // Price calculation rounding direction for bin ID conversion
     "creatorPoolOnOffControl": true, // Pool creator permission to enable/disable trading for permissionless pools
     "hasAlphaVault": false // If true, the alpha vault will be created after the pool is created
+    // "concreteFunctionType": 0, // 0 - LimitOrder | 1 - LiquidityMining (defaults to 0, only pools created with 0 accept limit orders)
+    // "collectFeeMode": 0 // 0 - InputOnly | 1 - OnlyY (defaults to 0)
   },
 
   /* lfgSeedLiquidity is only used in the following actions:
@@ -104,6 +106,29 @@
    */
   "setDlmmPoolStatus": {
     "enabled": true // true = enable trading | false = disable trading
+  },
+
+  /* placeLimitOrder is only used in the following actions:
+   * 1. dlmm-place-limit-order (requires --poolAddress flag)
+   * The pool must have been created with the limit order function type (concreteFunctionType: 0).
+   * A limit order deposits into one or more bins (max 50) and fills as the market price crosses them.
+   */
+  "placeLimitOrder": {
+    "side": "bid", // "ask" = sell the base token above the active bin | "bid" = buy with the quote token below the active bin
+    "bins": [
+      {
+        "price": 1.2, // price (in terms of quote/base price) for this portion of the order
+        "amount": 100 // amount in token units: base token amount for "ask" orders, quote token amount for "bid" orders
+      }
+    ]
+  },
+
+  /* cancelLimitOrder is only used in the following actions:
+   * 1. dlmm-cancel-limit-order (requires --poolAddress flag, optional --limitOrder flag)
+   * Cancelling withdraws unfilled deposits, filled proceeds and earned fees, then closes the order account.
+   */
+  "cancelLimitOrder": {
+    "cancelAll": false // when true and no --limitOrder flag is passed, cancels every open order on the pool
   },
 
   /* alphaVault is only used in the following actions:

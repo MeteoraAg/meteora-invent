@@ -31,9 +31,40 @@ import {
   deriveDbcPoolAuthority,
   deriveEscrow,
   DynamicBondingCurveClient,
+  SwapMode,
+  TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { getTransferHook, TOKEN_2022_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import BN from 'bn.js';
+import { getAmountInLamports } from '../../helpers/common';
 import { uploadTokenMetadata } from '../../helpers/metadata';
+
+/**
+ * Resolve the base mint's decimals and transfer hook program, when one is configured.
+ * @param connection - The connection to the network
+ * @param baseMint - The base mint to inspect
+ * @returns The mint decimals and the transfer hook program (null when the mint has no hook)
+ */
+async function getBaseMintInfo(
+  connection: Connection,
+  baseMint: PublicKey
+): Promise<{ decimals: number; transferHookProgram: PublicKey | null }> {
+  const mintAccount = await connection.getAccountInfo(baseMint, connection.commitment);
+  if (!mintAccount) {
+    throw new Error(`Base mint account not found: ${baseMint.toString()}`);
+  }
+  const mintState = unpackMint(baseMint, mintAccount, mintAccount.owner);
+
+  let transferHookProgram: PublicKey | null = null;
+  if (mintAccount.owner.equals(TOKEN_2022_PROGRAM_ID)) {
+    const transferHook = getTransferHook(mintState);
+    if (transferHook && !transferHook.programId.equals(PublicKey.default)) {
+      transferHookProgram = transferHook.programId;
+    }
+  }
+
+  return { decimals: mintState.decimals, transferHookProgram };
+}
 
 /**
  * Create a DBC config
@@ -62,7 +93,14 @@ export async function createDbcConfig(
   let curveConfig: ConfigParameters | null = null;
 
   // Destructure out fields not needed by buildCurve* functions
-  const { buildCurveMode, leftoverReceiver, feeClaimer, ...buildCurveParams } = config.dbcConfig;
+  const { buildCurveMode, leftoverReceiver, feeClaimer, transferHookProgram, ...buildCurveParams } =
+    config.dbcConfig;
+
+  if (transferHookProgram && buildCurveParams.token?.tokenType !== TokenType.Token2022) {
+    throw new Error(
+      'transferHookProgram requires token.tokenType to be 1 (Token2022) in config/dbc_config.jsonc'
+    );
+  }
 
   if (buildCurveMode === 0) {
     curveConfig = buildCurve(buildCurveParams as any);
@@ -102,16 +140,27 @@ export async function createDbcConfig(
   const configKeypair = Keypair.generate();
   console.log(`> Generated config keypair: ${configKeypair.publicKey.toString()}`);
 
-  const createConfigTx = await dbcInstance.partner.createConfig({
+  const createConfigParams = {
     config: configKeypair.publicKey,
     quoteMint,
     feeClaimer: new PublicKey(feeClaimer),
     leftoverReceiver: new PublicKey(leftoverReceiver),
     payer: wallet.publicKey,
     ...curveConfig,
-  });
+  };
 
-  modifyComputeUnitPriceIx(createConfigTx as any, config.computeUnitPriceMicroLamports ?? 0);
+  let createConfigTx: Transaction;
+  if (transferHookProgram) {
+    console.log(`> Creating config with transfer hook program: ${transferHookProgram}`);
+    createConfigTx = await dbcInstance.partner.createConfigWithTransferHook({
+      ...createConfigParams,
+      transferHookProgram: new PublicKey(transferHookProgram),
+    });
+  } else {
+    createConfigTx = await dbcInstance.partner.createConfig(createConfigParams);
+  }
+
+  modifyComputeUnitPriceIx(createConfigTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
     console.log(`> Simulating create config tx...`);
@@ -182,7 +231,37 @@ export async function createDbcPool(
     configPublicKey = dbcConfigKey;
   }
 
+  // A pool on a transfer hook config must be created with the same hook program.
+  // Fall back to the dbcConfig hook when the config was created in this run.
+  const transferHookProgram =
+    config.dbcPool.transferHookProgram ??
+    (!dbcConfigKey ? config.dbcConfig?.transferHookProgram : null) ??
+    null;
+
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
+
+  const buildCreatePoolTx = async (metadataUri: string): Promise<Transaction> => {
+    if (!config.dbcPool) {
+      throw new Error('Missing dbc pool configuration');
+    }
+    const createPoolParams = {
+      baseMint: baseMint.publicKey,
+      config: configPublicKey,
+      name: config.dbcPool.name,
+      symbol: config.dbcPool.symbol,
+      uri: metadataUri,
+      payer: wallet.publicKey,
+      poolCreator: new PublicKey(config.dbcPool.creator),
+    };
+    if (transferHookProgram) {
+      console.log(`> Creating pool with transfer hook program: ${transferHookProgram}`);
+      return dbcInstance.creator.createPoolWithTransferHook({
+        ...createPoolParams,
+        transferHookProgram: new PublicKey(transferHookProgram),
+      });
+    }
+    return dbcInstance.creator.createPool(createPoolParams);
+  };
 
   let metadataUri: string;
   if (config.dbcPool.metadata.uri) {
@@ -211,17 +290,9 @@ export async function createDbcPool(
       `> Simulating create pool tx (note: this may fail in dry-run mode due to missing config state)...`
     );
     try {
-      const createPoolTx = await dbcInstance.pool.createPool({
-        baseMint: baseMint.publicKey,
-        config: configPublicKey,
-        name: config.dbcPool.name,
-        symbol: config.dbcPool.symbol,
-        uri: metadataUri,
-        payer: wallet.publicKey,
-        poolCreator: new PublicKey(config.dbcPool.creator),
-      });
+      const createPoolTx = await buildCreatePoolTx(metadataUri);
 
-      modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);
+      modifyComputeUnitPriceIx(createPoolTx, config.computeUnitPriceMicroLamports ?? 0);
 
       await runSimulateTransaction(connection, [wallet.payer, baseMint], wallet.publicKey, [
         createPoolTx,
@@ -234,17 +305,9 @@ export async function createDbcPool(
     }
   } else {
     console.log(`>> Creating pool transaction...`);
-    const createPoolTx = await dbcInstance.pool.createPool({
-      baseMint: baseMint.publicKey,
-      config: configPublicKey,
-      name: config.dbcPool.name,
-      symbol: config.dbcPool.symbol,
-      uri: metadataUri,
-      payer: wallet.publicKey,
-      poolCreator: new PublicKey(config.dbcPool.creator),
-    });
+    const createPoolTx = await buildCreatePoolTx(metadataUri);
 
-    modifyComputeUnitPriceIx(createPoolTx as any, config.computeUnitPriceMicroLamports ?? 0);
+    modifyComputeUnitPriceIx(createPoolTx, config.computeUnitPriceMicroLamports ?? 0);
 
     console.log(`>> Sending create pool transaction...`);
     const createPoolTxHash = await sendAndConfirmTransaction(
@@ -280,21 +343,27 @@ export async function claimTradingFee(
 
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolState = await dbcInstance.state.getPoolByBaseMint(baseMint);
-  if (!poolState) {
+  const virtualPool = await dbcInstance.state.getPoolByBaseMint(baseMint);
+  if (!virtualPool) {
     throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
   }
+  const poolState = virtualPool.account.poolState;
 
-  const dbcConfigAddress = poolState.account.config;
+  const dbcConfigAddress = poolState.config;
   const poolConfig = await dbcInstance.state.getPoolConfig(dbcConfigAddress);
   if (!poolConfig) {
     throw new Error(`DBC Pool config not found for ${dbcConfigAddress.toString()}`);
   }
 
-  const poolAddress = poolState.publicKey;
-  const creator = poolState.account.creator;
+  const poolAddress = virtualPool.publicKey;
+  const creator = poolState.creator;
   const partner = poolConfig.feeClaimer;
   const feeMetrics = await dbcInstance.state.getPoolFeeMetrics(poolAddress);
+
+  const { transferHookProgram } = await getBaseMintInfo(connection, baseMint);
+  if (transferHookProgram) {
+    console.log(`> Base mint has transfer hook program: ${transferHookProgram.toString()}`);
+  }
 
   const isCreator = creator.toString() === wallet.publicKey.toString();
   console.log(`> Is creator: ${isCreator}`);
@@ -309,13 +378,19 @@ export async function claimTradingFee(
   const transactions: Transaction[] = [];
 
   if (isCreator) {
-    const claimCreatorTradingFeeTx = await dbcInstance.creator.claimCreatorTradingFee({
+    const claimCreatorParams = {
       creator: wallet.publicKey,
       pool: poolAddress,
       maxBaseAmount: feeMetrics.current.creatorBaseFee,
       maxQuoteAmount: feeMetrics.current.creatorQuoteFee,
       payer: wallet.publicKey,
-    });
+    };
+    const claimCreatorTradingFeeTx = transferHookProgram
+      ? await dbcInstance.creator.claimCreatorTradingFee2({
+          ...claimCreatorParams,
+          receiver: wallet.publicKey,
+        })
+      : await dbcInstance.creator.claimCreatorTradingFee(claimCreatorParams);
     modifyComputeUnitPriceIx(claimCreatorTradingFeeTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(claimCreatorTradingFeeTx);
   } else {
@@ -323,13 +398,19 @@ export async function claimTradingFee(
   }
 
   if (isPartner) {
-    const claimPartnerTradingFeeTx = await dbcInstance.partner.claimPartnerTradingFee({
+    const claimPartnerParams = {
       feeClaimer: wallet.publicKey,
       pool: poolAddress,
       maxBaseAmount: feeMetrics.current.partnerBaseFee,
       maxQuoteAmount: feeMetrics.current.partnerQuoteFee,
       payer: wallet.publicKey,
-    });
+    };
+    const claimPartnerTradingFeeTx = transferHookProgram
+      ? await dbcInstance.partner.claimPartnerTradingFee2({
+          ...claimPartnerParams,
+          receiver: wallet.publicKey,
+        })
+      : await dbcInstance.partner.claimPartnerTradingFee(claimPartnerParams);
     modifyComputeUnitPriceIx(claimPartnerTradingFeeTx, config.computeUnitPriceMicroLamports ?? 0);
     transactions.push(claimPartnerTradingFeeTx);
   } else {
@@ -391,21 +472,26 @@ export async function swap(
 
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolState = await dbcInstance.state.getPoolByBaseMint(new PublicKey(baseMint));
-  if (!poolState) {
+  const virtualPool = await dbcInstance.state.getPoolByBaseMint(new PublicKey(baseMint));
+  if (!virtualPool) {
     throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
   }
 
-  const poolAddress = poolState.publicKey;
+  const poolAddress = virtualPool.publicKey;
 
-  const dbcConfigAddress = poolState.account.config;
+  const dbcConfigAddress = virtualPool.account.poolState.config;
   const poolConfig = await dbcInstance.state.getPoolConfig(dbcConfigAddress);
   if (!poolConfig) {
     throw new Error(`DBC Pool config not found for ${dbcConfigAddress.toString()}`);
   }
 
+  const { decimals: baseMintDecimals, transferHookProgram } = await getBaseMintInfo(
+    connection,
+    baseMint
+  );
   const quoteMintDecimals = await getQuoteDecimals(connection, poolConfig.quoteMint.toString());
-  const amountIn = new BN(config.dbcSwap.amountIn * 10 ** quoteMintDecimals);
+  const amountInDecimals = config.dbcSwap.swapBaseForQuote ? baseMintDecimals : quoteMintDecimals;
+  const amountIn = getAmountInLamports(config.dbcSwap.amountIn, amountInDecimals);
 
   let currentPoint;
   if (poolConfig.activationType === 0) {
@@ -420,25 +506,43 @@ export async function swap(
   }
 
   const quote = await dbcInstance.pool.swapQuote({
-    virtualPool: poolState.account,
+    virtualPool: virtualPool.account,
     config: poolConfig,
     swapBaseForQuote: config.dbcSwap.swapBaseForQuote,
     amountIn,
-    hasReferral: config.dbcSwap.referralTokenAccount !== '',
+    slippageBps: config.dbcSwap.slippageBps,
+    hasReferral: !!config.dbcSwap.referralTokenAccount,
     currentPoint: new BN(currentPoint),
     eligibleForFirstSwapWithMinFee: false,
   });
 
-  const swapTx = await dbcInstance.pool.swap({
-    amountIn,
-    minimumAmountOut: quote.minimumAmountOut,
-    owner: wallet.publicKey,
-    pool: poolAddress,
-    swapBaseForQuote: config.dbcSwap.swapBaseForQuote,
-    referralTokenAccount: config.dbcSwap.referralTokenAccount
-      ? new PublicKey(config.dbcSwap.referralTokenAccount)
-      : null,
-  });
+  const referralTokenAccount = config.dbcSwap.referralTokenAccount
+    ? new PublicKey(config.dbcSwap.referralTokenAccount)
+    : null;
+
+  let swapTx: Transaction;
+  if (transferHookProgram) {
+    console.log(`> Swapping through transfer hook program: ${transferHookProgram.toString()}`);
+    swapTx = await dbcInstance.pool.swap2WithTransferHook({
+      swapMode: SwapMode.ExactIn,
+      amountIn,
+      minimumAmountOut: quote.minimumAmountOut,
+      owner: wallet.publicKey,
+      pool: poolAddress,
+      swapBaseForQuote: config.dbcSwap.swapBaseForQuote,
+      referralTokenAccount,
+      payer: wallet.publicKey,
+    });
+  } else {
+    swapTx = await dbcInstance.pool.swap({
+      amountIn,
+      minimumAmountOut: quote.minimumAmountOut,
+      owner: wallet.publicKey,
+      pool: poolAddress,
+      swapBaseForQuote: config.dbcSwap.swapBaseForQuote,
+      referralTokenAccount,
+    });
+  }
 
   modifyComputeUnitPriceIx(swapTx, config.computeUnitPriceMicroLamports ?? 0);
 
@@ -478,21 +582,22 @@ export async function migrateDammV1(
 
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolState = await dbcInstance.state.getPoolByBaseMint(baseMint);
-  if (!poolState) {
+  const virtualPool = await dbcInstance.state.getPoolByBaseMint(baseMint);
+  if (!virtualPool) {
     throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
   }
+  const poolState = virtualPool.account.poolState;
 
-  const dbcConfigAddress = poolState.account.config;
+  const dbcConfigAddress = poolState.config;
   const poolConfig = await dbcInstance.state.getPoolConfig(dbcConfigAddress);
   if (!poolConfig) {
     throw new Error(`DBC Pool config not found for ${dbcConfigAddress.toString()}`);
   }
 
-  console.log('> Pool Quote Reserve:', poolState.account.quoteReserve.toString());
+  console.log('> Pool Quote Reserve:', poolState.quoteReserve.toString());
   console.log('> Pool Migration Quote Threshold:', poolConfig.migrationQuoteThreshold.toString());
 
-  if (poolState.account.quoteReserve.lt(poolConfig.migrationQuoteThreshold)) {
+  if (poolState.quoteReserve.lt(poolConfig.migrationQuoteThreshold)) {
     throw new Error(
       'Unable to migrate DBC to DAMM V1: Pool quote reserve is less than migration quote threshold'
     );
@@ -504,7 +609,7 @@ export async function migrateDammV1(
     throw new Error(`No DAMM config address found for migration fee option: ${migrationFeeOption}`);
   }
 
-  const poolAddress = poolState.publicKey;
+  const poolAddress = virtualPool.publicKey;
 
   const transactions: Transaction[] = [];
 
@@ -537,7 +642,7 @@ export async function migrateDammV1(
     if (!escrowAccount) {
       console.log('> Locker not found, creating locker...');
       const createLockerTx = await dbcInstance.migration.createLocker({
-        virtualPool: poolAddress,
+        pool: poolAddress,
         payer: wallet.publicKey,
       });
       modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports ?? 0);
@@ -551,10 +656,10 @@ export async function migrateDammV1(
 
   // migrate to DAMM V1
   console.log('Migrating to DAMM V1...');
-  if (poolState.account.isMigrated === 0) {
+  if (poolState.isMigrated === 0) {
     const migrateTx = await dbcInstance.migration.migrateToDammV1({
       payer: wallet.publicKey,
-      virtualPool: poolAddress,
+      pool: poolAddress,
       dammConfig: dammConfigAddress,
     });
     transactions.push(migrateTx);
@@ -616,7 +721,7 @@ export async function migrateDammV1(
   }
 
   // check if creator and partner are the same address
-  const creator = poolState.account.creator;
+  const creator = poolState.creator;
   const partner = poolConfig.feeClaimer;
   const isCreatorSameAsPartner = creator.toString() === partner.toString();
 
@@ -635,7 +740,7 @@ export async function migrateDammV1(
     throw new Error(`DAMM v1 migration metadata not found for ${poolAddress.toString()}`);
   }
 
-  if (config.dryRun && poolState.account.isMigrated === 0) {
+  if (config.dryRun && poolState.isMigrated === 0) {
     console.log('> Pool not actually migrated in dry-run mode, skipping LP operations');
     return;
   }
@@ -655,7 +760,7 @@ export async function migrateDammV1(
       console.log('> Claiming combined Creator+Partner DAMM V1 LP tokens...');
       const claimCreatorLpTx = await dbcInstance.migration.claimDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: false, // Use creator (false) for the combined claim
       });
@@ -675,7 +780,7 @@ export async function migrateDammV1(
       console.log('> Claiming Creator DAMM V1 LP tokens...');
       const claimCreatorLpTx = await dbcInstance.migration.claimDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: false,
       });
@@ -693,7 +798,7 @@ export async function migrateDammV1(
       console.log('> Claiming Partner DAMM V1 LP tokens...');
       const claimPartnerLpTx = await dbcInstance.migration.claimDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: true,
       });
@@ -719,7 +824,7 @@ export async function migrateDammV1(
       console.log('> Locking combined Creator+Partner DAMM V1 LP tokens...');
       const lockCreatorLpTx = await dbcInstance.migration.lockDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: false, // Use creator (false) for the combined lock
       });
@@ -739,7 +844,7 @@ export async function migrateDammV1(
       console.log('> Locking Creator DAMM V1 LP tokens...');
       const lockCreatorLpTx = await dbcInstance.migration.lockDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: false,
       });
@@ -757,7 +862,7 @@ export async function migrateDammV1(
       console.log('> Locking Partner DAMM V1 LP tokens...');
       const lockPartnerLpTx = await dbcInstance.migration.lockDammV1LpToken({
         payer: wallet.publicKey,
-        virtualPool: poolAddress,
+        pool: poolAddress,
         dammConfig: dammConfigAddress,
         isPartner: true,
       });
@@ -830,21 +935,22 @@ export async function migrateDammV2(
 
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolState = await dbcInstance.state.getPoolByBaseMint(baseMint);
-  if (!poolState) {
+  const virtualPool = await dbcInstance.state.getPoolByBaseMint(baseMint);
+  if (!virtualPool) {
     throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
   }
+  const poolState = virtualPool.account.poolState;
 
-  const dbcConfigAddress = poolState.account.config;
+  const dbcConfigAddress = poolState.config;
   const poolConfig = await dbcInstance.state.getPoolConfig(dbcConfigAddress);
   if (!poolConfig) {
     throw new Error(`DBC Pool config not found for ${dbcConfigAddress.toString()}`);
   }
 
-  console.log('> Pool Quote Reserve:', poolState.account.quoteReserve.toString());
+  console.log('> Pool Quote Reserve:', poolState.quoteReserve.toString());
   console.log('> Pool Migration Quote Threshold:', poolConfig.migrationQuoteThreshold.toString());
 
-  if (poolState.account.quoteReserve.lt(poolConfig.migrationQuoteThreshold)) {
+  if (poolState.quoteReserve.lt(poolConfig.migrationQuoteThreshold)) {
     throw new Error(
       'Unable to migrate DBC to DAMM V2: Pool quote reserve is less than migration quote threshold'
     );
@@ -852,14 +958,18 @@ export async function migrateDammV2(
 
   const migrationFeeOption = poolConfig.migrationFeeOption;
   let dammConfigAddress = DAMM_V2_MIGRATION_FEE_ADDRESS[migrationFeeOption];
-  if (config.rpcUrl === LOCALNET_RPC_URL) {
-    const poolAuthority = deriveDbcPoolAuthority();
-    dammConfigAddress = await createDammV2Config(
-      connection,
-      wallet.payer as Keypair,
-      poolAuthority,
-      migrationFeeOption
-    );
+  if (config.rpcUrl === LOCALNET_RPC_URL && dammConfigAddress) {
+    // start-test-validator preloads the canonical migration configs; only create one when missing
+    const canonicalConfigAccount = await connection.getAccountInfo(dammConfigAddress);
+    if (!canonicalConfigAccount) {
+      const poolAuthority = deriveDbcPoolAuthority();
+      dammConfigAddress = await createDammV2Config(
+        connection,
+        wallet.payer as Keypair,
+        poolAuthority,
+        migrationFeeOption
+      );
+    }
   }
   if (!dammConfigAddress) {
     throw new Error(
@@ -867,7 +977,7 @@ export async function migrateDammV2(
     );
   }
 
-  const poolAddress = poolState.publicKey;
+  const poolAddress = virtualPool.publicKey;
 
   const transactions: Transaction[] = [];
 
@@ -881,7 +991,7 @@ export async function migrateDammV2(
     if (!escrowAccount) {
       console.log('> Locker not found, creating locker...');
       const createLockerTx = await dbcInstance.migration.createLocker({
-        virtualPool: poolAddress,
+        pool: poolAddress,
         payer: wallet.publicKey,
       });
       modifyComputeUnitPriceIx(createLockerTx, config.computeUnitPriceMicroLamports ?? 0);
@@ -932,14 +1042,14 @@ export async function migrateDammV2(
 
   // migrate to DAMM V2
   console.log('Migrating to DAMM V2...');
-  if (poolState.account.isMigrated === 0) {
+  if (poolState.isMigrated === 0) {
     const {
       transaction: migrateTx,
       firstPositionNftKeypair,
       secondPositionNftKeypair,
     } = await dbcInstance.migration.migrateToDammV2({
       payer: wallet.publicKey,
-      virtualPool: poolAddress,
+      pool: poolAddress,
       dammConfig: dammConfigAddress,
     });
 
@@ -999,15 +1109,15 @@ export async function transferDbcPoolCreator(
 
   const dbcInstance = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolState = await dbcInstance.state.getPoolByBaseMint(new PublicKey(baseMint));
-  if (!poolState) {
+  const virtualPool = await dbcInstance.state.getPoolByBaseMint(new PublicKey(baseMint));
+  if (!virtualPool) {
     throw new Error(`DBC Pool not found for ${baseMint.toString()}`);
   }
 
-  const poolAddress = poolState.publicKey;
+  const poolAddress = virtualPool.publicKey;
 
   const transferPoolCreatorTx = await dbcInstance.creator.transferPoolCreator({
-    virtualPool: poolAddress,
+    pool: poolAddress,
     creator: wallet.publicKey,
     newCreator: new PublicKey(config.dbcTransferPoolCreator.newCreator),
   });

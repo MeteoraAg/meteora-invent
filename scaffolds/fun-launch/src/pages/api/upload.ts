@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import AWS from 'aws-sdk';
+import { PutObjectCommand, PutObjectCommandOutput, S3Client } from '@aws-sdk/client-s3';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 
@@ -48,12 +48,13 @@ type MetadataUploadParams = {
 };
 
 // R2 client setup
-const r2 = new AWS.S3({
+const r2 = new S3Client({
   endpoint: PRIVATE_R2_URL,
-  accessKeyId: R2_ACCESS_KEY_ID,
-  secretAccessKey: R2_SECRET_ACCESS_KEY,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
   region: 'auto',
-  signatureVersion: 'v4',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -149,24 +150,15 @@ async function uploadToR2(
   fileBuffer: Buffer,
   contentType: string,
   fileName: string
-): Promise<AWS.S3.PutObjectOutput> {
-  return new Promise((resolve, reject) => {
-    r2.putObject(
-      {
-        Bucket: R2_BUCKET,
-        Key: fileName,
-        Body: fileBuffer,
-        ContentType: contentType,
-      },
-      (err, data) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data);
-        }
-      }
-    );
-  });
+): Promise<PutObjectCommandOutput> {
+  return r2.send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: fileName,
+      Body: fileBuffer,
+      ContentType: contentType,
+    })
+  );
 }
 
 async function createPoolTransaction({
@@ -185,7 +177,7 @@ async function createPoolTransaction({
   const connection = new Connection(RPC_URL, 'confirmed');
   const client = new DynamicBondingCurveClient(connection, 'confirmed');
 
-  const poolTx = await client.pool.createPool({
+  const poolTx = await client.creator.createPool({
     config: new PublicKey(POOL_CONFIG_KEY),
     baseMint: new PublicKey(mint),
     name: tokenName,

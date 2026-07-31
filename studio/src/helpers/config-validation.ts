@@ -103,7 +103,8 @@ function throwIfErrors(errors: ValidationError[], context: string): void {
 export function validateDbcConfigFields(dbcConfig: {
   feeClaimer?: string;
   leftoverReceiver?: string;
-  dbcPool?: { creator?: string } | null;
+  transferHookProgram?: string | null;
+  dbcPool?: { creator?: string; transferHookProgram?: string | null } | null;
   dbcTransferPoolCreator?: { newCreator?: string } | null;
 }): void {
   const CONFIG_FILE = 'config/dbc_config.jsonc';
@@ -120,9 +121,29 @@ export function validateDbcConfigFields(dbcConfig: {
   );
   if (leftoverReceiverErr) errors.push(leftoverReceiverErr);
 
+  // Validate dbcConfig.transferHookProgram (optional)
+  if (dbcConfig.transferHookProgram != null) {
+    const err = validateAddress(
+      'dbcConfig.transferHookProgram',
+      dbcConfig.transferHookProgram,
+      CONFIG_FILE
+    );
+    if (err) errors.push(err);
+  }
+
   // Validate dbcPool.creator
   if (dbcConfig.dbcPool?.creator !== undefined) {
     const err = validateAddress('dbcPool.creator', dbcConfig.dbcPool.creator, CONFIG_FILE);
+    if (err) errors.push(err);
+  }
+
+  // Validate dbcPool.transferHookProgram (optional)
+  if (dbcConfig.dbcPool?.transferHookProgram != null) {
+    const err = validateAddress(
+      'dbcPool.transferHookProgram',
+      dbcConfig.dbcPool.transferHookProgram,
+      CONFIG_FILE
+    );
     if (err) errors.push(err);
   }
 

@@ -180,9 +180,8 @@ export default function CreatePool() {
                       >
                         Token Name*
                       </label>
-                      {form.Field({
-                        name: 'tokenName',
-                        children: (field) => (
+                      <form.Field name="tokenName">
+                        {(field) => (
                           <input
                             id="tokenName"
                             name={field.name}
@@ -194,8 +193,8 @@ export default function CreatePool() {
                             required
                             minLength={3}
                           />
-                        ),
-                      })}
+                        )}
+                      </form.Field>
                     </div>
 
                     <div className="mb-4">
@@ -205,9 +204,8 @@ export default function CreatePool() {
                       >
                         Token Symbol*
                       </label>
-                      {form.Field({
-                        name: 'tokenSymbol',
-                        children: (field) => (
+                      <form.Field name="tokenSymbol">
+                        {(field) => (
                           <input
                             id="tokenSymbol"
                             name={field.name}
@@ -219,8 +217,8 @@ export default function CreatePool() {
                             required
                             maxLength={10}
                           />
-                        ),
-                      })}
+                        )}
+                      </form.Field>
                     </div>
                   </div>
 
@@ -231,9 +229,8 @@ export default function CreatePool() {
                     >
                       Token Logo*
                     </label>
-                    {form.Field({
-                      name: 'tokenLogo',
-                      children: (field) => (
+                    <form.Field name="tokenLogo">
+                      {(field) => (
                         <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center">
                           <span className="iconify w-6 h-6 mx-auto mb-2 text-gray-400 ph--upload-bold" />
                           <p className="text-gray-400 text-xs mb-2">PNG, JPG or SVG (max. 2MB)</p>
@@ -255,8 +252,8 @@ export default function CreatePool() {
                             Browse Files
                           </label>
                         </div>
-                      ),
-                    })}
+                      )}
+                    </form.Field>
                   </div>
                 </div>
               </div>
@@ -273,9 +270,8 @@ export default function CreatePool() {
                     >
                       Website
                     </label>
-                    {form.Field({
-                      name: 'website',
-                      children: (field) => (
+                    <form.Field name="website">
+                      {(field) => (
                         <input
                           id="website"
                           name={field.name}
@@ -285,8 +281,8 @@ export default function CreatePool() {
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                      ),
-                    })}
+                      )}
+                    </form.Field>
                   </div>
 
                   <div className="mb-4">
@@ -296,9 +292,8 @@ export default function CreatePool() {
                     >
                       Twitter
                     </label>
-                    {form.Field({
-                      name: 'twitter',
-                      children: (field) => (
+                    <form.Field name="twitter">
+                      {(field) => (
                         <input
                           id="twitter"
                           name={field.name}
@@ -308,8 +303,8 @@ export default function CreatePool() {
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                      ),
-                    })}
+                      )}
+                    </form.Field>
                   </div>
                 </div>
               </div>

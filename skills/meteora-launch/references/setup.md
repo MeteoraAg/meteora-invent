@@ -15,15 +15,16 @@ pnpm install
 
 ## Configure Environment
 
-```bash
-cp studio/.env.example studio/.env
-```
+RPC endpoint, keypair path, and dry-run mode all live in the protocol config files
+(`studio/config/*.jsonc`), not in `.env`:
 
-Edit `studio/.env`:
-
-```env
-PAYER_PRIVATE_KEY=<your_wallet_private_key_in_base58>
-RPC_URL=<your_rpc_endpoint>
+```jsonc
+{
+  "rpcUrl": "https://api.devnet.solana.com",
+  "dryRun": true,
+  "keypairFilePath": "./keypair.json",
+  "computeUnitPriceMicroLamports": 100000
+}
 ```
 
 **RPC options:**
@@ -34,14 +35,16 @@ RPC_URL=<your_rpc_endpoint>
 ## Get a Wallet
 
 ```bash
-# Generate a fresh keypair
+# Generate a fresh keypair (writes keypair.json)
 pnpm studio generate-keypair
 
 # On devnet — generate + airdrop 5 SOL
 pnpm studio generate-keypair --network devnet --airdrop
 ```
 
-Or import an existing wallet: paste the base58 private key into `PAYER_PRIVATE_KEY`.
+To import an existing wallet instead: `cp studio/.env.example studio/.env`, set
+`PRIVATE_KEY` (base58 or JSON byte array) in `studio/.env`, then run
+`pnpm studio generate-keypair` — it converts the key into `keypair.json`.
 
 ## Local Testing (Optional)
 

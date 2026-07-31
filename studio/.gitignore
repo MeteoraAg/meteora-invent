@@ -3,6 +3,8 @@ node_modules
 package-lock.json
 .env
 
+mint-keypair.json
+
 dbc/.DS_Store
 
 damm-v1/.DS_Store

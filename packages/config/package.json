@@ -8,6 +8,6 @@
     "clean": "rm -rf node_modules .turbo"
   },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }
