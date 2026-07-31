@@ -2,13 +2,6 @@
 
 A toolkit consisting of everything you need to invent innovative token launches on Meteora.
 
-## Metsumi
-
-Meet Metsumi, your personal launch assistant engineered to help you launch anything and do any
-action on Meteora programs with just a few configurations and CLI commands.
-
-![Metsumi](./assets/metsumi/metsumi-1.webp)
-
 ## 📋 Table of Contents
 
 - [🚀 Getting Started](#-getting-started)

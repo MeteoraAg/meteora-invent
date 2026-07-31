@@ -4,7 +4,7 @@
 
 ## 🎯 Quick AI Context
 
-Meteora Invent is a comprehensive toolkit consisting of everything you need to invent innovative token launches on Meteora. Meet **Metsumi**, your personal launch assistant engineered to help you launch anything and do any action on Meteora programs with just a few configurations and CLI commands.
+Meteora Invent is a comprehensive toolkit consisting of everything you need to invent innovative token launches on Meteora.
 
 ### Core Components:
 - **Studio**: Scripts for doing any action on Meteora programs
@@ -25,7 +25,6 @@ Meteora Invent is a comprehensive toolkit consisting of everything you need to i
 - ✅ **Config-Driven**: All parameters externalized to JSONC files
 - ✅ **Safe Execution**: Built-in dry-run and validation modes
 - ✅ **Clear Boundaries**: Explicit files AI can/cannot modify
-- ✅ **Metsumi**: (coming soon)
 
 ## 🚀 Global Setup & Prerequisites
 
