@@ -1,12 +1,12 @@
 import { PublicKey } from '@solana/web3.js';
-import { safeParseKeypairFromFile, getDbcConfig, parseCliArguments } from '../../helpers';
+import { safeParseKeypairFromFile, getDammV2Config, parseCliArguments } from '../../helpers';
 import { Wallet } from '@coral-xyz/anchor';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
-import { claimTradingFee } from '../../lib/dbc/trading';
+import { getPositions } from '../../lib/damm_v2/trading';
 import { createCheckedConnection } from '../../helpers/connection';
 
 async function main() {
-  const config = await getDbcConfig();
+  const config = await getDammV2Config();
 
   console.log(`> Using keypair file path ${config.keypairFilePath}`);
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
@@ -14,23 +14,19 @@ async function main() {
   console.log('\n> Initializing configuration...');
   console.log(`- Using RPC URL ${config.rpcUrl}`);
   console.log(`- Dry run = ${config.dryRun}`);
-  console.log(`- Using wallet ${keypair.publicKey} to claim trading fee`);
+  console.log(`- Using wallet ${keypair.publicKey} for this action`);
 
   const connection = await createCheckedConnection(config.rpcUrl, DEFAULT_COMMITMENT_LEVEL);
   const wallet = new Wallet(keypair);
 
-  const { baseMint } = parseCliArguments();
-  if (!baseMint) {
-    throw new Error('Please provide --baseMint flag to do this action');
+  const { poolAddress: targetKey } = parseCliArguments();
+  if (!targetKey) {
+    throw new Error('Please provide --poolAddress flag to do this action');
   }
+  const target = new PublicKey(targetKey);
+  console.log(`- Using poolAddress ${target.toString()}`);
 
-  console.log(`- Using base token mint ${baseMint.toString()}`);
-
-  if (config) {
-    await claimTradingFee(config, connection, wallet, new PublicKey(baseMint));
-  } else {
-    throw new Error('Must provide DAMM V1 configuration');
-  }
+  await getPositions(connection, wallet, target);
 }
 
 main();

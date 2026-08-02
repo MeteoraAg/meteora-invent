@@ -1,0 +1,63 @@
+{
+  /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": true, // Set to false only after you understand what will happen
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* quoteMint is required for the following actions:
+   * 1. alpha-vault-create
+   * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
+   */
+  "quoteMint": "So11111111111111111111111111111111111111112",
+
+  /* alphaVault is only used in the following actions:
+   * 1. alpha-vault-create
+   * There are 2 types of alpha vault: First Come First Serve (FCFS) and Prorata.
+   */
+  "alphaVault": {
+    "poolType": "dlmm", // DLMM = dlmm | DAMM v1 = dynamic | DAMM v2 = damm2
+    "alphaVaultType": "fcfs", // FCFS = fcfs | Prorata = prorata
+
+    /* Only use the following parameters for alphaVaultType: fcfs
+     * 1. maxDepositCap
+     * 2. individualDepositingCap
+     */
+    "maxDepositCap": 10000, // Maximum total amount (in quote token) that can be deposited across all users in the vault
+    "individualDepositingCap": 1, // Maximum amount (in quote token) that each individual user can deposit
+
+    /* Only use the following parameters for alphaVaultType: prorata
+     * 1. maxBuyingCap
+     */
+    // "maxBuyingCap": 10000, // Maximum total amount (in quote token) that can be bought across all users in the vault
+
+    "depositingPoint": 1733626299, // When users can start depositing depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+    "startVestingPoint": 1746808201, // When token vesting begins and users can start claiming their vested tokens depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+    "endVestingPoint": 1746808201, // When token vesting ends and all tokens become fully claimable depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+    "escrowFee": 0, // Fee amount (in quote token) charged when creating a stake escrow account
+    "whitelistMode": "permissionless" // Whitelist mode: permissionless | permissioned_with_merkle_proof | permissioned_with_authority
+
+    /* Optional Configuration: whitelistFilePath
+     * Only use when whitelistMode is permissioned_with_merkle_proof or permissioned_with_authority
+     */
+    // "whitelistFilepath": "./data/whitelist_wallet.csv", // Optional path to CSV file containing whitelisted wallet addresses and their deposit caps (format: wallet,deposit_cap)
+
+    /* Optional Configuration: merkleProofBaseUrl, chunkSize, kvProofFilepath, cloudflareKvProofUpload
+     * Only use when whitelistMode is permissioned_with_merkle_proof
+     */
+    // "merkleProofBaseUrl": "https://example.workers.dev/", // Base URL endpoint where merkle proofs are stored and can be retrieved for whitelisted wallet verification
+    // "chunkSize": 1000, // Optional batch size for processing large whitelist files or merkle tree operations to avoid memory/performance issues
+    // "kvProofFilepath": "./data/kv_proofs", // Optional path to key-value file storing pre-computed merkle proofs for whitelisted addresses
+    // "cloudflareKvProofUpload": {
+    //   "kvNamespaceId": "YOUR_KV_NAMESPACE_ID",
+    //   "accountId": "YOUR_ACCOUNT_ID",
+    //   "apiKey": "YOUR_API_KEY"
+    // }
+  }
+}

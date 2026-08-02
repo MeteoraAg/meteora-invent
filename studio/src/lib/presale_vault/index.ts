@@ -49,6 +49,8 @@ export async function createFcfsPresaleVault(
     presaleEndTime: new BN(params.presaleArgs.presaleEndTime),
     whitelistMode: params.presaleArgs.whitelistMode,
     unsoldTokenAction: params.presaleArgs.unsoldTokenAction,
+    disableEarlierPresaleEndOnceCapReached:
+      params.presaleArgs.disableEarlierPresaleEndOnceCapReached ?? false,
   };
 
   console.log(`\n> Presale Configuration:`);
@@ -71,6 +73,11 @@ export async function createFcfsPresaleVault(
       lockDuration: new BN(params.lockedVestingArgs.lockDuration),
       vestDuration: new BN(params.lockedVestingArgs.vestDuration),
       immediateReleaseBps: new BN(params.lockedVestingArgs.immediateReleaseBps),
+      // SDK examples default the immediate-release timing to the presale end
+      immediateReleaseTimestamp:
+        params.lockedVestingArgs.immediateReleaseTimestamp != null
+          ? new BN(params.lockedVestingArgs.immediateReleaseTimestamp)
+          : new BN(params.presaleArgs.presaleEndTime),
     };
 
     console.log(`\n> Locked Vesting Configuration:`);
@@ -185,6 +192,8 @@ export async function createProrataPresaleVault(
     presaleEndTime: new BN(params.presaleArgs.presaleEndTime),
     whitelistMode: params.presaleArgs.whitelistMode,
     unsoldTokenAction: params.presaleArgs.unsoldTokenAction,
+    disableEarlierPresaleEndOnceCapReached:
+      params.presaleArgs.disableEarlierPresaleEndOnceCapReached ?? false,
   };
 
   console.log(`\n> Presale Configuration:`);
@@ -207,6 +216,11 @@ export async function createProrataPresaleVault(
       lockDuration: new BN(params.lockedVestingArgs.lockDuration),
       vestDuration: new BN(params.lockedVestingArgs.vestDuration),
       immediateReleaseBps: new BN(params.lockedVestingArgs.immediateReleaseBps),
+      // SDK examples default the immediate-release timing to the presale end
+      immediateReleaseTimestamp:
+        params.lockedVestingArgs.immediateReleaseTimestamp != null
+          ? new BN(params.lockedVestingArgs.immediateReleaseTimestamp)
+          : new BN(params.presaleArgs.presaleEndTime),
     };
 
     console.log(`\n> Locked Vesting Configuration:`);
@@ -336,6 +350,8 @@ export async function createFixedPricePresaleVault(
     presaleEndTime: new BN(params.presaleArgs.presaleEndTime),
     whitelistMode: params.presaleArgs.whitelistMode,
     unsoldTokenAction: params.presaleArgs.unsoldTokenAction,
+    disableEarlierPresaleEndOnceCapReached:
+      params.presaleArgs.disableEarlierPresaleEndOnceCapReached ?? false,
   };
 
   console.log(`\n> Presale Configuration:`);
@@ -358,6 +374,11 @@ export async function createFixedPricePresaleVault(
       lockDuration: new BN(params.lockedVestingArgs.lockDuration),
       vestDuration: new BN(params.lockedVestingArgs.vestDuration),
       immediateReleaseBps: new BN(params.lockedVestingArgs.immediateReleaseBps),
+      // SDK examples default the immediate-release timing to the presale end
+      immediateReleaseTimestamp:
+        params.lockedVestingArgs.immediateReleaseTimestamp != null
+          ? new BN(params.lockedVestingArgs.immediateReleaseTimestamp)
+          : new BN(params.presaleArgs.presaleEndTime),
     };
 
     console.log(`\n> Locked Vesting Configuration:`);
@@ -385,6 +406,7 @@ export async function createFixedPricePresaleVault(
     {
       price,
       rounding,
+      disableWithdraw: params.fixedPricePresaleConfig?.disableWithdraw ?? false,
     }
   );
 

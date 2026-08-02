@@ -2,7 +2,7 @@ import { PublicKey } from '@solana/web3.js';
 import { safeParseKeypairFromFile, getDbcConfig, parseCliArguments } from '../../helpers';
 import { Wallet } from '@coral-xyz/anchor';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
-import { swap } from '../../lib/dbc';
+import { swap } from '../../lib/dbc/trading';
 import { createCheckedConnection } from '../../helpers/connection';
 
 async function main() {

@@ -78,3 +78,18 @@ jobs:
 
       - name: Type check
         run: pnpm exec tsc --noEmit --project tsconfig.typecheck.json
+
+  skills-validate:
+    name: Validate Agent Skill
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate skill spec, links, version pins, config drift
+        run: node .github/scripts/validate-skills.mjs

@@ -90,6 +90,7 @@ export type DammV1Config = MeteoraConfigBase & {
   dammV1LockLiquidity: LockLiquidityConfig | null;
   stake2EarnFarm: Stake2EarnFarmConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
+  dammV1Swap?: DammV1SwapConfig | null;
 };
 
 export interface DynamicAmmV1Config {
@@ -125,6 +126,7 @@ export type DammV2Config = MeteoraConfigBase & {
   addLiquidity: AddLiquidityConfig | null;
   splitPosition: SplitPositionConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
+  dammV2Swap?: DammV2SwapConfig | null;
 };
 
 export interface DynamicAmmV2Config {
@@ -195,6 +197,7 @@ export type DlmmConfig = MeteoraConfigBase & {
   setDlmmPoolStatus: SetDlmmPoolStatusConfig | null;
   placeLimitOrder?: DlmmPlaceLimitOrderConfig | null;
   cancelLimitOrder?: DlmmCancelLimitOrderConfig | null;
+  dlmmSwap?: DlmmSwapConfig | null;
 };
 
 export interface DynamicLmmConfig {
@@ -433,6 +436,24 @@ export type DbcPool = {
   transferHookProgram?: string | null;
 };
 
+export type DlmmSwapConfig = {
+  amountIn: number;
+  slippageBps: number;
+  swapForY: boolean;
+};
+
+export type DammV2SwapConfig = {
+  inputMint: string;
+  amountIn: number;
+  slippage: number;
+};
+
+export type DammV1SwapConfig = {
+  inputMint: string;
+  amountIn: number;
+  slippage: number;
+};
+
 export type DbcSwap = {
   amountIn: number;
   slippageBps: number;
@@ -581,4 +602,5 @@ export interface PresaleVaultConfig {
 export interface FixedPricePresaleVaultConfig {
   price: number;
   rounding: 'up' | 'down';
+  disableWithdraw?: boolean; // fixed-price only: block withdrawals after deposit (default false)
 }
