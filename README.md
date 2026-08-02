@@ -8,6 +8,7 @@ A toolkit consisting of everything you need to invent innovative token launches 
 - [📦 Workspaces](#-workspaces)
   - [Studio](#studio-meteora-inventstudio)
   - [Scaffolds](#scaffolds)
+- [🤖 Agent Skill](#-agent-skill)
 - [🏗️ Structure](#%EF%B8%8F-structure)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
@@ -481,6 +482,30 @@ pnpm --filter @meteora-invent/scaffold/fun-launch dev
 pnpm --filter @meteora-invent/scaffold/fun-launch build
 ```
 
+## 🤖 Agent Skill
+
+`skills/meteora` is the official [Agent Skill](https://agentskills.io) for Meteora: it
+teaches AI agents (Claude Code, OpenClaw, Hermes, Cursor, and any Agent-Skills-compatible
+runtime) how to run every studio action safely — devnet-first, dry-run-first, with explicit
+owner confirmation gates — and how to write correct TypeScript against the Meteora SDKs
+(version-pinned reference packs for DBC, DAMM v1/v2, and DLMM, plus runnable one-shot
+scripts for swaps, quotes, positions, and fee claims).
+
+**Install:**
+
+```bash
+# Claude Code (user-level) — or any runtime reading the cross-client convention path:
+cp -R skills/meteora ~/.claude/skills/meteora
+cp -R skills/meteora ~/.agents/skills/meteora
+
+# Working inside this repo with Claude Code? The skill is picked up from skills/ directly.
+```
+
+The skill is validated in CI (`.github/scripts/validate-skills.mjs`): spec-compliant
+frontmatter, no broken references, SDK version pins matched against `studio/package.json`,
+config templates synced with `studio/config`, and all bundled scripts type-checked against
+the installed SDKs.
+
 ## 🏗️ Structure
 
 ```
@@ -492,6 +517,12 @@ meteora-invent/
 │       └── typescript/
 ├── scaffolds/         # Scaffolds - production-ready frontend application templates
 │   └── fun-launch/
+├── skills/            # Agent Skill - teaches AI agents the Meteora stack (ACT + BUILD)
+│   ├── evals/
+│   └── meteora/
+│       ├── SKILL.md
+│       ├── references/
+│       └── scripts/
 └── studio/            # Studio - a collection of actions for you to innovate and create
     ├── config
     │   ├── alpha_vault_config.jsonc
@@ -504,7 +535,6 @@ meteora-invent/
     │   │   └── test-token.jpg
     │   ├── kv_proof_example.json
     │   └── whitelist_wallet_example.csv
-    ├── LLM.txt
     ├── package.json
     ├── README.md
     ├── src

@@ -78,3 +78,35 @@ jobs:
 
       - name: Type check
         run: pnpm exec tsc --noEmit --project tsconfig.typecheck.json
+
+  skills-validate:
+    name: Validate Agent Skill
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Validate skill spec, links, version pins, config drift
+        run: node .github/scripts/validate-skills.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check skill scripts against installed SDKs
+        run: |
+          mkdir -p studio/.tmp-skill-typecheck
+          cp -R skills/meteora/scripts/lib studio/.tmp-skill-typecheck/
+          cp skills/meteora/scripts/*.ts studio/.tmp-skill-typecheck/
+          cd studio && npx tsc --noEmit --target ES2020 --module CommonJS --moduleResolution node \
+            --esModuleInterop --resolveJsonModule --skipLibCheck --strict \
+            .tmp-skill-typecheck/*.ts .tmp-skill-typecheck/lib/*.ts
+          rm -rf .tmp-skill-typecheck

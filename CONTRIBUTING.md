@@ -60,7 +60,6 @@ meteora-invent/
     │   │   └── test-token.jpg
     │   ├── kv_proof_example.json
     │   └── whitelist_wallet_example.csv
-    ├── LLM.txt
     ├── package.json
     ├── README.md
     ├── src

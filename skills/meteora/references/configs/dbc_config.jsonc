@@ -3,7 +3,7 @@
   "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
 
   /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
-  "dryRun": false,
+  "dryRun": true, // Set to false only after you understand what will happen
 
   /* keypairFilePath is required and will be the payer + signer for all transactions */
   "keypairFilePath": "./keypair.json",
@@ -91,7 +91,7 @@
         "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
         "feeSchedulerParam": {
           "startingFeeBps": 100, // starting fee (max 99% fee === 9900 bps)
-          "endingFeeBps": 100, // ending fee (minimum 0.01% fee === 1 bps)
+          "endingFeeBps": 100, // ending fee (minimum 0.25% fee === 25 bps)
           "numberOfPeriod": 0, // number of period
           "totalDuration": 0 // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
         }
