@@ -71,6 +71,15 @@
    * 1. damm-v1-lock-liquidity
    * 2. damm-v1-lock-liquidity-stake2earn
    */
+  /* dammV1Swap is only used in the following actions:
+   * 1. damm-v1-swap (requires --poolAddress flag)
+   */
+  "dammV1Swap": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are paying with; must be one of the pool's two mints
+    "amountIn": 0.1, // amount of inputMint to swap, in human token units
+    "slippage": 0.5 // slippage tolerance in percent (0.5 = 0.5%)
+  },
+
   "dammV1LockLiquidity": {
     "allocations": [
       {

@@ -127,6 +127,15 @@
    * 1. dlmm-cancel-limit-order (requires --poolAddress flag, optional --limitOrder flag)
    * Cancelling withdraws unfilled deposits, filled proceeds and earned fees, then closes the order account.
    */
+  /* dlmmSwap is only used in the following actions:
+   * 1. dlmm-swap (requires --poolAddress flag)
+   */
+  "dlmmSwap": {
+    "amountIn": 0.1, // amount of the INPUT token to swap, in human token units (input = X when swapForY is true, Y otherwise)
+    "slippageBps": 100, // slippage tolerance in bps (100 = 1%)
+    "swapForY": true // true = sell token X for token Y | false = buy token X with token Y
+  },
+
   "cancelLimitOrder": {
     "cancelAll": false // when true and no --limitOrder flag is passed, cancels every open order on the pool
   },

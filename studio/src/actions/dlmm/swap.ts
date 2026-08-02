@@ -1,12 +1,8 @@
 import { PublicKey } from '@solana/web3.js';
 import { safeParseKeypairFromFile, getDlmmConfig, parseCliArguments } from '../../helpers';
 import { Wallet } from '@coral-xyz/anchor';
-import { getDlmmLimitOrders } from '../../lib/dlmm/status';
-import {
-  DEFAULT_COMMITMENT_LEVEL,
-  DLMM_PROGRAM_IDS,
-  LOCALNET_RPC_URL,
-} from '../../utils/constants';
+import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
+import { swap as dlmmSwap } from '../../lib/dlmm/trading';
 import { createCheckedConnection } from '../../helpers/connection';
 
 async function main() {
@@ -17,27 +13,20 @@ async function main() {
 
   console.log('\n> Initializing configuration...');
   console.log(`- Using RPC URL ${config.rpcUrl}`);
-  console.log(`- Using owner ${keypair.publicKey} to fetch limit orders`);
+  console.log(`- Dry run = ${config.dryRun}`);
+  console.log(`- Using wallet ${keypair.publicKey} for this action`);
 
   const connection = await createCheckedConnection(config.rpcUrl, DEFAULT_COMMITMENT_LEVEL);
   const wallet = new Wallet(keypair);
 
-  const { poolAddress: poolKey } = parseCliArguments();
-  if (!poolKey) {
+  const { poolAddress: targetKey } = parseCliArguments();
+  if (!targetKey) {
     throw new Error('Please provide --poolAddress flag to do this action');
   }
-  const poolAddress = new PublicKey(poolKey);
-  console.log(`- Using pool address ${poolAddress.toString()}`);
+  const target = new PublicKey(targetKey);
+  console.log(`- Using poolAddress ${target.toString()}`);
 
-  const opts =
-    config.rpcUrl === LOCALNET_RPC_URL
-      ? {
-          cluster: 'localhost' as const,
-          programId: new PublicKey(DLMM_PROGRAM_IDS.localhost),
-        }
-      : undefined;
-
-  await getDlmmLimitOrders(connection, wallet, poolAddress, opts);
+  await dlmmSwap(config, connection, wallet, target);
 }
 
 main();

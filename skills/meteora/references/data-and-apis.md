@@ -55,13 +55,13 @@ or via `@meteora-ag/alpha-vault` (not yet covered by this skill).
 
 | Need | Call |
 |---|---|
-| DBC pool by token | `client.state.getPoolByBaseMint(mint)` → then `getPool`, `getPoolConfig` |
+| DBC pool by token | ACT: `pnpm studio dbc-get-status --baseMint <MINT>` · SDK: `client.state.getPoolByBaseMint(mint)` |
 | DBC graduation progress | `client.state.getPoolQuoteTokenCurveProgress(pool)` (0–1) |
 | DBC fees owed | `client.state.getPoolFeeBreakdown(pool)` |
-| DAMM v2 pool / position | `cpAmm.fetchPoolState(pool)` · `cpAmm.getUserPositionByPool(pool, user)` · `cpAmm.getPositionsByUser(user)` |
+| DAMM v2 pool / position | ACT: `pnpm studio damm-v2-get-positions --poolAddress <POOL>` · SDK: `cpAmm.fetchPoolState(pool)` / `getUserPositionByPool` / `getPositionsByUser` |
 | DAMM v2 pools by mint | `cpAmm.fetchPoolStatesByTokenMint(mint)` |
 | DLMM pool state | `DLMM.create(connection, pool)` → `getActiveBin()`, `getFeeInfo()`, `getDynamicFee()` |
-| DLMM user positions | `dlmm.getPositionsByUserAndLbPair(user)` · `DLMM.getAllLbPairPositionsByUser(connection, user)` (all pools — heavy) · `DLMM.getPositionsByUserAndTokenAddress(connection, user, mint)` |
+| DLMM user positions | ACT: `pnpm studio dlmm-get-positions --poolAddress <POOL>` · SDK: `dlmm.getPositionsByUserAndLbPair(user)` · `DLMM.getAllLbPairPositionsByUser(connection, user)` (all pools — heavy) · `DLMM.getPositionsByUserAndTokenAddress(connection, user, mint)` |
 | DLMM limit orders | `dlmm.getLimitOrderByUserAndLbPair(user)` · `DLMM.getLimitOrdersByUserAndTokenAddress(...)` |
 | DAMM v1 pool | `AmmImpl.create(connection, pool)` → `updateState()` → `poolInfo` |
 | DAMM v1 pools by token | `AmmImpl.searchPoolsByToken(connection, mint)` |

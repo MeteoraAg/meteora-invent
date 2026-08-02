@@ -45,6 +45,7 @@
       "presaleStartTime": 0, // Presale start time (unix timestamp in seconds, 0 = start immediately)
       "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds, e.g., Date.now() / 1000 + 86400 for 24 hours from now)
       "whitelistMode": 0, // Whitelist mode: 0 = permissionless (anyone can participate) | 1 = permissioned_with_merkle_proof | 2 = permissioned_with_authority
+      "disableEarlierPresaleEndOnceCapReached": false, // if true, FCFS/fixed-price presales keep running until presaleEndTime even after the max cap is hit
       "unsoldTokenAction": 1 // Action for unsold tokens: 0 = burn | 1 = refund to creator
     },
 
@@ -54,7 +55,8 @@
      */
     "fixedPricePresaleConfig": {
       "price": 0.1,
-      "rounding": "down"
+      "rounding": "down",
+      "disableWithdraw": false // fixed-price only: if true, buyers cannot withdraw their deposit after depositing
     },
 
     /* Optional: Locked vesting configuration
@@ -63,7 +65,8 @@
     "lockedVestingArgs": {
       "lockDuration": 3600, // Duration tokens are locked before vesting starts (in seconds, e.g., 3600 = 1 hour)
       "vestDuration": 3600, // Duration over which tokens vest linearly (in seconds, e.g., 3600 = 1 hour)
-      "immediateReleaseBps": 0 // Percentage of tokens released immediately in basis points (1000 = 10%, 0 = no immediate release)
+      "immediateReleaseBps": 0, // Percentage of tokens released immediately in basis points (1000 = 10%, 0 = no immediate release)
+      "immediateReleaseTimestamp": 0 // unix seconds when the immediate-release portion unlocks; 0/omitted = at presaleEndTime (SDK default)
     }
   }
 }

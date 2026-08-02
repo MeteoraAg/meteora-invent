@@ -320,8 +320,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@meteora-ag/presale':
-        specifier: ^0.0.5
-        version: 0.0.5(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        specifier: ^0.1.1
+        version: 0.1.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@meteora-ag/vault-sdk':
         specifier: ^2.3.1
         version: 2.3.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -1677,8 +1677,8 @@ packages:
     peerDependencies:
       typescript: ^5
 
-  '@meteora-ag/presale@0.0.5':
-    resolution: {integrity: sha512-jLu3o33I4JA4pzcFq9xm59I27IShlI4TuqfDyC4Bfbk7OZwbUBT12IEB0pAqmCR6229a9Ef0y54tAG3mrp/4BQ==}
+  '@meteora-ag/presale@0.1.1':
+    resolution: {integrity: sha512-YW91Io/009/cU3/o2ryjfmL1cYSdU0FrQeCXFMqMhqfBFqxcRLOMzY2eJju9AfVf6oeo9FvQvD9E/EUUJUh5RQ==}
 
   '@meteora-ag/vault-sdk@2.3.1':
     resolution: {integrity: sha512-I42o02fTpXdBcD/po/mXHnrOfVshr8vj9i7r+s7KG/FNdwC9/z+KZXvjXSTakKe/2CnLm75u3UFJly3j0KraSg==}
@@ -11618,9 +11618,11 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - utf-8-validate
 
-  '@meteora-ag/presale@0.0.5(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@meteora-ag/presale@0.1.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': 0.31.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@solana/buffer-layout': 4.0.1
+      '@solana/buffer-layout-utils': 0.3.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-token': 0.4.15(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       bn.js: 5.2.5

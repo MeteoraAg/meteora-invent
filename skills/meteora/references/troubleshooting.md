@@ -19,7 +19,7 @@
 |---|---|---|
 | Method doesn't exist / wrong signature at compile time | Using a pre-2026 or hallucinated API | Check the "Version fences" section of the protocol reference; verify against the SDK's `docs.md` or source |
 | `TypeError: ... is not a constructor` importing DLMM | `DLMM` is the **default** export | `import DLMM from '@meteora-ag/dlmm'` |
-| `SyntaxError: ... does not provide an export named 'BN'` (path inside `@meteora-ag/dlmm`) when running a script | `tsx` on recent Node mis-resolves the DLMM package as ESM | Run with `npx ts-node` (CommonJS pipeline) as the skill's scripts do — not `tsx` |
+| `SyntaxError: ... does not provide an export named 'BN'` (path inside `@meteora-ag/dlmm`) when running your own standalone script | `tsx` on recent Node mis-resolves the DLMM package as ESM | Run with `npx ts-node` (CommonJS pipeline), not `tsx` (the studio's bundled setup is unaffected) |
 | BN / type identity errors across packages | Mixed Anchor versions (DAMM v1 = 0.29; others = 0.31) or duplicate `bn.js` | Isolate DAMM v1 in its own package; import `BN` from one place |
 | Deep import fails under `moduleResolution: node16/bundler` | DAMM v1 SDK has no `exports` map | Use `"moduleResolution": "node"` or a path alias |
 | Quote looks wrong / stale | Cached state | DLMM `refetchStates()`, DAMM v1 `updateState()`, re-fetch pool state in DBC/CP-AMM before quoting |
@@ -40,7 +40,7 @@
 | Custom program error: other `0x...` | Protocol constraint (pool disabled, activation not reached, limit-order side wrong, ≥10% LP-lock rule violated…) | No — fix the cause | Decode via the SDK's error map (`src/*/error*.ts` exports); check pool status/activation |
 | Swap fails only on one pool | Pool disabled (`setPairStatus`), pre-activation, or rate limiter active | No — until state changes | Check pool state + activation point; DBC rate-limiter configs restrict early swap sizes |
 | `Insufficient funds` / lamports | Wallet underfunded | No — fund first | Airdrop (devnet) or owner funds (mainnet), then retry |
-| Dry-run simulation reports `err="AccountNotFound"` right after a valid quote | Fee payer has 0 SOL / doesn't exist on-chain (e.g. throwaway keypair) | No — fund first | The printed quote is still valid; fund the signer before `--execute` |
+| Simulation reports `AccountNotFound` right after a valid quote (or a swap action reports a 0-SOL wallet) | Fee payer has 0 SOL / doesn't exist on-chain | No — fund first | The printed quote is still valid; fund the signer, then re-run |
 | Airdrop fails | Devnet faucet limits | **Yes** — later | Retry, or fund from another devnet wallet |
 
 ## Escalation

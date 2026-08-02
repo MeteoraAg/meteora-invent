@@ -97,16 +97,3 @@ jobs:
 
       - name: Validate skill spec, links, version pins, config drift
         run: node .github/scripts/validate-skills.mjs
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check skill scripts against installed SDKs
-        run: |
-          mkdir -p studio/.tmp-skill-typecheck
-          cp -R skills/meteora/scripts/lib studio/.tmp-skill-typecheck/
-          cp skills/meteora/scripts/*.ts studio/.tmp-skill-typecheck/
-          cd studio && npx tsc --noEmit --target ES2020 --module CommonJS --moduleResolution node \
-            --esModuleInterop --resolveJsonModule --skipLibCheck --strict \
-            .tmp-skill-typecheck/*.ts .tmp-skill-typecheck/lib/*.ts
-          rm -rf .tmp-skill-typecheck

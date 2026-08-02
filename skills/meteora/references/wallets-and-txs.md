@@ -88,7 +88,7 @@ const sig = await sendAndConfirmTransaction(connection, tx, signers, { commitmen
   (DBC config, DLMM position, CP-AMM position NFT) → **extra signers**.
 - Simulate before sending real value: set blockhash + feePayer, **sign first**, then
   `await connection.simulateTransaction(tx)` and read the program logs
-  (`scripts/lib/common.ts` shows the exact order).
+  (the studio's `runSimulateTransaction` helper follows this order).
 - **Verify before signing** any transaction you didn't assemble instruction-by-instruction
   (SDK builders, and especially anything returned by a remote API): check it pays/sends
   what the owner approved — expected program IDs, destination/receiver, mint, and exact

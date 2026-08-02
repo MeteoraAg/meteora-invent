@@ -28,7 +28,7 @@ Both can have trading-fee shares, surplus, and migration-fee withdrawals.
 | Supply / decimals | Default 1,000,000,000 / base 6, quote 9. Human units in configs, not lamports. |
 | Quote mint | Default SOL `So11111111111111111111111111111111111111112`; USDC on request. |
 | Curve shape | Ask intent → mode: "simple" → `buildCurveMode: 0` (defaults: 20% supply on migration, threshold 10 quote); "target market caps" → mode 1 (`initialMarketCap`, `migrationMarketCap`); advanced → modes 2–5 (below). Set ONLY the chosen mode's shape fields — comment out the other modes' (the template ships mode 0 active). |
-| Graduation cost expectation | The SOL needed to graduate (`migrationQuoteThreshold`) is derived from the curve, not set directly in modes 1–5 — read it right after creation (`scripts/dbc-status.ts`, printed in quote lamports). Measured example: caps 20→600 SOL with the default 50/40/5/5 LP split ⇒ threshold ≈ 92.6 SOL. Devnet airdrops are 5 SOL/call — use small caps for devnet rehearsals. |
+| Graduation cost expectation | The SOL needed to graduate (`migrationQuoteThreshold`) is derived from the curve, not set directly in modes 1–5 — read it right after creation (`pnpm studio dbc-get-status --baseMint <MINT>`, printed in quote base units). Measured example: caps 20→600 SOL with the default 50/40/5/5 LP split ⇒ threshold ≈ 92.6 SOL. Devnet airdrops are 5 SOL/call — use small caps for devnet rehearsals. |
 | Fees | Defaults: fee scheduler 100→100 bps, `dynamicFeeEnabled: true`, `creatorTradingFeePercentage: 50`, `collectFeeMode: 0` (quote). Min base fee **25 bps**. |
 | Fee-share asks | "X% of trading fees" maps to TWO knobs — clarify which: `creatorTradingFeePercentage` splits **bonding-curve-phase** fees between creator and partner (`feeClaimer`); `liquidityDistribution` percentages set who owns the **post-graduation** LP (and its fees). Self-launches where the owner is both partner and creator receive 100% either way — the split only matters with a launchpad/partner. |
 | Migration target | Default DAMM v2 (`migrationOption: 1`), `migrationFeeOption: 3` (2% LP fee). Option 6 = customizable (needs `migratedPoolFee`). |
@@ -38,8 +38,8 @@ Both can have trading-fee shares, surplus, and migration-fee withdrawals.
 
 Studio actions: `dbc-create-config` (save the logged config pubkey) → `dbc-create-pool
 --config <that pubkey>` (or run `dbc-create-pool` alone to do both at once) → (trade) →
-`dbc-migrate-to-damm-v2` (or `-v1`). Template: `configs/dbc_config.jsonc`. Swap/claim:
-`dbc-swap`, `dbc-claim-trading-fee`. Post-migration withdrawals (leftover/surplus/migration
+`dbc-migrate-to-damm-v2` (or `-v1`). Template: `configs/dbc_config.jsonc`. Swap/claim/status:
+`dbc-swap`, `dbc-claim-trading-fee`, `dbc-get-status`. Post-migration withdrawals (leftover/surplus/migration
 fee) are BUILD-only. Details: `studio-actions.md`.
 
 ## Client setup (BUILD path)
@@ -106,7 +106,7 @@ Order — **DAMM v2**: (`createLocker` if locked vesting configured) → `migrat
 
 **Post-graduation detection & successor pool:** `pool.poolState.isMigrated` (numeric flag,
 0 = on curve) is set once the pool has migrated (progress reaches 1.0 at the threshold;
-`scripts/dbc-status.ts` prints it). The fetched config account exposes the routing fields
+`pnpm studio dbc-get-status` prints it). The fetched config account exposes the routing fields
 camelCased from the IDL — `migrationOption` (0 = DAMM v1, 1 = v2), `migrationFeeOption`,
 `activationType`. Find the graduated DAMM v2 pool with the DBC helper
 `deriveDammV2PoolAddress(config, tokenAMint, tokenBMint)` or by scanning

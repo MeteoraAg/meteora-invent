@@ -119,6 +119,15 @@
   /* splitPosition is only used in the following actions:
    * 1. damm-v2-split-position
    */
+  /* dammV2Swap is only used in the following actions:
+   * 1. damm-v2-swap (requires --poolAddress flag)
+   */
+  "dammV2Swap": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are paying with; must be one of the pool's two mints
+    "amountIn": 0.1, // amount of inputMint to swap, in human token units
+    "slippage": 0.5 // slippage tolerance in percent (0.5 = 0.5%)
+  },
+
   "splitPosition": {
     "newPositionOwner": "YOUR_NEW_POSITION_OWNER_ADDRESS", // this is the address that will receive the new DAMM v2 NFT position
     "unlockedLiquidityPercentage": 50, // this is the percentage of unlocked liquidity that will be split and transferred to the newPositionOwner's position

@@ -2,7 +2,7 @@
 name: meteora
 description: "Do anything on Meteora, Solana's liquidity layer: launch tokens on Dynamic Bonding Curves (DBC), create and manage DAMM v1/v2 and DLMM pools, add or remove liquidity, swap, place DLMM limit orders, claim fees, migrate DBC pools to DAMM, run alpha/presale vaults, and write TypeScript against Meteora SDKs. Use for any Meteora, meteora-invent, DBC, DLMM, DAMM, Solana token launch, bonding curve, or Solana liquidity/LP task — including building launchpads, trading bots, and integrations."
 license: MIT
-compatibility: "Requires Node.js 22.12+ and pnpm 10+ for the studio CLI path (repo enforces engine-strict), or Node.js 18+ with npm for the SDK scripts path; network access to a Solana RPC; a funded keypair for on-chain writes."
+compatibility: "Requires Node.js 22.12+ and pnpm 10+ for the studio CLI path (repo enforces engine-strict), or Node.js 18+ with npm for standalone SDK code; network access to a Solana RPC; a funded keypair for on-chain writes."
 metadata: {"version": "2.0.0", "author": "MeteoraAg", "openclaw": {"emoji": "🌊", "homepage": "https://github.com/MeteoraAg/meteora-invent", "requires": {"anyBins": ["pnpm", "npm"]}}, "hermes": {"category": "defi", "tags": ["solana", "meteora", "defi", "liquidity", "token-launch"]}}
 ---
 
@@ -23,29 +23,32 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | via studio CLI | — |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | via studio CLI | — |
 
-Not yet covered in depth (see https://docs.meteora.ag/llms.txt for docs): Dynamic Vault,
-Stake2Earn (M3M3), Zap, Dynamic Fee Sharing.
+Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
+(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing — live in `references/other-products.md`
+(deep docs: https://docs.meteora.ag/llms.txt).
 
 ## Decide the Path: ACT vs BUILD
 
 **ACT — the user wants an outcome on-chain now** → use the **meteora-invent studio CLI**
-(config-driven JSONC, `dryRun` simulation, devnet parity). Best for high-stakes multi-step
-flows: token launches, migrations, pool creation, liquidity seeding, vaults, locks.
+(config-driven JSONC, `dryRun` simulation, devnet parity). Covers launches, migrations,
+pool creation, seeding, vaults, locks — and swaps, position/status reads, and DLMM fee
+claims on every protocol.
 
-**BUILD — the user wants code, or an action the studio doesn't have** → use the **SDKs
-directly** with the pinned versions above. Required for: swaps and quotes (all protocols
-except `dbc-swap`), reading pools/positions/fees, DLMM position management (add/remove/claim/
-rebalance) on existing pools, bots, backends, UIs.
+**BUILD — the user wants code, or a flow the studio doesn't have** → use the **SDKs
+directly** with the pinned versions above. Required for: bots, backends, UIs, and position
+management beyond the studio (DLMM add/remove/rebalance on existing positions, CP-AMM
+position ops on arbitrary pools, vault/presale user flows).
 
 | Intent | Path | First action → then read |
 |---|---|---|
 | Launch token on bonding curve | ACT | Run intake in `references/dbc.md` → `dbc-create-config` → `dbc-create-pool` (`references/studio-actions.md`) |
-| Migrate graduated DBC pool | ACT | Check progress (`scripts/dbc-status.ts`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
+| Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
 | Alpha/presale vault, locks, farms | ACT | `alpha-vault-create` / lock actions (`references/studio-actions.md`) |
-| Swap / quote on any pool | BUILD | `npx ts-node scripts/<protocol>-swap.ts` dry-run (`scripts/README.md`) |
-| List positions, pool state, fees owed | BUILD | `scripts/positions.ts` / `dbc-status.ts`, or REST (`references/data-and-apis.md`) |
-| DLMM manage existing position (add/remove/claim/rebalance) | BUILD | Read `references/dlmm.md`, write against `@meteora-ag/dlmm@1.9.14` |
+| Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
+| List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
+| Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |
+| DLMM add/remove/rebalance an existing position | BUILD | Read `references/dlmm.md`, write against `@meteora-ag/dlmm@1.9.14` |
 | Trading bot, backend, integration | BUILD | Read the protocol reference pack, then code against the pinned SDK |
 | Launchpad / token UI | BUILD | `references/scaffolds.md` (fun-launch or custom via `references/dbc.md`) |
 | Aggregated multi-DEX swap routing, DCA across venues | **Defer** | Jupiter APIs — not this skill |
@@ -114,9 +117,9 @@ All 31 actions with their real flags, config blocks, and outputs:
 
 ## BUILD Quick Start (SDKs)
 
-Standalone runnable one-shots (swap, quote, positions, claim) with pinned deps live in
-`scripts/` — copy that folder, `npm install`, set env vars, run. For anything else, read the
-protocol reference first, then write code. Universal rules — all four SDKs:
+Read the protocol reference pack first, then write code against the pinned SDK versions in
+the Product Map (`npm install <pkg>@<pinned>` in a fresh project OUTSIDE the monorepo; run
+TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 
 1. **web3.js v1 only** (`Connection`, `Transaction`, `PublicKey`, `Keypair`). Never
    `@solana/kit` / web3.js v2 types.
@@ -177,7 +180,7 @@ protocol reference first, then write code. Universal rules — all four SDKs:
 | Errors → causes → fixes (all protocols) | `references/troubleshooting.md` |
 | Launchpad UI / frontend templates | `references/scaffolds.md` |
 | Ready-to-fill config templates | `references/configs/*.jsonc` |
-| Runnable SDK one-shots | `scripts/README.md` |
+| Alpha Vault / Presale / M3M3 / Zap / Dynamic Vault / Fee Sharing SDK surfaces | `references/other-products.md` |
 
 ## Verification
 
@@ -186,8 +189,8 @@ After every state-changing action:
 1. Confirm the transaction signature landed: explorer link `https://solscan.io/tx/<SIG>`
    (append `?cluster=devnet` on devnet) or `connection.confirmTransaction`.
 2. Re-read state and check the expected change:
-   - DBC: `client.state.getPoolByBaseMint(mint)` → pool exists / reserves moved;
-     curve progress via `getPoolQuoteTokenCurveProgress`.
+   - DBC: `pnpm studio dbc-get-status --baseMint <MINT>` (progress, migrated, reserves,
+     fees) or `client.state.getPoolByBaseMint(mint)`.
    - DAMM v2: `cpAmm.fetchPoolState(pool)` / `getUserPositionByPool(pool, user)`.
    - DLMM: `dlmm.refetchStates()` → `getActiveBin()`, `getPositionsByUserAndLbPair(user)`.
    - DAMM v1: `pool.updateState()` → `poolInfo`, `getUserBalance(owner)`.

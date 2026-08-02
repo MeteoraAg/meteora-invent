@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 31 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 38 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -82,7 +82,7 @@ When `uri` is set it takes precedence — the `image`/`description`/social field
 in the file and are ignored (verified).
 For transfer-hook configs set `dbcPool.transferHookProgram` to the same hook program.
 Output: base mint, config pubkey, and tx hashes are logged — **the pool address is NOT
-logged**; derive it with `scripts/dbc-status.ts --mint <MINT>`. Note: in the combined
+logged**; derive it with `dbc-get-status --baseMint <MINT>`. Note: in the combined
 run (no `--config`), the dry-run's pool-leg simulation always fails with "config doesn't
 exist" — expected, since the config isn't on-chain yet; the config-leg simulation is the
 meaningful gate. ~0.05 SOL.
@@ -109,7 +109,7 @@ pnpm studio dbc-migrate-to-damm-v1 --baseMint <MINT>   # config migrationOption:
 pnpm studio dbc-migrate-to-damm-v2 --baseMint <MINT>   # config migrationOption: 1
 ```
 Flags: `--baseMint` (required). Preconditions: pool's `quoteReserve` ≥ its
-`migrationQuoteThreshold` (check with `scripts/dbc-status.ts`), and the config's
+`migrationQuoteThreshold` (check with `dbc-get-status --baseMint <MINT>`), and the config's
 `migrationOption` must match the action. The action handles the intermediate steps
 (locker for locked vesting, v1 metadata/LP lock+claim) per config. The migration is
 permissionless to execute. Verify + find the graduated pool afterwards: `dbc.md`
@@ -122,6 +122,14 @@ pnpm studio dbc-transfer-pool-creator --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). New creator comes from config block
 `dbcTransferPoolCreator.newCreator` (there is no `--newCreator` flag).
+
+### `dbc-get-status`
+```bash
+pnpm studio dbc-get-status --baseMint <MINT>
+```
+Flags: `--baseMint` (required). **Read-only.** Prints pool + config addresses, quote
+reserve, migrated flag, graduation %, migration threshold (quote base units), and
+unclaimed creator/partner fees.
 
 ## DLMM actions — config file: `studio/config/dlmm_config.jsonc`
 
@@ -192,6 +200,31 @@ deposits + filled proceeds + earned fees and closes the order account (rent refu
 Note: fees accrued inside limit orders are ONLY recoverable this way — position fee claims
 don't touch them.
 
+### `dlmm-swap`
+```bash
+pnpm studio dlmm-swap --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `dlmmSwap`: `amountIn` (human units of the INPUT
+token), `slippageBps`, `swapForY` (true = sell token X for Y, false = buy X with Y).
+Quotes first (out, min-out, price impact logged), then simulates (`dryRun: true`) or sends.
+Requires the wallet to hold the input amount; a 0-SOL wallet is rejected with a clear error.
+
+### `dlmm-claim-fees`
+```bash
+pnpm studio dlmm-claim-fees --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Claims **swap fees + LM rewards** for all of the
+wallet's positions on the pool (per-position unclaimed amounts logged first; may send
+multiple transactions). Fees inside limit orders are NOT claimed here — cancel the order
+to recover those.
+
+### `dlmm-get-positions`
+```bash
+pnpm studio dlmm-get-positions --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). **Read-only.** Prints the active bin and, per position:
+bin range, X/Y amounts (base units), unclaimed feeX/feeY.
+
 ## DAMM v2 actions — config file: `studio/config/damm_v2_config.jsonc`
 
 ### `damm-v2-create-balanced-pool` / `damm-v2-create-one-sided-pool`
@@ -248,6 +281,21 @@ pnpm studio damm-v2-refresh-vesting --poolAddress <POOL>
 ```
 Flags: `--poolAddress` (required). Refreshes vesting state on the wallet's locked position(s).
 
+### `damm-v2-swap`
+```bash
+pnpm studio damm-v2-swap --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `dammV2Swap`: `inputMint` (must be one of the
+pool's two mints — validated), `amountIn` (human units), `slippage` (percent). Token-2022
+aware. Quotes first, then simulates or sends per `dryRun`.
+
+### `damm-v2-get-positions`
+```bash
+pnpm studio damm-v2-get-positions --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). **Read-only.** Prints per position: unlocked/vested/
+permanent-locked liquidity and unclaimed tokenA/tokenB fees.
+
 ## DAMM v1 actions — config file: `studio/config/damm_v1_config.jsonc`
 
 ### `damm-v1-create-pool`
@@ -286,6 +334,14 @@ pnpm studio damm-v1-lock-liquidity-stake2earn --baseMint <MINT>
 Flags: `--baseMint` (required). Locks LP wired to the Stake2Earn fee farm — **run
 `damm-v1-create-stake2earn-farm` first**; same `allocations[]` semantics as above.
 
+### `damm-v1-swap`
+```bash
+pnpm studio damm-v1-swap --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `dammV1Swap`: `inputMint` (one of the pool's
+mints — validated), `amountIn` (human units), `slippage` (percent). Quotes, then simulates
+or sends per `dryRun`.
+
 ## Vault actions
 
 ### `alpha-vault-create` — config file: `studio/config/alpha_vault_config.jsonc`
@@ -311,7 +367,10 @@ pnpm studio presale-vault-create --baseMint <MINT>
 Flags: `--baseMint` (required). Reads `presaleVault`: `presaleRegistries[]` tiers
 (`presaleSupply` in **raw base-token units — passed straight to BN, no decimal
 conversion** (verified); buyer min/max deposit caps **in quote lamports**;
-`depositFeeBps`), timing points, and mode (fcfs/prorata variants per template comments).
+`depositFeeBps`), timing points, and mode (fcfs/prorata/fixed-price per template comments).
+Creator options (SDK 0.1.1): `presaleArgs.disableEarlierPresaleEndOnceCapReached`
+(default false), `lockedVestingArgs.immediateReleaseTimestamp` (0/omitted = at
+`presaleEndTime`), and fixed-price `fixedPricePresaleConfig.disableWithdraw` (default false).
 Scope note: this skill covers vault **creation only** — buyer claims, raise withdrawal,
 refunds, and tier-assignment mechanics are not yet covered; see
 https://docs.meteora.ag/helper-products/presale-vault/what-is-presale-vault.md and dry-run
@@ -331,6 +390,7 @@ output before committing real funds.
 | `dbc-migrate-to-damm-v1` | `--baseMint` | — | 0.05 |
 | `dbc-migrate-to-damm-v2` | `--baseMint` | — | 0.05 |
 | `dbc-transfer-pool-creator` | `--baseMint` | `dbcTransferPoolCreator` | 0.001 |
+| `dbc-get-status` | `--baseMint` | — (read-only) | 0 |
 | `dlmm-create-pool` | `--baseMint` or `createBaseToken` | `dlmmConfig` (+ `alphaVault` if enabled) | 0.05 |
 | `dlmm-seed-liquidity-lfg` | `--baseMint` | `lfgSeedLiquidity` | 0.01 |
 | `dlmm-seed-liquidity-single-bin` | `--baseMint` | `singleBinSeedLiquidity` | 0.01 |
@@ -338,6 +398,9 @@ output before committing real funds.
 | `dlmm-place-limit-order` | `--poolAddress` | `placeLimitOrder` | 0.01 |
 | `dlmm-get-limit-orders` | `--poolAddress` | — | 0 |
 | `dlmm-cancel-limit-order` | `--poolAddress` (`--limitOrder` opt.) | `cancelLimitOrder` | 0.001 |
+| `dlmm-swap` | `--poolAddress` | `dlmmSwap` | 0.001 |
+| `dlmm-claim-fees` | `--poolAddress` | — | 0.001 |
+| `dlmm-get-positions` | `--poolAddress` | — (read-only) | 0 |
 | `damm-v2-create-balanced-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` | 0.05 |
 | `damm-v2-create-one-sided-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` | 0.05 |
 | `damm-v2-add-liquidity` | `--poolAddress` | `addLiquidity` | 0.01 |
@@ -346,15 +409,18 @@ output before committing real funds.
 | `damm-v2-split-position` | `--poolAddress` | `splitPosition` | 0.01 |
 | `damm-v2-close-position` | `--poolAddress` | — | 0.001 |
 | `damm-v2-refresh-vesting` | `--poolAddress` | — | 0.001 |
+| `damm-v2-swap` | `--poolAddress` | `dammV2Swap` | 0.001 |
+| `damm-v2-get-positions` | `--poolAddress` | — (read-only) | 0 |
 | `damm-v1-create-pool` | `--baseMint` or `createBaseToken` | `dammV1Config` | 0.05 |
 | `damm-v1-lock-liquidity` | `--baseMint` | `dammV1LockLiquidity` | 0.01 |
 | `damm-v1-create-stake2earn-farm` | `--baseMint` | `stake2EarnFarm` | 0.05 |
 | `damm-v1-lock-liquidity-stake2earn` | `--baseMint` | `dammV1LockLiquidity` + `stake2EarnFarm` | 0.01 |
+| `damm-v1-swap` | `--poolAddress` | `dammV1Swap` | 0.001 |
 | `alpha-vault-create` | `--baseMint` | `alphaVault` | 0.05 |
 | `presale-vault-create` | `--baseMint` | `presaleVault` | 0.05 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 
-> Not here by design: swaps (except `dbc-swap`), position reads, DLMM claim-fees /
-> add-to-existing-position / rebalance. Those are BUILD-path tasks — see the protocol
-> reference packs and `scripts/`.
+> Not here by design: DLMM add-to-existing-position / rebalance, CP-AMM position
+> management beyond the listed actions, and vault/presale user flows — BUILD-path tasks;
+> see the protocol reference packs and `other-products.md`.
