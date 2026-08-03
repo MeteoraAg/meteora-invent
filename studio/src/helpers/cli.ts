@@ -59,6 +59,15 @@ export function parseCliArguments(): CliArguments {
       poolAddress: {
         type: 'string',
       },
+      vault: {
+        type: 'string',
+      },
+      escrow: {
+        type: 'string',
+      },
+      farm: {
+        type: 'string',
+      },
       limitOrder: {
         type: 'string',
       },

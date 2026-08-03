@@ -8,6 +8,9 @@ export interface CliArguments {
   network?: string | undefined;
   baseMint?: string | undefined;
   poolAddress?: string | undefined;
+  vault?: string | undefined;
+  escrow?: string | undefined;
+  farm?: string | undefined;
   limitOrder?: string | undefined;
   airdrop?: boolean | undefined;
   help?: boolean | undefined;
@@ -23,7 +26,17 @@ export interface CommandOption {
 
 /* COMMON */
 
-export type MeteoraConfig = DammV1Config | DammV2Config | DlmmConfig | DbcConfig | AlphaVaultConfig;
+export type MeteoraConfig =
+  | DammV1Config
+  | DammV2Config
+  | DlmmConfig
+  | DbcConfig
+  | AlphaVaultConfig
+  | DynamicVaultConfig
+  | FarmingConfig
+  | FeeSharingConfig
+  | ZapConfig
+  | LockConfig;
 
 export interface CreateTokenMintOptions {
   dryRun: boolean;
@@ -604,3 +617,28 @@ export interface FixedPricePresaleVaultConfig {
   rounding: 'up' | 'down';
   disableWithdraw?: boolean; // fixed-price only: block withdrawals after deposit (default false)
 }
+
+/* Dynamic Vault */
+
+// Empty for now — the dynamic-vault SDK commit adds deposit/withdraw/status blocks.
+export type DynamicVaultConfig = MeteoraConfigBase;
+
+/* Pool Farms (reward-pool) */
+
+// Empty for now — the farming SDK commit adds stake/unstake/claim blocks.
+export type FarmingConfig = MeteoraConfigBase;
+
+/* Dynamic Fee Sharing */
+
+// Empty for now — the fee-sharing SDK commit adds create/fund/claim blocks.
+export type FeeSharingConfig = MeteoraConfigBase;
+
+/* Zap */
+
+// Empty for now — the zap SDK commit adds zap-in/zap-out blocks.
+export type ZapConfig = MeteoraConfigBase;
+
+/* Met Lock */
+
+// Empty for now — the met-lock SDK commit adds escrow/claim blocks.
+export type LockConfig = MeteoraConfigBase;

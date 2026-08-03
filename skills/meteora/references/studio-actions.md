@@ -11,8 +11,9 @@ Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-inv
    real ones: `configs/` next to this file).
 2. **Flags are selectors only.** The full set the parser accepts (anything else errors):
    `--network <mainnet-beta|devnet|localnet>`, `--baseMint <pubkey>`, `--poolAddress <pubkey>`,
-   `--limitOrder <pubkey>`, `--airdrop` (boolean), `--config <pubkey>` (ONE action only, see
-   `dbc-create-pool`), `--help`.
+   `--vault <pubkey>`, `--escrow <pubkey>`, `--farm <pubkey>`, `--limitOrder <pubkey>`,
+   `--airdrop` (boolean), `--config <pubkey>` (ONE action only, see `dbc-create-pool`),
+   `--help`.
 3. Every config file shares the same base fields: `rpcUrl`, `dryRun`, `keypairFilePath`
    (resolved from `studio/`), `computeUnitPriceMicroLamports`, `quoteMint`. `dryRun`
    applies to every action reading that file — **flip it to `false` only for the action
