@@ -19,11 +19,11 @@
    */
   "lockCreateEscrow": {
     "recipient": "YOUR_RECIPIENT_ADDRESS", // wallet that will receive the vested tokens
-    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from
-    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time
+    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from; MUST be <= cliffTime (program rejects creation otherwise)
+    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time; must be >= vestingStartTime
     "frequency": 2592000, // seconds between unlock periods after the cliff (e.g. 2592000 = 30 days)
-    "cliffUnlockAmount": 2500, // human token units unlocked exactly at cliffTime
-    "amountPerPeriod": 2500, // human token units unlocked every `frequency` seconds after the cliff
+    "cliffUnlockAmount": 2500, // human token units unlocked exactly at cliffTime; total locked = cliffUnlockAmount + amountPerPeriod * numberOfPeriod — set to 0 unless an upfront cliff unlock is wanted
+    "amountPerPeriod": 2500, // human token units unlocked every `frequency` seconds after the cliff — put the full amount here for pure linear vesting
     "numberOfPeriod": 4, // total number of periods after the cliff
     "updateRecipientMode": 0, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can change the recipient address later)
     "cancelMode": 1, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can cancel the escrow)

@@ -12,11 +12,10 @@ async function main() {
 
   const connection = await createCheckedConnection(config.rpcUrl, DEFAULT_COMMITMENT_LEVEL);
 
-  const { vault: vaultKey } = parseCliArguments();
-  if (!vaultKey) {
-    throw new Error('Please provide --vault flag to do this action');
+  const { vault: vaultKey, baseMint: baseMintKey } = parseCliArguments();
+  if (!vaultKey && !baseMintKey) {
+    throw new Error('Please provide --vault or --baseMint flag to do this action');
   }
-  const vault = new PublicKey(vaultKey);
 
   // Read-only action: the wallet is optional and only used to additionally show the
   // per-wallet escrow view. No keypair -> plain presale status only.
@@ -31,7 +30,14 @@ async function main() {
     );
   }
 
-  await getStatus(connection, vault, walletPubkey);
+  await getStatus(
+    connection,
+    {
+      vault: vaultKey ? new PublicKey(vaultKey) : undefined,
+      baseMint: baseMintKey ? new PublicKey(baseMintKey) : undefined,
+    },
+    walletPubkey
+  );
 }
 
 main();

@@ -69,6 +69,14 @@ Buyer lifecycle (instance methods → `Transaction`): `createPermissionlessEscro
 Studio actions: `presale-vault-*` (create + full buyer/creator lifecycle + status) — see
 `studio-actions.md`.
 
+**Finding a presale:** there is no REST endpoint for presales today (unlike Pool Farms'
+`amm.meteora.ag` lookup, below). ACT path: `pnpm studio presale-vault-get-status --baseMint
+<mint>` — discovery mode that scans every presale and filters by base mint, printing the match
+(or a `pubkey | mode | progress` list if the mint has more than one). BUILD path:
+`Presale.getPresales(connection)` returns every presale account on the program (a full
+`getProgramAccounts` scan — there's no memcmp/PDA shortcut from just the mint); filter the
+results' `.account.baseMint` yourself.
+
 ## Stake2Earn (M3M3) — `@meteora-ag/m3m3@1.0.10`
 
 Program `FEESngU3neckdwib9X3KWqdL7Mjmqk9XNp3uh5JbP4KP`. DAMM v1 pools only. **Anchor 0.29.**
@@ -85,6 +93,13 @@ Admin: `StakeForFee.createFeeVault(...)` (what the studio's stake2earn actions w
 
 Studio actions: `stake2earn-*` (farm create + lock via `damm-v1-*`, full staker lifecycle +
 status) — see `studio-actions.md`.
+
+**Finding a farm:** SDK static `StakeForFee.getAllFeeVault(connection)` (verified) returns
+every fee vault on the program as `{ publicKey, account }[]`, with `account.pool` and
+`account.stakeMint` among the decoded fields — filter by either to find a farm, then run
+`stake2earn-get-status --poolAddress <pool>`. Heuristic for which pools have one at all: M3M3
+farms sit on DAMM v1 memecoin pools (`is_meme: true` in `damm-api.meteora.ag` pool search
+results — see `data-and-apis.md`).
 
 ## Zap — `@meteora-ag/zap-sdk@1.3.2`
 
@@ -215,6 +230,12 @@ returned map) and is the right way to compute claimable rewards. It deep-imports
 runtime — an undeclared peer dependency this package never lists in its own `package.json` —
 but studio already depends on `@meteora-ag/dynamic-amm-sdk` directly, so it resolves (verified:
 the whole package imports cleanly end to end, including this deep path).
+
+**Caution — the REST `farming_pool` field can be stale:** `damm-api.meteora.ag/farms`'s
+`farming_pool` value for a pool can point to a DIFFERENT (older) farm account than what the CLI
+resolves — verified live with pool `7TY9HFLwy8BpS1sGNzYt281YY9WP4V1TzKcYbYft5SD1` (two distinct
+farm accounts with different reward-end timestamps). Trust the CLI's resolution
+(`farm-get-status --poolAddress ...`); treat the REST field as advisory, not authoritative.
 
 Farm discovery: `getFarmAddressesByPoolAddress(poolAddress, cluster?)` /
 `getFarmAddressesByLp(lpAddress, cluster?)` → `{farmAddress, APY, expired}[]` are **REST calls**

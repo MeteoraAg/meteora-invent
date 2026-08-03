@@ -49,7 +49,7 @@ converts keys, it does not create them.**
 cp -n studio/.env.example studio/.env    # then set PRIVATE_KEY=... in it
 
 # New wallet: create one without echoing the secret, appended straight into .env
-cd studio && node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();fs.appendFileSync('.env','\nPRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())" && cd ..
+cd studio && node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();const env=fs.existsSync('.env')?fs.readFileSync('.env','utf8').split('\n').filter(l=>!l.startsWith('PRIVATE_KEY=')).join('\n').replace(/\n*$/,'\n'):'';fs.writeFileSync('.env',env+'PRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())" && cd ..
 
 # Convert to studio/keypair.json (+ optional devnet airdrop of 5 SOL)
 pnpm studio generate-keypair --network devnet --airdrop

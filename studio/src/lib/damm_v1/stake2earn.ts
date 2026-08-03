@@ -500,9 +500,16 @@ export async function unstakeStart(
     config.dryRun ? '  STAKE2EARN — UNSTAKE REQUEST (DRY RUN)' : '  STAKE2EARN — UNSTAKE REQUEST'
   );
   console.log('='.repeat(70));
-  console.log('  Unstake account (SAVE THIS — needed by stake2earn-cancel-unstake and');
-  console.log('  stake2earn-withdraw, via config.stake2EarnWithdraw.unstakeKey):');
-  console.log(`    ${unstakeKeypair.publicKey.toString()}`);
+  if (config.dryRun) {
+    console.log('  Unstake account (THROWAWAY — dry run only, do NOT save):');
+    console.log(`    ${unstakeKeypair.publicKey.toString()}`);
+    console.log('  >>> DRY RUN — this address is a placeholder from a throwaway keypair. A NEW');
+    console.log('  >>> address will be generated and printed when you run with dryRun=false.');
+  } else {
+    console.log('  Unstake account (SAVE THIS — needed by stake2earn-cancel-unstake and');
+    console.log('  stake2earn-withdraw, via config.stake2EarnWithdraw.unstakeKey):');
+    console.log(`    ${unstakeKeypair.publicKey.toString()}`);
+  }
   console.log(`  Amount:                     ${amount} (${amountLamports.toString()} base units)`);
   console.log(`  Farm's unstakeLockDuration: ${unlockDurationSecs} seconds from now`);
   console.log('='.repeat(70));

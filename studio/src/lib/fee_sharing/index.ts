@@ -144,7 +144,14 @@ export async function createVault(
   modifyComputeUnitPriceIx(createTx, config.computeUnitPriceMicroLamports ?? 0);
 
   console.log(`\n>>> FEE VAULT ADDRESS: ${vaultAddress.toString()}`);
-  console.log('>>> Save this — every other fee-sharing-* action needs it via --vault.\n');
+  if (config.dryRun) {
+    console.log(
+      '>>> DRY RUN — this address is a placeholder from a throwaway keypair. A NEW address will'
+    );
+    console.log('>>> be generated and printed when you run with dryRun=false. Do NOT save it.\n');
+  } else {
+    console.log('>>> Save this — every other fee-sharing-* action needs it via --vault.\n');
+  }
 
   if (config.dryRun) {
     console.log('> Simulating fee vault creation transaction...');

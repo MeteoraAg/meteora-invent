@@ -43,6 +43,7 @@ anything else not exposed as a studio action.
 
 | Intent | Path | First action → then read |
 |---|---|---|
+| Wallet setup / get devnet SOL | ACT | `generate-keypair` → `airdrop-sol` (`references/studio-actions.md`) |
 | Launch token on bonding curve | ACT | Run intake in `references/dbc.md` → `dbc-create-config` → `dbc-create-pool` (`references/studio-actions.md`) |
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
@@ -94,7 +95,10 @@ do before doing it:
 
 **Gates (non-negotiable):**
 1. First execution of any state-changing flow runs with `"dryRun": true` (ACT) or a
-   simulation/quote (BUILD); show the owner the result.
+   simulation/quote (BUILD); show the owner the result. For actions that generate a fresh
+   keypair (lock escrow, fee-sharing vault, stake2earn unstake account, zap position), the
+   address a dry run prints is a throwaway placeholder — only save the address the real
+   (`dryRun: false`) run prints.
 2. Mainnet + real execution only after the owner explicitly confirms in this conversation.
 3. After executing, verify on-chain (see Verification) and report addresses, costs, and
    next steps. Never claim success without verifying.

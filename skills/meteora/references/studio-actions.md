@@ -1,6 +1,7 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 78 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+77 studio actions (plus the start-test-validator helper), verified against
+`studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -15,10 +16,15 @@ Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-inv
    `--airdrop` (boolean), `--config <pubkey>` (ONE action only, see `dbc-create-pool`),
    `--help`.
 3. Every config file shares the same base fields: `rpcUrl`, `dryRun`, `keypairFilePath`
-   (resolved from `studio/`), `computeUnitPriceMicroLamports`, `quoteMint`. `dryRun`
+   (resolved from `studio/`), `computeUnitPriceMicroLamports` — plus `quoteMint` where the
+   protocol trades against a quote token (5 of the 11 templates — `dynamic_vault`, `farming`,
+   `fee_sharing`, `lock`, `zap` — have no `quoteMint` field by design). `dryRun`
    applies to every action reading that file — **flip it to `false` only for the action
    the owner just confirmed, and set it back to `true` immediately after** (a stale
-   `false` is a live-execution hazard for the next action).
+   `false` is a live-execution hazard for the next action). Addresses printed by a DRY RUN
+   for actions that generate a fresh keypair (lock escrow, fee-sharing vault, stake2earn
+   unstake account, zap position) are throwaway placeholders — only save the address printed
+   by the real (`dryRun: false`) run.
 4. Amounts in config files are **human token units** unless the field's comment says
    otherwise (notable exceptions called out below).
 
@@ -37,7 +43,7 @@ to. Need a brand-new wallet first? Create one without echoing the secret:
 
 ```bash
 cd studio && cp -n .env.example .env
-node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();fs.appendFileSync('.env','\nPRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())"
+node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();const env=fs.existsSync('.env')?fs.readFileSync('.env','utf8').split('\n').filter(l=>!l.startsWith('PRIVATE_KEY=')).join('\n').replace(/\n*$/,'\n'):'';fs.writeFileSync('.env',env+'PRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())"
 cd .. && pnpm studio generate-keypair --network devnet --airdrop
 ```
 (or `solana-keygen new` if the Solana CLI is installed, then paste its base58 key into `studio/.env`).
@@ -53,8 +59,10 @@ is fixed by the action. Requires `studio/keypair.json` to exist.
 ```bash
 pnpm studio start-test-validator
 ```
-Local validator at `http://localhost:8899` preloaded with all Meteora programs (DLMM, DAMM
-v1/v2, DBC, Alpha Vault, Dynamic Vault, locker, metaplex, a transfer-hook fixture).
+Local validator at `http://localhost:8899` preloaded with every Meteora program this studio
+uses: DLMM, DAMM v1, DAMM v2, DBC, Alpha Vault, Dynamic Vault, Met Lock, and Dynamic Fee
+Sharing, plus Presale, Stake2Earn (M3M3), Zap, and Pool Farms — plus a metaplex fixture and a
+transfer-hook fixture.
 
 ## DBC actions — config file: `studio/config/dbc_config.jsonc`
 
@@ -250,8 +258,10 @@ quote). Targets the wallet's existing position in that pool (interactive selecti
 ```bash
 pnpm studio damm-v2-remove-liquidity --poolAddress <POOL>
 ```
-Flags: `--poolAddress` (required). No config block — operates on the wallet's position(s)
-in the pool (interactive selection; removes the position's available liquidity).
+Flags: `--poolAddress` (required). No config block for the removal amounts themselves —
+operates on the wallet's position(s) in the pool (interactive selection; removes the
+position's available liquidity) — but it does read `dammV2Config.activationType` to compute
+the current point for vested/locked-liquidity timing.
 
 ### `damm-v2-claim-position-fee`
 ```bash
@@ -304,7 +314,9 @@ permanent-locked liquidity and unclaimed tokenA/tokenB fees.
 pnpm studio damm-v1-create-pool --baseMint <MINT>
 ```
 Flags: `--baseMint` — or omit and fill `createBaseToken`. Reads `dammV1Config` (amounts,
-fee, activation; see template comments). Fee note: this customizable path takes
+fee, activation; see template comments). **If `dammV1Config.hasAlphaVault: true`, the action
+also creates the alpha vault automatically** from this file's `alphaVault` block right after
+the pool. Fee note: this customizable path takes
 `tradeFeeNumerator` over a 100,000 denominator (2500 = 2.5%); the fixed bps tiers
 `[25, 100, 400, 600]` in `damm-v1.md` apply to config-based pools, not this path.
 Legacy — prefer DAMM v2 for new pools. ~0.05 SOL.
@@ -563,9 +575,18 @@ raise has resolved (`Completed` or `Failed`); errors if the action has already b
 ### `presale-vault-get-status`
 ```bash
 pnpm studio presale-vault-get-status --vault <PRESALE>
+pnpm studio presale-vault-get-status --baseMint <MINT>   # discovery: scans + filters by base mint
 ```
-Flags: `--vault` (required). **Read-only** — keypair is optional (a missing/invalid keypair
-file degrades to presale-only output, same as `alpha-vault-get-status`). Prints progress
+Flags: `--vault` or `--baseMint` (one required). With `--baseMint`, scans every presale on the
+program (`Presale.getPresales` — a full account scan, see `other-products.md`) and filters by
+base mint: exactly one match prints its status directly; more than one prints a
+`pubkey | mode | progress` list and asks you to re-run with `--vault <address>`; none gives a
+clean "No presale found for base mint ..." error. A nonexistent `--vault` address also gets a
+clean "No presale vault at ..." error instead of the raw Anchor "account does not exist"
+exception. **Read-only** — keypair is optional (a missing/invalid keypair file degrades to
+presale-only output — this part matches every other `*-get-status` action, but the clean
+not-found error handling above is presale's own: `alpha-vault-get-status`, for one, does not
+yet wrap a bad `--vault` this cleanly). Prints progress
 state/%, mode, whitelist mode, totals, average token price, timings, every gate boolean, and a
 per-registry table (supply, deposits, caps, fee, price); with a usable wallet, also each of its
 escrows (deposited, claimable, pending, withdrawable-remaining-quote). **After the raise** —
@@ -589,12 +610,15 @@ known errors (see `other-products.md`), so these actions mirror the SDK repo's o
 pnpm studio lock-create-vesting-escrow --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `lockCreateEscrow`: `recipient`, `vestingStartTime` /
-`cliffTime` (unix **seconds**), `frequency` (seconds between unlock periods),
+`cliffTime` (unix **seconds** — **`vestingStartTime` must be ≤ `cliffTime`; the program
+rejects creation otherwise**), `frequency` (seconds between unlock periods),
 `cliffUnlockAmount` + `amountPerPeriod` (human token units, converted via the mint's
 decimals), `numberOfPeriod`, `updateRecipientMode` / `cancelMode` (0-3: NONE / CREATOR_ONLY /
 RECIPIENT_ONLY / CREATOR_RECIPIENT), `isSenderMultiSig`. Pre-checks the wallet's token
-balance against `cliffUnlockAmount + amountPerPeriod * numberOfPeriod` before building the
-transaction; Token-2022 mints are detected automatically (mint owner-program check).
+balance against the **total locked amount = `cliffUnlockAmount + amountPerPeriod *
+numberOfPeriod`** before building the transaction — leave `cliffUnlockAmount: 0` and put the
+full amount across `amountPerPeriod`/`numberOfPeriod` unless an upfront unlock right at the
+cliff is actually wanted. Token-2022 mints are detected automatically (mint owner-program check).
 **Generates a fresh `base` keypair that co-signs once** — signers are
 `[sender=wallet, base, payer=wallet]` — and **the derived escrow address is logged
 prominently: save it**, every other `lock-*` action needs it via `--escrow`. wSOL note: this
@@ -786,7 +810,10 @@ action's own note below says exactly how that's guaranteed); `zap-in-dlmm` is
 pool's own and keeps whichever pays out more, so it needs network access to Jupiter (see its
 own subsection for the — optional — key setup).
 
-All three build/send an ORDERED bundle of transactions through the shared
+All three run a pre-flight `assertFunded` check first — a 0-SOL wallet aborts immediately with
+a clear "fund it first" error, before any pool fetch, quote, or per-step simulation runs (this
+happens even under `dryRun`, since simulating still needs an existing fee-payer account).
+Past that gate, all three build/send an ORDERED bundle of transactions through the shared
 `sendOrderedTransactions` helper (`studio/src/helpers/transaction.ts`, generic — any future
 multi-tx flow can reuse it). Under `dryRun` it simulates **every** step in order even after an
 earlier one fails, so a single dry run surfaces every problem it can find at once, then throws a
@@ -956,20 +983,20 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `dlmm-swap` | `--poolAddress` | `dlmmSwap` | 0.001 |
 | `dlmm-claim-fees` | `--poolAddress` | — | 0.001 |
 | `dlmm-get-positions` | `--poolAddress` | — (read-only) | 0 |
-| `damm-v2-create-balanced-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` | 0.05 |
-| `damm-v2-create-one-sided-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` | 0.05 |
+| `damm-v2-create-balanced-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` (+ `alphaVault` if enabled) | 0.05 |
+| `damm-v2-create-one-sided-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` (+ `alphaVault` if enabled) | 0.05 |
 | `damm-v2-add-liquidity` | `--poolAddress` | `addLiquidity` | 0.01 |
-| `damm-v2-remove-liquidity` | `--poolAddress` | — | 0.001 |
+| `damm-v2-remove-liquidity` | `--poolAddress` | `dammV2Config.activationType` | 0.001 |
 | `damm-v2-claim-position-fee` | `--poolAddress` | — | 0.001 |
 | `damm-v2-split-position` | `--poolAddress` | `splitPosition` | 0.01 |
 | `damm-v2-close-position` | `--poolAddress` | — | 0.001 |
 | `damm-v2-refresh-vesting` | `--poolAddress` | — | 0.001 |
 | `damm-v2-swap` | `--poolAddress` | `dammV2Swap` | 0.001 |
 | `damm-v2-get-positions` | `--poolAddress` | — (read-only) | 0 |
-| `damm-v1-create-pool` | `--baseMint` or `createBaseToken` | `dammV1Config` | 0.05 |
+| `damm-v1-create-pool` | `--baseMint` or `createBaseToken` | `dammV1Config` (+ `alphaVault` if enabled) | 0.05 |
 | `damm-v1-lock-liquidity` | `--baseMint` | `dammV1LockLiquidity` | 0.01 |
 | `damm-v1-create-stake2earn-farm` | `--baseMint` | `stake2EarnFarm` | 0.05 |
-| `damm-v1-lock-liquidity-stake2earn` | `--baseMint` | `dammV1LockLiquidity` + `stake2EarnFarm` | 0.01 |
+| `damm-v1-lock-liquidity-stake2earn` | `--baseMint` | `dammV1LockLiquidity` | 0.01 |
 | `damm-v1-swap` | `--poolAddress` | `dammV1Swap` | 0.001 |
 | `stake2earn-stake` | `--poolAddress` | `stake2EarnStake` | 0.002 |
 | `stake2earn-claim-fee` | `--poolAddress` | `stake2EarnClaim` | 0.001 |
@@ -984,14 +1011,14 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `alpha-vault-withdraw-remaining-quote` | `--vault` | — | 0.001 |
 | `alpha-vault-crank-fill` | `--vault` | — | 0.001 (per tx; may send several) |
 | `alpha-vault-get-status` | `--vault` or `--poolAddress` | — (read-only) | 0 |
-| `presale-vault-create` | `--baseMint` | `presaleVault` | 0.05 |
+| `presale-vault-create` | `--baseMint` | `presaleVault` + `presaleVaultType` | 0.05 |
 | `presale-vault-deposit` | `--vault` | `presaleDeposit` | 0.002 |
 | `presale-vault-withdraw` | `--vault` | `presaleWithdraw` | 0.001 |
 | `presale-vault-claim` | `--vault` | `presaleClaim` | 0.001 |
 | `presale-vault-withdraw-remaining-quote` | `--vault` | — | 0.001 |
 | `presale-vault-creator-withdraw` | `--vault` | — (`presaleCreatorWithdraw` opt.) | 0.001 |
 | `presale-vault-handle-unsold` | `--vault` | — | 0.001 |
-| `presale-vault-get-status` | `--vault` | — (read-only) | 0 |
+| `presale-vault-get-status` | `--vault` or `--baseMint` | — (read-only) | 0 |
 | `lock-create-vesting-escrow` | `--baseMint` | `lockCreateEscrow` | 0.01 |
 | `lock-create-escrow-metadata` | `--escrow` | `lockEscrowMetadata` | 0.002 |
 | `lock-claim` | `--escrow` | `lockClaim` | 0.001 |

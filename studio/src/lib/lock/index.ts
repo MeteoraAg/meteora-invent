@@ -169,8 +169,15 @@ export async function createVestingEscrow(
     config.dryRun ? '  MET LOCK — VESTING ESCROW (DRY RUN)' : '  MET LOCK — VESTING ESCROW'
   );
   console.log('='.repeat(70));
-  console.log(`  Escrow address (SAVE THIS — needed by every other lock-* action):`);
-  console.log(`    ${escrow.toString()}`);
+  if (config.dryRun) {
+    console.log(`  Escrow address (THROWAWAY — dry run only, do NOT save):`);
+    console.log(`    ${escrow.toString()}`);
+    console.log('  >>> DRY RUN — this address is a placeholder from a throwaway keypair. A NEW');
+    console.log('  >>> address will be generated and printed when you run with dryRun=false.');
+  } else {
+    console.log(`  Escrow address (SAVE THIS — needed by every other lock-* action):`);
+    console.log(`    ${escrow.toString()}`);
+  }
   console.log(`  Base keypair:   ${base.publicKey.toString()}`);
   console.log(`  Recipient:      ${recipient}`);
   console.log('='.repeat(70));

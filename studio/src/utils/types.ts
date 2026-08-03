@@ -501,7 +501,6 @@ export type DbcTransferPoolCreator = {
 /* Alpha Vault */
 
 export type AlphaVaultConfig = MeteoraConfigBase & {
-  createBaseToken: TokenConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
   alphaVaultDeposit?: AlphaVaultDepositConfig | null;
   alphaVaultWithdraw?: AlphaVaultWithdrawConfig | null;
@@ -627,7 +626,6 @@ export type Stake2EarnConfig = MeteoraConfigBase & {
 /* Presale */
 
 export type PresaleConfig = MeteoraConfigBase & {
-  createBaseToken: TokenConfig | null;
   presaleVault: PresaleVaultConfig | null;
   presaleVaultType: PresaleVaultTypeConfig;
   presaleDeposit?: PresaleDepositConfig | null;

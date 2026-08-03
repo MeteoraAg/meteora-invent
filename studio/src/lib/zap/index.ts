@@ -307,7 +307,14 @@ export async function zapInDammV2(
   const bundle = await zap.buildZapInDammV2Transaction(directParams);
 
   console.log(`\n>>> Position NFT mint: ${positionNftMint.toString()}`);
-  console.log('>>> Save this — it identifies the position this zap deposited into.');
+  if (positionMode === 'new' && config.dryRun) {
+    console.log(
+      '>>> DRY RUN — this is a placeholder from a throwaway keypair. A NEW position mint will'
+    );
+    console.log('>>> be generated and printed when you run with dryRun=false. Do NOT save it.');
+  } else {
+    console.log('>>> Save this — it identifies the position this zap deposited into.');
+  }
 
   const steps: OrderedTransactionStep[] = [...preambleSteps];
   if (bundle.setupTransaction) {
@@ -551,7 +558,14 @@ export async function zapInDlmm(
 
   const positionKeypair = Keypair.generate();
   console.log(`\n>>> Position: ${positionKeypair.publicKey.toString()}`);
-  console.log('>>> Save this — it identifies the position this zap deposited into.');
+  if (config.dryRun) {
+    console.log(
+      '>>> DRY RUN — this is a placeholder from a throwaway keypair. A NEW position will be'
+    );
+    console.log('>>> generated and printed when you run with dryRun=false. Do NOT save it.');
+  } else {
+    console.log('>>> Save this — it identifies the position this zap deposited into.');
+  }
 
   const directParams = await zap
     .getZapInDlmmDirectParams({

@@ -33,8 +33,13 @@ schemas / Swagger):
 - `GET /pools`, `GET /pools/{address}`, `GET /pools/groups`, `GET /pools/{address}/ohlcv`,
   `GET /pools/{address}/volume/history`, `GET /stats/protocol_metrics`
 
-**DAMM v1** (`damm-api.meteora.ag`)
-- pool listing/search + metrics, pool configs, alpha vault data, fee configs, farms
+**DAMM v1** (`damm-api.meteora.ag`) — verified live 2026-08-04:
+- `GET /pools/search?q=<term>&page=0&size=<n>` — pool discovery; response includes
+  `pool_address`, `is_meme`, `pool_tvl`, `trading_volume` (+ more TVL/volume fields)
+- `GET /farms` — every farm across every pool; each entry carries a `farming_pool` field that
+  can be STALE relative to what the CLI resolves for the same pool (see `other-products.md`'s
+  Pool Farms section — treat this field as advisory, not authoritative)
+- also: pool configs, alpha vault data, fee configs (not yet spot-checked here)
 
 ```bash
 # verified: most active DLMM pools right now — note the volume field is NESTED
@@ -43,6 +48,10 @@ curl -s "https://dlmm.datapi.meteora.ag/pools?page_size=10&sort_by=volume_24h:de
   | jq -r '.data[] | [.address, .name, (.volume["24h"]|tostring)] | @tsv'
 # verified: a wallet's open DLMM positions
 curl -s "https://dlmm.datapi.meteora.ag/portfolio/open?user=<WALLET>" | jq '.'
+# verified: DAMM v1 pool discovery — is_meme flags memecoin pools (useful for the M3M3/
+# Stake2Earn farm heuristic in other-products.md)
+curl -s "https://damm-api.meteora.ag/pools/search?q=USDC&page=0&size=5" \
+  | jq -r '.data[] | [.pool_address, .pool_name, .is_meme] | @tsv'
 ```
 
 Each base URL serves a Swagger UI with the full schemas — fetch it when a param is unknown

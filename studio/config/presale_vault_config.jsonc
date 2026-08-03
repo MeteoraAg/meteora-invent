@@ -8,6 +8,9 @@
   /* keypairFilePath is required and will be the payer + signer for all transactions */
   "keypairFilePath": "./keypair.json",
 
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
   /* quoteMint is required for the presale
    * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
    */
