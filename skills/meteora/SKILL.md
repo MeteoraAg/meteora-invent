@@ -20,14 +20,14 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.4.5` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
 | **DLMM** | Bin-based concentrated liquidity, dynamic fees, limit orders | Active LP strategies, capital efficiency, limit orders | `@meteora-ag/dlmm@1.9.14` | `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo` |
 | **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@1.4.1` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
-| **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | via studio CLI | — |
-| **Presale Vault** | Generic presale with vesting | Presale before pool creation | via studio CLI | — |
+| **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | `@meteora-ag/alpha-vault@1.1.16` | `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` |
+| **Presale Vault** | Generic presale with vesting | Presale before pool creation | `@meteora-ag/presale@0.1.1` | `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` |
 | **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
 | **Pool Farms** | DAMM v1 LP staking/reward farms | Stake DAMM v1 LP tokens to earn a separate reward token | `@meteora-ag/farming-sdk@1.0.18` | `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1` |
 
 Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
-(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock — live in `references/other-products.md`
-(deep docs: https://docs.meteora.ag/llms.txt).
+(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock, Pool Farms — live in
+`references/other-products.md` (deep docs: https://docs.meteora.ag/llms.txt).
 
 ## Decide the Path: ACT vs BUILD
 
@@ -37,16 +37,16 @@ pool creation, seeding, vaults, locks — and swaps, position/status reads, and 
 claims on every protocol.
 
 **BUILD — the user wants code, or a flow the studio doesn't have** → use the **SDKs
-directly** with the pinned versions above. Required for: bots, backends, UIs, and position
-management beyond the studio (DLMM add/remove/rebalance on existing positions, CP-AMM
-position ops on arbitrary pools, vault/presale user flows).
+directly** with the pinned versions above. Required for: bots, backends, UIs, DLMM
+add/remove/rebalance on existing positions, CP-AMM position ops on arbitrary pools, and
+anything else not exposed as a studio action.
 
 | Intent | Path | First action → then read |
 |---|---|---|
 | Launch token on bonding curve | ACT | Run intake in `references/dbc.md` → `dbc-create-config` → `dbc-create-pool` (`references/studio-actions.md`) |
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
-| Alpha/presale vault, locks, farms | ACT | `alpha-vault-create` / lock actions (`references/studio-actions.md`) |
+| Create an alpha/presale vault, a DAMM v1 lock escrow, or a Stake2Earn farm | ACT | `alpha-vault-create` / `presale-vault-create` / `damm-v1-lock-liquidity` / `damm-v1-create-stake2earn-farm` (`references/studio-actions.md`) |
 | Participate in a launch vault (deposit / claim / refund) | ACT | `alpha-vault-deposit` → `alpha-vault-claim` (`references/studio-actions.md`) |
 | Join / claim a presale (deposit, claim, refunds) | ACT | `presale-vault-deposit` → `presale-vault-claim` (`references/studio-actions.md`) |
 | Lock/vest tokens for a recipient (cliff + vesting) | ACT | `lock-create-vesting-escrow` (`references/studio-actions.md`) |
@@ -121,7 +121,7 @@ pnpm studio generate-keypair --network devnet --airdrop
 pnpm studio <action> [--baseMint <MINT> | --poolAddress <POOL>]
 ```
 
-All 31 actions with their real flags, config blocks, and outputs:
+All 77 actions with their real flags, config blocks, and outputs:
 `references/studio-actions.md`. Environment details and wallet import:
 `references/studio-setup.md`.
 
@@ -190,7 +190,7 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 | Errors → causes → fixes (all protocols) | `references/troubleshooting.md` |
 | Launchpad UI / frontend templates | `references/scaffolds.md` |
 | Ready-to-fill config templates | `references/configs/*.jsonc` |
-| Alpha Vault / Presale / M3M3 / Zap / Dynamic Vault / Fee Sharing SDK surfaces | `references/other-products.md` |
+| Alpha Vault / Presale / Stake2Earn / Zap / Dynamic Vault / Fee Sharing / Met Lock / Pool Farms SDK surfaces | `references/other-products.md` |
 
 ## Verification
 

@@ -54,7 +54,12 @@ meteora-invent/
     │   ├── damm_v1_config.jsonc
     │   ├── damm_v2_config.jsonc
     │   ├── dbc_config.jsonc
-    │   └── dlmm_config.jsonc
+    │   ├── dlmm_config.jsonc
+    │   ├── dynamic_vault_config.jsonc
+    │   ├── farming_config.jsonc
+    │   ├── fee_sharing_config.jsonc
+    │   ├── lock_config.jsonc
+    │   └── zap_config.jsonc
     ├── data
     │   ├── image
     │   │   └── test-token.jpg
@@ -65,12 +70,24 @@ meteora-invent/
     ├── src
     │   ├── actions
     │   │   ├── alpha_vault
-    │   │   │   └── create_alpha_vault.ts
+    │   │   │   ├── claim.ts
+    │   │   │   ├── crank_fill.ts
+    │   │   │   ├── create_alpha_vault.ts
+    │   │   │   ├── deposit.ts
+    │   │   │   ├── get_status.ts
+    │   │   │   ├── withdraw.ts
+    │   │   │   └── withdraw_remaining_quote.ts
     │   │   ├── damm_v1
     │   │   │   ├── create_pool.ts
     │   │   │   ├── create_stake2earn_farm.ts
     │   │   │   ├── lock_liquidity_stake2earn.ts
-    │   │   │   └── lock_liquidity.ts
+    │   │   │   ├── lock_liquidity.ts
+    │   │   │   ├── stake2earn_cancel_unstake.ts
+    │   │   │   ├── stake2earn_claim_fee.ts
+    │   │   │   ├── stake2earn_get_status.ts
+    │   │   │   ├── stake2earn_stake.ts
+    │   │   │   ├── stake2earn_unstake.ts
+    │   │   │   └── stake2earn_withdraw.ts
     │   │   ├── damm_v2
     │   │   │   ├── add_liquidity.ts
     │   │   │   ├── claim_position_fee.ts
@@ -93,11 +110,43 @@ meteora-invent/
     │   │   │   ├── seed_liquidity_lfg.ts
     │   │   │   ├── seed_liquidity_single_bin.ts
     │   │   │   └── set_pool_status.ts
+    │   │   ├── dynamic_vault
+    │   │   │   ├── deposit.ts
+    │   │   │   ├── get_status.ts
+    │   │   │   └── withdraw.ts
+    │   │   ├── farming
+    │   │   │   ├── claim.ts
+    │   │   │   ├── get_status.ts
+    │   │   │   ├── stake.ts
+    │   │   │   └── unstake.ts
+    │   │   ├── fee_sharing
+    │   │   │   ├── claim.ts
+    │   │   │   ├── create_vault.ts
+    │   │   │   ├── fund.ts
+    │   │   │   ├── fund_from_damm_v2.ts
+    │   │   │   ├── fund_from_dbc.ts
+    │   │   │   └── get_status.ts
+    │   │   ├── lock
+    │   │   │   ├── claim.ts
+    │   │   │   ├── create_escrow_metadata.ts
+    │   │   │   ├── create_vesting_escrow.ts
+    │   │   │   ├── get_escrow.ts
+    │   │   │   └── list_escrows.ts
     │   │   ├── presale_vault
-    │   │   │   └── create_presale_vault.ts
-    │   │   └── settings
-    │   │       ├── airdrop_sol.ts
-    │   │       └── generate_keypair.ts
+    │   │   │   ├── claim.ts
+    │   │   │   ├── create_presale_vault.ts
+    │   │   │   ├── creator_withdraw.ts
+    │   │   │   ├── deposit.ts
+    │   │   │   ├── get_status.ts
+    │   │   │   ├── handle_unsold.ts
+    │   │   │   ├── withdraw.ts
+    │   │   │   └── withdraw_remaining_quote.ts
+    │   │   ├── settings
+    │   │   │   ├── airdrop_sol.ts
+    │   │   │   └── generate_keypair.ts
+    │   │   └── zap
+    │   │       ├── zap_in_damm_v2.ts
+    │   │       └── zap_out.ts
     │   ├── helpers
     │   │   ├── accounts.ts
     │   │   ├── cli.ts

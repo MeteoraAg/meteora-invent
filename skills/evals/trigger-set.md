@@ -1,7 +1,7 @@
 # Trigger Evals — `meteora` skill
 
 Prompt set for testing whether the skill loads when it should (and stays quiet when it
-shouldn't), per the Agent Skills description-testing methodology (~20 prompts, 3 runs each,
+shouldn't), per the Agent Skills description-testing methodology (~30 prompts, 3 runs each,
 trigger-rate ≥ 0.5 for should-trigger, ≤ 0.1 for should-not). Re-run whenever
 `SKILL.md` frontmatter (name/description) changes.
 
@@ -21,6 +21,13 @@ trigger-rate ≥ 0.5 for should-trigger, ≤ 0.1 for should-not). Re-run wheneve
 | T10 | Write a TypeScript bot that rebalances my DLMM position around the active bin |
 | T11 | Use meteora-invent to create an alpha vault for my launch |
 | T12 | What's the graduation progress of my dynamic bonding curve token? |
+| T13 | Lock my team's tokens with a 6-month cliff vesting monthly |
+| T14 | Deposit 100 USDC into the alpha vault for this launch |
+| T15 | Claim my presale allocation |
+| T16 | Stake my LP into the farm and claim rewards |
+| T17 | Stake for fees on this memecoin pool (M3M3) |
+| T18 | Zap 1 SOL into this DAMM v2 pool |
+| T19 | Split my DBC trading fees 70/30 between two wallets |
 
 ## Should NOT trigger (near misses)
 
