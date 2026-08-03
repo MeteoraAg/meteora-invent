@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 65 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 71 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -691,6 +691,89 @@ PDA, total LP supply, withdrawable amount (underlying tokens available right now
 already excluded), and the virtual price (withdrawable amount ÷ total LP supply); with a usable
 wallet, also that wallet's LP balance and its current underlying redemption value.
 
+## Dynamic Fee Sharing actions — config file: `studio/config/fee_sharing_config.jsonc`
+
+Splits a fee stream among up to 5 fixed recipients — program
+`dfsdo2UqvwfN8DuUVrMRNfQe11VaiNoKcMqLHVvDPzh`. Verified against
+`@meteora-ag/dynamic-fee-sharing-sdk@1.1.0`'s installed `.d.ts` + source (has a `docs.md`,
+cross-checked against the shipped scripts). Vault creation co-signs with a fresh, ephemeral
+keypair (the vault's own `feeVault` keypair, or a `base` keypair for the PDA variant) — used
+once, and the resulting vault address is logged prominently (save it: every other
+`fee-sharing-*` action needs it via `--vault`). The two `fund-from-*` bridge actions pull fees
+straight out of an existing DAMM v2 position or DBC pool into the vault — no separate
+"claim then transfer" step. DBC bridging always uses the `2`-suffixed trading-fee variants
+(`fundByClaimDbcCreatorTradingFee2` / `fundByClaimDbcPartnerTradingFee2`), per the SDK's own
+release notes.
+
+### `fee-sharing-create-vault`
+```bash
+pnpm studio fee-sharing-create-vault --baseMint <MINT>
+```
+Flags: `--baseMint` (required — the token mint whose fees will be shared). Reads
+`feeSharingCreate`: `userShares` (2-5 `{address, share}` entries — the program allows at most 5
+recipients; `share` is a relative integer weight, NOT a percentage, and does not need to sum to
+100), `useKeypairVault` (`true` = `createFeeVault`, a fresh **feeVault KEYPAIR co-signs once and
+IS the vault address**; `false` = `createFeeVaultPda`, a fresh **base keypair co-signs once** and
+the vault address is a PDA derived from base + tokenMint). Either way **the vault address is
+logged prominently — save it**; the co-signing keypair's secret is discarded afterward (never
+needed again). Token-2022 mints are detected automatically (mint owner-program check). ~0.01 SOL.
+
+### `fee-sharing-fund`
+```bash
+pnpm studio fee-sharing-fund --vault <VAULT>
+```
+Flags: `--vault` (required). Reads `feeSharingFund.amount` (the vault's tokenMint human units,
+converted via the mint's own decimals). Pre-checks the wallet's token balance first. wSOL note:
+when the vault's tokenMint is native SOL's wrapped mint, the SDK wraps the requested amount of
+SOL for you internally — no pre-funded wSOL account needed. ~0.002 SOL.
+
+### `fee-sharing-fund-from-damm-v2`
+```bash
+pnpm studio fee-sharing-fund-from-damm-v2 --vault <VAULT> --poolAddress <POOL>
+```
+Flags: `--vault` + `--poolAddress` (both required). Resolves the wallet's position(s) on the
+pool via `cpAmm.getUserPositionByPool` (same lookup `damm-v2-get-positions` uses), then picks
+the first one whose position-NFT account is already owned by the fee vault
+(`checkPositionOwnership`, Token-2022 — DAMM v2 position NFTs always are) and sweeps its fees
+straight into the vault via `fundByClaimDammV2Fee`. **The position NFT must already have been
+transferred to the fee vault** (the SDK's `setTokenAccountOwnerTx` helper — a one-time manual
+step outside this action) or this fails with a clear pre-flight error instead of a doomed
+transaction. ~0.001 SOL.
+
+### `fee-sharing-fund-from-dbc`
+```bash
+pnpm studio fee-sharing-fund-from-dbc --vault <VAULT> --baseMint <MINT>
+```
+Flags: `--vault` + `--baseMint` (both required — `--baseMint` resolves the DBC pool via
+`DynamicBondingCurveClient.state.getPoolByBaseMint`, same as `dbc-get-status`). Reads
+`feeSharingFundDbc`: `role` (`"creator"` | `"partner"`) x `source` (`"tradingFee"` |
+`"surplus"` | `"migrationFee"`) routes to the matching bridge — **always the `2`-suffixed
+trading-fee variants** (`fundByClaimDbcCreatorTradingFee2` / `fundByClaimDbcPartnerTradingFee2`),
+never the unsuffixed ones; `surplus` → `fundByWithdrawDbc{Creator,Partner}Surplus`;
+`migrationFee` → `fundByWithdrawDbcMigrationFee` with `isPartner` set from `role`. The fee vault
+must already be set as the DBC pool config's creator (role `"creator"`) or feeClaimer (role
+`"partner"`) — the SDK validates this itself and throws a clear `InvalidCreator` /
+`InvalidFeeClaimer` error otherwise. ~0.001 SOL.
+
+### `fee-sharing-claim`
+```bash
+pnpm studio fee-sharing-claim --vault <VAULT>
+```
+Flags: `--vault` (required). Prints the wallet's allocated/claimed/claimable amounts first
+(`getFeeBreakdown`) and refuses to send if nothing is claimable yet. Uses `claimUserFee2` with
+`receiver` = the wallet — unlike `claimUserFee`, the receiver does not need to sign. ~0.001 SOL.
+
+### `fee-sharing-get-status`
+```bash
+pnpm studio fee-sharing-get-status --vault <VAULT>
+```
+Flags: `--vault` (optional). **Read-only** — keypair is optional (a missing/invalid keypair
+file degrades to vault-only output, same as `vault-get-status`). With `--vault`: prints the
+vault header (owner, token mint, token vault, total share) plus `getFeeBreakdown` totals and a
+per-user table (each user's total/claimed/unclaimed). Without `--vault` but with a usable
+keypair: reverse-lookup via `getRecipientDfsVault` and list every vault the wallet holds a
+share in.
+
 ## Quick Reference
 
 | Action | Required flag | Config block(s) | ~Min SOL |
@@ -760,6 +843,12 @@ wallet, also that wallet's LP balance and its current underlying redemption valu
 | `vault-deposit` | `--baseMint` | `dynamicVaultDeposit` | 0.002 |
 | `vault-withdraw` | `--baseMint` | `dynamicVaultWithdraw` | 0.001 |
 | `vault-get-status` | `--baseMint` | — (read-only) | 0 |
+| `fee-sharing-create-vault` | `--baseMint` | `feeSharingCreate` | 0.01 |
+| `fee-sharing-fund` | `--vault` | `feeSharingFund` | 0.002 |
+| `fee-sharing-fund-from-damm-v2` | `--vault` + `--poolAddress` | — | 0.001 |
+| `fee-sharing-fund-from-dbc` | `--vault` + `--baseMint` | `feeSharingFundDbc` | 0.001 |
+| `fee-sharing-claim` | `--vault` | — | 0.001 |
+| `fee-sharing-get-status` | `--vault` (optional) | — (read-only) | 0 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 

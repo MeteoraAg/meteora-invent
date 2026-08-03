@@ -121,6 +121,8 @@ Funding bridges pull straight from other protocols: `fundByClaimDammV2Fee`,
 `fundByWithdrawDbcMigrationFee`. User claim: `claimUserFee2({ feeVault, user, payer, receiver })`.
 Gotcha: ESM-first package (`"type": "module"` with a `.cjs` fallback).
 
+Studio actions: `fee-sharing-*` — see `studio-actions.md`.
+
 ## Met Lock — `@meteora-ag/met-lock-sdk@1.0.1`
 
 Program `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn`. Standalone vesting/lock escrows for

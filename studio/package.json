@@ -72,7 +72,13 @@
     "lock-list-escrows": "tsx src/actions/lock/list_escrows.ts",
     "vault-deposit": "tsx src/actions/dynamic_vault/deposit.ts",
     "vault-withdraw": "tsx src/actions/dynamic_vault/withdraw.ts",
-    "vault-get-status": "tsx src/actions/dynamic_vault/get_status.ts"
+    "vault-get-status": "tsx src/actions/dynamic_vault/get_status.ts",
+    "fee-sharing-create-vault": "tsx src/actions/fee_sharing/create_vault.ts",
+    "fee-sharing-fund": "tsx src/actions/fee_sharing/fund.ts",
+    "fee-sharing-fund-from-damm-v2": "tsx src/actions/fee_sharing/fund_from_damm_v2.ts",
+    "fee-sharing-fund-from-dbc": "tsx src/actions/fee_sharing/fund_from_dbc.ts",
+    "fee-sharing-claim": "tsx src/actions/fee_sharing/claim.ts",
+    "fee-sharing-get-status": "tsx src/actions/fee_sharing/get_status.ts"
   },
   "keywords": [
     "studio",

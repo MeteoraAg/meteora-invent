@@ -9,5 +9,50 @@
   "keypairFilePath": "./keypair.json",
 
   /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
-  "computeUnitPriceMicroLamports": 100000
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* feeSharingCreate is only used in the following actions:
+   * 1. fee-sharing-create-vault (requires --baseMint flag; the token mint whose fees will be
+   *    shared, e.g. a DBC or DAMM v2 pool's base/quote mint)
+   * userShares: 2-5 recipients ({address, share}) — the program allows at most 5 users per
+   * vault. `share` is a relative integer weight, NOT a percentage — it does not need to sum to
+   * 100; getFeeBreakdown later computes each user's cut as their share divided by the sum of
+   * every user's share.
+   * useKeypairVault: true creates the vault via a fresh KEYPAIR that co-signs once (the vault
+   * address is that keypair's public key — logged prominently after creation, save it); false
+   * creates the vault as a PDA off a fresh `base` keypair instead (vault address is derived
+   * and deterministic from base + tokenMint, also logged).
+   */
+  "feeSharingCreate": {
+    "userShares": [
+      { "address": "YOUR_RECIPIENT_ADDRESS_1", "share": 60 },
+      { "address": "YOUR_RECIPIENT_ADDRESS_2", "share": 40 }
+    ],
+    "useKeypairVault": true
+  },
+
+  /* feeSharingFund is only used in the following actions:
+   * 1. fee-sharing-fund (requires --vault flag)
+   * Directly funds the vault from the wallet's own token account. amount is in the vault's
+   * tokenMint human units (converted via the mint's own decimals).
+   */
+  "feeSharingFund": {
+    "amount": 1
+  },
+
+  /* feeSharingFundDbc is only used in the following actions:
+   * 1. fee-sharing-fund-from-dbc (requires --vault + --baseMint flags)
+   * Routes to the matching DBC fee-sharing bridge instruction based on role x source — the
+   * fee vault must already be set as the DBC pool config's creator (role "creator") or
+   * feeClaimer (role "partner") for the on-chain claim to succeed:
+   *   creator + tradingFee   -> fundByClaimDbcCreatorTradingFee2
+   *   partner + tradingFee   -> fundByClaimDbcPartnerTradingFee2
+   *   creator + surplus      -> fundByWithdrawDbcCreatorSurplus
+   *   partner + surplus      -> fundByWithdrawDbcPartnerSurplus
+   *   creator/partner + migrationFee -> fundByWithdrawDbcMigrationFee (isPartner flag set accordingly)
+   */
+  "feeSharingFundDbc": {
+    "role": "creator",
+    "source": "tradingFee"
+  }
 }

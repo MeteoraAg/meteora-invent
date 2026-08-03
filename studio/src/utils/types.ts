@@ -703,8 +703,33 @@ export type FarmingConfig = MeteoraConfigBase;
 
 /* Dynamic Fee Sharing */
 
-// Empty for now — the fee-sharing SDK commit adds create/fund/claim blocks.
-export type FeeSharingConfig = MeteoraConfigBase;
+export type FeeSharingConfig = MeteoraConfigBase & {
+  feeSharingCreate?: FeeSharingCreateConfig | null;
+  feeSharingFund?: FeeSharingFundConfig | null;
+  feeSharingFundDbc?: FeeSharingFundDbcConfig | null;
+};
+
+export interface FeeSharingUserShareConfig {
+  address: string; // recipient wallet
+  share: number; // relative integer weight (u32) — NOT a percentage; a user's cut is share / sum(all shares)
+}
+
+export interface FeeSharingCreateConfig {
+  // 2-5 entries — the program allows at most 5 recipients per vault
+  userShares: FeeSharingUserShareConfig[];
+  // true = createFeeVault (fresh feeVault KEYPAIR co-signs once; vault address = its pubkey)
+  // false = createFeeVaultPda (fresh `base` KEYPAIR co-signs once; vault address is a PDA derived from base + tokenMint)
+  useKeypairVault: boolean;
+}
+
+export interface FeeSharingFundConfig {
+  amount: number; // vault's tokenMint human units to fund directly from the wallet
+}
+
+export interface FeeSharingFundDbcConfig {
+  role: 'creator' | 'partner'; // which side of the DBC pool config the fee vault is assigned as
+  source: 'tradingFee' | 'surplus' | 'migrationFee'; // which DBC fee bucket to sweep into the vault
+}
 
 /* Zap */
 

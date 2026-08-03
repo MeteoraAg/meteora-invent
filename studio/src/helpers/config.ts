@@ -1129,6 +1129,46 @@ export const CONFIG_SCHEMA = {
       required: ['amount'],
       additionalProperties: false,
     },
+    feeSharingCreate: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        userShares: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              address: { type: 'string' },
+              share: { type: 'number' },
+            },
+            required: ['address', 'share'],
+            additionalProperties: false,
+          },
+        },
+        useKeypairVault: { type: 'boolean' },
+      },
+      required: ['userShares', 'useKeypairVault'],
+      additionalProperties: false,
+    },
+    feeSharingFund: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    feeSharingFundDbc: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        role: { enum: ['creator', 'partner'] },
+        source: { enum: ['tradingFee', 'surplus', 'migrationFee'] },
+      },
+      required: ['role', 'source'],
+      additionalProperties: false,
+    },
   },
   required: ['rpcUrl', 'dryRun', 'keypairFilePath', 'computeUnitPriceMicroLamports'],
   additionalProperties: true,
