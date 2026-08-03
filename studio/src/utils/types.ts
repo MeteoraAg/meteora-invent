@@ -104,6 +104,10 @@ export type DammV1Config = MeteoraConfigBase & {
   stake2EarnFarm: Stake2EarnFarmConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
   dammV1Swap?: DammV1SwapConfig | null;
+  stake2EarnStake?: Stake2EarnStakeConfig | null;
+  stake2EarnClaim?: Stake2EarnClaimConfig | null;
+  stake2EarnUnstake?: Stake2EarnUnstakeConfig | null;
+  stake2EarnWithdraw?: Stake2EarnWithdrawConfig | null;
 };
 
 export interface DynamicAmmV1Config {
@@ -129,6 +133,22 @@ export interface Stake2EarnFarmConfig {
   unstakeLockDurationSecs: number;
   secondsToFullUnlock: number;
   startFeeDistributeTimestamp: number;
+}
+
+export interface Stake2EarnStakeConfig {
+  amount: number; // stake-mint human units to stake (passed as the stake instruction's maxAmount)
+}
+
+export interface Stake2EarnClaimConfig {
+  maxFee: number | string | null; // null = claim everything pending (u64::MAX); else a raw base-unit ceiling applied to both feeA and feeB (they can have different decimals — see other-products.md)
+}
+
+export interface Stake2EarnUnstakeConfig {
+  amount: number; // stake-mint human units to unstake; must not exceed the wallet's current staked amount
+}
+
+export interface Stake2EarnWithdrawConfig {
+  unstakeKey: string | null; // unstake account pubkey logged by stake2earn-unstake; null = list this wallet's open unstake requests and stop (also reused by stake2earn-cancel-unstake)
 }
 
 /* DAMM v2 */

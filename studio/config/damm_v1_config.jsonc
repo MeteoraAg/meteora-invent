@@ -103,6 +103,35 @@
     "startFeeDistributeTimestamp": 1753441790 // Start date for fee distribution (Jan 24, 2025 17:49:50 UTC)
   },
 
+  /* stake2EarnStake is only used in the following action:
+   * 1. stake2earn-stake (requires --poolAddress flag; the pool's farm must already exist)
+   */
+  "stake2EarnStake": {
+    "amount": 100 // amount of the stake mint to stake, in human (stake-token) units
+  },
+
+  /* stake2EarnClaim is only used in the following action:
+   * 1. stake2earn-claim-fee (requires --poolAddress flag)
+   */
+  "stake2EarnClaim": {
+    "maxFee": null // null = claim all pending fees (u64::MAX); or a raw base-unit ceiling applied to both feeA and feeB (they can use different decimals)
+  },
+
+  /* stake2EarnUnstake is only used in the following action:
+   * 1. stake2earn-unstake (requires --poolAddress flag)
+   */
+  "stake2EarnUnstake": {
+    "amount": 50 // amount of the stake mint to unstake, in human (stake-token) units; must not exceed the wallet's current staked amount
+  },
+
+  /* stake2EarnWithdraw is used by the following actions:
+   * 1. stake2earn-withdraw (requires --poolAddress flag)
+   * 2. stake2earn-cancel-unstake (requires --poolAddress flag; reuses this same block)
+   */
+  "stake2EarnWithdraw": {
+    "unstakeKey": null // unstake account pubkey logged by stake2earn-unstake ("SAVE THIS"); null = list this wallet's open unstake requests and stop
+  },
+
   /* alphaVault is only used in the following actions:
    * 1. damm-v1-create-pool
    * There are 2 types of alpha vault: First Come First Serve (FCFS) and Prorata.

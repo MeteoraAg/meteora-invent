@@ -83,6 +83,9 @@ User ops: `initializeStakeEscrow(owner)` → `stake(maxAmount, owner)` →
 `claimFee(owner, maxFee)` · `unstake(amount, unstakeKey, owner)` → `withdraw(unstakeKey, owner)`.
 Admin: `StakeForFee.createFeeVault(...)` (what the studio's stake2earn actions wrap).
 
+Studio actions: `stake2earn-*` (farm create + lock via `damm-v1-*`, full staker lifecycle +
+status) — see `studio-actions.md`.
+
 ## Zap — `@meteora-ag/zap-sdk@1.3.2`
 
 Program `zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Single-token in/out of DAMM v2 and

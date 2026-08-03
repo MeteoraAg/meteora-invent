@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 56 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 62 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -325,8 +325,8 @@ restate the amounts before executing.**
 pnpm studio damm-v1-create-stake2earn-farm --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `stake2EarnFarm` (top-list size, unlock duration,
-start time). Creates an M3M3 fee farm on the pool. Farm operations beyond creation
-(staking, claims) live in `@meteora-ag/m3m3` — not yet covered by this skill.
+start time). Creates an M3M3 fee farm on the pool. The staker lifecycle (stake, claim,
+unstake, cancel/withdraw) and a status read live in the `stake2earn-*` actions below.
 
 ### `damm-v1-lock-liquidity-stake2earn`
 ```bash
@@ -342,6 +342,62 @@ pnpm studio damm-v1-swap --poolAddress <POOL>
 Flags: `--poolAddress` (required). Reads `dammV1Swap`: `inputMint` (one of the pool's
 mints — validated), `amountIn` (human units), `slippage` (percent). Quotes, then simulates
 or sends per `dryRun`.
+
+### `stake2earn-stake`
+```bash
+pnpm studio stake2earn-stake --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required — the DAMM v1 pool, not the fee vault). Reads
+`stake2EarnStake.amount` (stake-mint human units, converted via the mint's own decimals).
+Fails clearly if no Stake2Earn farm exists yet on this pool (run
+`damm-v1-create-stake2earn-farm` first). The SDK's own `stake()` creates the wallet's stake
+escrow inline on first use — no separate init step needed.
+
+### `stake2earn-claim-fee`
+```bash
+pnpm studio stake2earn-claim-fee --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `stake2EarnClaim.maxFee` (`null` = claim
+everything pending, sent as `u64::MAX`; or a raw base-unit ceiling applied to both fees).
+Prints pending fee A / fee B (in the pool's tokenA/tokenB decimals — they can differ) before
+claiming, and refuses with a clear message instead of a no-op transaction when both are zero.
+
+### `stake2earn-unstake`
+```bash
+pnpm studio stake2earn-unstake --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `stake2EarnUnstake.amount` (stake-mint human units;
+must not exceed the wallet's current staked amount). **Generates a fresh `unstake` keypair
+that co-signs this transaction — its public key is logged prominently ("SAVE THIS") and is
+required by both `stake2earn-cancel-unstake` and `stake2earn-withdraw` afterwards** (set it as
+`stake2EarnWithdraw.unstakeKey`). Unstaked tokens stay locked for the farm's
+`unstakeLockDuration` seconds (see `stake2earn-get-status`) before `stake2earn-withdraw` can
+release them — `stake2earn-cancel-unstake` can reverse the request at any point before that.
+
+### `stake2earn-cancel-unstake` / `stake2earn-withdraw`
+```bash
+pnpm studio stake2earn-cancel-unstake --poolAddress <POOL>   # reads stake2EarnWithdraw.unstakeKey
+pnpm studio stake2earn-withdraw --poolAddress <POOL>         # same config block
+```
+Flags: `--poolAddress` (required). Both read `stake2EarnWithdraw.unstakeKey` — the address
+`stake2earn-unstake` printed. **When `unstakeKey` is left `null`, the action lists every open
+unstake request for this wallet on this farm (address, amount, release time) and stops**,
+instead of guessing which one to act on. `stake2earn-cancel-unstake` restores the tokens to
+the stake escrow and can run any time before withdrawal. `stake2earn-withdraw` pre-checks the
+farm's on-chain clock against the unstake's release time and fails with a clear "still locked
+for ~N seconds" message if `unstakeLockDuration` hasn't elapsed yet — the on-chain program
+would otherwise just revert.
+
+### `stake2earn-get-status`
+```bash
+pnpm studio stake2earn-get-status --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). **Read-only** — keypair is optional (a missing/invalid
+keypair file degrades to farm-only output, same as `alpha-vault-get-status`). Prints whether
+the farm exists, total staked, top-staker list size and entry threshold
+(`getTopStakerListEntryStakeAmount`), unstake lock duration, and seconds-to-full-unlock; with
+a usable wallet, also that wallet's staked amount, top-list membership, pending fees, and every
+open unstake request (address, amount, release time) via `getUnstakeByUser`.
 
 ## Alpha Vault actions — config file: `studio/config/alpha_vault_config.jsonc`
 
@@ -626,6 +682,12 @@ Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow 
 | `damm-v1-create-stake2earn-farm` | `--baseMint` | `stake2EarnFarm` | 0.05 |
 | `damm-v1-lock-liquidity-stake2earn` | `--baseMint` | `dammV1LockLiquidity` + `stake2EarnFarm` | 0.01 |
 | `damm-v1-swap` | `--poolAddress` | `dammV1Swap` | 0.001 |
+| `stake2earn-stake` | `--poolAddress` | `stake2EarnStake` | 0.002 |
+| `stake2earn-claim-fee` | `--poolAddress` | `stake2EarnClaim` | 0.001 |
+| `stake2earn-unstake` | `--poolAddress` | `stake2EarnUnstake` | 0.001 |
+| `stake2earn-cancel-unstake` | `--poolAddress` | `stake2EarnWithdraw` | 0.001 |
+| `stake2earn-withdraw` | `--poolAddress` | `stake2EarnWithdraw` | 0.001 |
+| `stake2earn-get-status` | `--poolAddress` | — (read-only) | 0 |
 | `alpha-vault-create` | `--baseMint` | `alphaVault` | 0.05 |
 | `alpha-vault-deposit` | `--vault` or `--poolAddress` | `alphaVaultDeposit` | 0.002 |
 | `alpha-vault-withdraw` | `--vault` | `alphaVaultWithdraw` | 0.001 |

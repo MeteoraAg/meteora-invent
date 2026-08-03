@@ -974,6 +974,46 @@ export const CONFIG_SCHEMA = {
       required: ['inputMint', 'amountIn', 'slippage'],
       additionalProperties: false,
     },
+    stake2EarnStake: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    stake2EarnClaim: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        maxFee: {
+          anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }],
+        },
+      },
+      required: ['maxFee'],
+      additionalProperties: false,
+    },
+    stake2EarnUnstake: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    stake2EarnWithdraw: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        unstakeKey: {
+          anyOf: [{ type: 'string' }, { type: 'null' }],
+        },
+      },
+      required: ['unstakeKey'],
+      additionalProperties: false,
+    },
     lockCreateEscrow: {
       type: 'object',
       nullable: true,
