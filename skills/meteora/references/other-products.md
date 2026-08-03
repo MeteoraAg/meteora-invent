@@ -102,7 +102,13 @@ Program `24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi`. The yield layer under DA
 reserves. **Anchor 0.28, oldest stack.** `VaultImpl.create(connection, tokenMint)` (keys off
 the TOKEN MINT, not a vault address) → `getUserBalance(owner)`, `getVaultSupply()`,
 `getWithdrawableAmount()`; ops `deposit(owner, amount)` / `withdraw(owner, amount)`.
-DAMM v1's `AmmImpl` already exposes these per-pool as `pool.vaultA` / `pool.vaultB`.
+DAMM v1's `AmmImpl` already exposes these per-pool as `pool.vaultA` / `pool.vaultB`. Gotcha:
+`withdraw`'s second parameter is misleadingly named `baseTokenAmount` in the `.d.ts` — verified
+against the compiled source + vault program IDL, it actually burns **vault LP tokens**
+(`unmintAmount`), not base-mint units; convert with the exported `getAmountByShare` /
+`getUnmintAmount` helpers.
+
+Studio actions: `vault-*` — see `studio-actions.md`.
 
 ## Dynamic Fee Sharing — `@meteora-ag/dynamic-fee-sharing-sdk@1.1.0`
 

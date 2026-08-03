@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 62 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 65 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -642,6 +642,55 @@ for creator (both verified against the SDK repo's `sumCreatorLockVaultTotals.s.t
 Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow --escrow
 <ADDR>` for the decimal-formatted single view.
 
+## Dynamic Vault actions — config file: `studio/config/dynamic_vault_config.jsonc`
+
+The yield layer under DAMM v1 pool reserves — program
+`24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi` (**Anchor 0.28, the oldest stack in the
+studio**). Verified against `@meteora-ag/vault-sdk@2.3.1`'s installed `.d.ts` + compiled
+source. All three actions key off **the token mint being deposited/withdrawn (`--baseMint`),
+not a vault address** — there is one permissionless dynamic vault per mint, PDA-derived from
+it; DAMM v1 pools already reference these same vaults internally as `pool.vaultA` /
+`pool.vaultB`.
+
+### `vault-deposit`
+```bash
+pnpm studio vault-deposit --baseMint <MINT>
+```
+Flags: `--baseMint` (required — the mint being deposited, e.g. wSOL or USDC; fails clearly if
+no permissionless vault exists yet for this mint). Reads `dynamicVaultDeposit.amount` (baseMint
+human units, converted via the mint's own decimals). wSOL note (verified against the installed
+package's compiled `deposit()`): **when `baseMint` is native SOL's wrapped mint, the SDK wraps
+the requested amount of SOL for you internally** — unlike `lock-create-vesting-escrow`, there
+is no pre-funded-wSOL requirement, just enough actual SOL in the wallet to cover the wrap
+amount plus rent/fees (checked up front with a clear error otherwise).
+
+### `vault-withdraw`
+```bash
+pnpm studio vault-withdraw --baseMint <MINT>
+```
+Flags: `--baseMint` (required). Reads `dynamicVaultWithdraw.amount` — **in VAULT LP TOKEN
+human units, NOT baseMint units.** The SDK's `withdraw(owner, baseTokenAmount)` is misleadingly
+named: verified against the compiled source (it computes `amountToWithdraw = baseTokenAmount *
+withdrawableAmount / totalSupply` — exactly the `getAmountByShare` formula) and the vault
+program's IDL (the on-chain instruction's real args are `unmintAmount` + `minOutAmount`), the
+amount burns **LP/vault shares**, not the underlying token. The LP mint always has the same
+decimals as `baseMint` on-chain, so the human-unit scale looks identical, but 1 LP token does
+not equal 1 baseMint token once the vault has earned yield. Guarded against withdrawing more LP
+than the wallet's `getUserBalance` holds; **prints the equivalent underlying-token amount this
+will actually redeem (via `getAmountByShare`) before every send** — run `vault-get-status`
+first to see the wallet's LP balance and current virtual price if unsure. Auto-unwraps to SOL
+on exit when `baseMint` is native SOL's wrapped mint.
+
+### `vault-get-status`
+```bash
+pnpm studio vault-get-status --baseMint <MINT>
+```
+Flags: `--baseMint` (required). **Read-only** — keypair is optional (a missing/invalid
+keypair file degrades to vault-only output, same as `alpha-vault-get-status`). Prints the vault
+PDA, total LP supply, withdrawable amount (underlying tokens available right now, locked profit
+already excluded), and the virtual price (withdrawable amount ÷ total LP supply); with a usable
+wallet, also that wallet's LP balance and its current underlying redemption value.
+
 ## Quick Reference
 
 | Action | Required flag | Config block(s) | ~Min SOL |
@@ -708,6 +757,9 @@ Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow 
 | `lock-claim` | `--escrow` | `lockClaim` | 0.001 |
 | `lock-get-escrow` | `--escrow` | — (read-only) | 0 |
 | `lock-list-escrows` | — | `lockList` | 0 |
+| `vault-deposit` | `--baseMint` | `dynamicVaultDeposit` | 0.002 |
+| `vault-withdraw` | `--baseMint` | `dynamicVaultWithdraw` | 0.001 |
+| `vault-get-status` | `--baseMint` | — (read-only) | 0 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 

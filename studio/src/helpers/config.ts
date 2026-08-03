@@ -1111,6 +1111,24 @@ export const CONFIG_SCHEMA = {
       required: ['collectFee'],
       additionalProperties: false,
     },
+    dynamicVaultDeposit: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    dynamicVaultWithdraw: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
   },
   required: ['rpcUrl', 'dryRun', 'keypairFilePath', 'computeUnitPriceMicroLamports'],
   additionalProperties: true,

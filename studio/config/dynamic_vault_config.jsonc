@@ -9,5 +9,32 @@
   "keypairFilePath": "./keypair.json",
 
   /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
-  "computeUnitPriceMicroLamports": 100000
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* dynamicVaultDeposit is only used in the following actions:
+   * 1. vault-deposit (requires --baseMint flag; the token mint to deposit, e.g. wSOL/USDC —
+   *    a permissionless dynamic vault must already exist for this mint)
+   * Depositing native SOL's wrapped mint (So11111111111111111111111111111111111111112)
+   * auto-wraps the amount for you — no pre-funded wSOL account needed, just enough actual
+   * SOL in the wallet.
+   */
+  "dynamicVaultDeposit": {
+    "amount": 1 // amount to deposit, in baseMint human units (e.g. 1 = 1 USDC for a 6-decimal USDC mint)
+  },
+
+  /* dynamicVaultWithdraw is only used in the following actions:
+   * 1. vault-withdraw (requires --baseMint flag)
+   * UNIT WARNING: `amount` is in VAULT LP TOKEN human units, NOT baseMint units — verified
+   * against the installed SDK's compiled source and the vault program's IDL (the on-chain
+   * instruction's real args are `unmintAmount` + `minOutAmount`, i.e. this burns LP/vault
+   * shares, despite the SDK's own `withdraw(owner, baseTokenAmount)` parameter name saying
+   * otherwise). The LP mint always has the same decimals as baseMint on-chain, so the
+   * human-unit scale looks the same, but 1 LP token does NOT necessarily equal 1 baseMint
+   * token once the vault has earned yield — run vault-get-status first to see the wallet's
+   * LP balance and the current virtual price if unsure. The equivalent underlying-token
+   * amount is computed and printed before every withdraw.
+   */
+  "dynamicVaultWithdraw": {
+    "amount": 1 // amount of VAULT LP TOKENS to redeem, in human units (see UNIT WARNING above)
+  }
 }

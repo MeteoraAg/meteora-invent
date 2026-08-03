@@ -677,8 +677,24 @@ export interface PresaleCreatorWithdrawConfig {
 
 /* Dynamic Vault */
 
-// Empty for now — the dynamic-vault SDK commit adds deposit/withdraw/status blocks.
-export type DynamicVaultConfig = MeteoraConfigBase;
+export type DynamicVaultConfig = MeteoraConfigBase & {
+  dynamicVaultDeposit?: DynamicVaultDepositConfig | null;
+  dynamicVaultWithdraw?: DynamicVaultWithdrawConfig | null;
+};
+
+export interface DynamicVaultDepositConfig {
+  amount: number; // baseMint human units to deposit (converted via the mint's own decimals)
+}
+
+export interface DynamicVaultWithdrawConfig {
+  // VAULT LP TOKEN human units to redeem — NOT baseMint units. The SDK's own
+  // `withdraw(owner, baseTokenAmount)` parameter name is misleading: verified against the
+  // compiled source + vault program IDL, it actually burns LP/vault shares (on-chain args are
+  // `unmintAmount` + `minOutAmount`). The LP mint's decimals always equal baseMint's decimals
+  // on-chain, so this is scaled the same way, but 1 LP token != 1 baseMint token once the vault
+  // has earned yield — see dynamic_vault_config.jsonc for the full note.
+  amount: number;
+}
 
 /* Pool Farms (reward-pool) */
 
