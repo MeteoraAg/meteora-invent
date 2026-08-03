@@ -52,6 +52,7 @@ position ops on arbitrary pools, vault/presale user flows).
 | Stake for fees on a DAMM v1 memecoin pool (M3M3) | ACT | `stake2earn-stake` → `stake2earn-claim-fee` (`references/studio-actions.md`) |
 | Earn lending yield on idle tokens (Dynamic Vault) | ACT | `vault-deposit` (`references/studio-actions.md`) |
 | Split a fee stream between wallets (create/fund/claim fee vault) | ACT | `fee-sharing-create-vault` (`references/studio-actions.md`) |
+| Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-out` (`references/studio-actions.md` — DAMM v2 direct routes only; `zap-in-dlmm` deferred) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
 | Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |

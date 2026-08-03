@@ -95,6 +95,7 @@ DLMM positions, optionally routing through Jupiter (**Jupiter API key required**
 `buildZapInDammV2Transaction(...)`; same for DLMM (`...Dlmm...`); `zapOut*` variants; also
 `rebalanceDlmmPosition(params)`. Build results are **multi-transaction bundles**
 (`setupTransaction`, `swapTransactions[]`, `zapInTransaction`, `cleanUpTransaction`) — send in order.
+Studio actions: `zap-*` (direct pool routes) — see `studio-actions.md`.
 
 ## Dynamic Vault — `@meteora-ag/vault-sdk@2.3.1`
 

@@ -78,7 +78,9 @@
     "fee-sharing-fund-from-damm-v2": "tsx src/actions/fee_sharing/fund_from_damm_v2.ts",
     "fee-sharing-fund-from-dbc": "tsx src/actions/fee_sharing/fund_from_dbc.ts",
     "fee-sharing-claim": "tsx src/actions/fee_sharing/claim.ts",
-    "fee-sharing-get-status": "tsx src/actions/fee_sharing/get_status.ts"
+    "fee-sharing-get-status": "tsx src/actions/fee_sharing/get_status.ts",
+    "zap-in-damm-v2": "tsx src/actions/zap/zap_in_damm_v2.ts",
+    "zap-out": "tsx src/actions/zap/zap_out.ts"
   },
   "keywords": [
     "studio",

@@ -733,8 +733,32 @@ export interface FeeSharingFundDbcConfig {
 
 /* Zap */
 
-// Empty for now — the zap SDK commit adds zap-in/zap-out blocks.
-export type ZapConfig = MeteoraConfigBase;
+export type ZapConfig = MeteoraConfigBase & {
+  zapInDammV2?: ZapInDammV2Config | null;
+  zapOut?: ZapOutConfig | null;
+};
+
+export interface ZapInDammV2Config {
+  inputMint: string; // must be tokenA or tokenB of the pool — direct route only, no Jupiter fallback
+  amountIn: number; // inputMint human units, converted via the mint's own decimals
+  slippageBps: number; // swap slippage tolerance in basis points (SDK param name: slippageBps)
+  maxSqrtPriceChangeBps: number; // max allowed pool sqrt-price impact from the internal rebalance swap, in bps
+  maxTransferAmountExtendPercentage: number; // % buffer the SDK adds on top of the swap estimate's max-transfer ceiling
+  // "new" generates a fresh position-NFT keypair and creates an empty position first (that
+  // keypair co-signs once); "existing" deposits into the wallet's own position on this pool
+  // (prompts when there is more than one).
+  positionMode: 'new' | 'existing';
+}
+
+// DLMM zap-in is NOT implemented (deferred) — see studio-actions.md's Zap section for why.
+export type ZapOutProtocolConfig = 'damm-v2' | 'dlmm';
+
+export interface ZapOutConfig {
+  protocol: ZapOutProtocolConfig;
+  outputMint: string; // token the position gets fully converted into (must be one of the pool's two tokens)
+  // Applied to the swap that converts the removed non-output side into outputMint (basis points).
+  slippageBps: number;
+}
 
 /* Met Lock */
 

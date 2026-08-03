@@ -9,5 +9,37 @@
   "keypairFilePath": "./keypair.json",
 
   /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
-  "computeUnitPriceMicroLamports": 100000
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* zapInDammV2 is only used in the following actions:
+   * 1. zap-in-damm-v2 (requires --poolAddress flag)
+   * DIRECT ROUTE ONLY: inputMint must already be tokenA or tokenB of the pool — the SDK
+   * sources the other side from the pool's own liquidity, never Jupiter. If inputMint is not
+   * one of the pool's two mints, the action throws instead of routing indirectly.
+   * positionMode "new" creates a fresh, empty position first (a throwaway keypair co-signs
+   * once — only the resulting position address matters afterward); "existing" deposits into
+   * the wallet's own position on this pool (prompts if there is more than one).
+   */
+  "zapInDammV2": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are zapping in with; must be one of the pool's two mints
+    "amountIn": 0.1, // amount of inputMint to zap in, in human token units (converted via the mint's own decimals)
+    "slippageBps": 100, // swap slippage tolerance in basis points (100 = 1%), applied to the internal rebalance swap
+    "maxSqrtPriceChangeBps": 100, // max allowed pool sqrt-price impact from the internal rebalance swap, in basis points
+    "maxTransferAmountExtendPercentage": 20, // % buffer added on top of the swap estimate's max-transfer ceiling
+    "positionMode": "new" // "new" | "existing"
+  },
+
+  /* zapOut is only used in the following actions:
+   * 1. zap-out (requires --poolAddress flag; for "dlmm" this is the lbPair address)
+   * Removes ALL of the wallet's unlocked liquidity from its position on the pool, then
+   * converts whichever side is NOT outputMint into outputMint — the position exits into a
+   * single token. outputMint must be one of the pool's two mints. Direct-pool routes only
+   * (no Jupiter). Vested/permanent-locked liquidity is out of scope; only unlocked liquidity
+   * is removed.
+   */
+  "zapOut": {
+    "protocol": "damm-v2", // "damm-v2" | "dlmm"
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // token the position gets fully converted into
+    "slippageBps": 100 // swap slippage tolerance in basis points (100 = 1%), applied to the non-output side being converted
+  }
 }

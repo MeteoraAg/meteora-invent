@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 71 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 73 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -774,6 +774,71 @@ per-user table (each user's total/claimed/unclaimed). Without `--vault` but with
 keypair: reverse-lookup via `getRecipientDfsVault` and list every vault the wallet holds a
 share in.
 
+## Zap actions — config file: `studio/config/zap_config.jsonc`
+
+Single-token enter/exit for DAMM v2 and DLMM positions — program
+`zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Verified against `@meteora-ag/zap-sdk@1.3.2`'s
+installed `.d.ts` plus its own `examples/*.ts` and `tests/*.test.ts` (its `docs.md` only covers
+`zapOut*`/Jupiter helper functions, not zap-in — cross-checked against source instead).
+**Direct-pool routes only — Jupiter-routed (indirect) zaps are not covered by either action.**
+
+**`zap-in-dlmm` is NOT implemented (deferred).** The SDK's `estimateDlmmDirectSwap` — the
+documented path to build `getZapInDlmmDirectParams`'s `directSwapEstimate` — unconditionally
+queries Jupiter's live quote API internally (`getBestSwapQuoteJupiterDlmm`, confirmed in both the
+published dist and the source) and may pick the Jupiter route over the DLMM pool's own quote,
+with no parameter to disable it — unlike DAMM v2's `jupiterQuote: null` escape hatch. Guaranteeing
+a Jupiter-free DLMM zap-in would mean re-implementing the SDK's own bin-liquidity balancing math
+from scratch, which would be unverified guesswork, not a supported SDK contract. `zap-out`'s DLMM
+branch has no such issue (`zapOutThroughDlmm` never touches Jupiter) and ships normally below.
+
+`zap-in-damm-v2` and `zap-out` build an ORDERED bundle of transactions and send it through the
+shared `sendOrderedTransactions` helper (`studio/src/helpers/transaction.ts`, generic — any future
+multi-tx flow can reuse it). Under `dryRun` it simulates **every** step in order even after an
+earlier one fails, so a single dry run surfaces every problem it can find at once, then throws a
+combined report naming each failed step if any did. For a real send it goes step-by-step with a
+fresh blockhash fetched right before each one and **aborts immediately on the first failure**,
+naming the failed step and every step that was NOT sent — steps before the failure already landed
+on-chain, so the right recovery is re-running the same command (it rebuilds a fresh bundle from
+current on-chain state), not assuming a clean slate.
+
+### `zap-in-damm-v2`
+```bash
+pnpm studio zap-in-damm-v2 --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `zapInDammV2`: `inputMint` (must already be tokenA or
+tokenB of the pool — throws instead of routing indirectly otherwise), `amountIn` (human units),
+`slippageBps`, `maxSqrtPriceChangeBps`, `maxTransferAmountExtendPercentage`, `positionMode`
+(`"new"` creates a fresh, empty position first — a throwaway keypair co-signs once, and the
+resulting position NFT mint is logged prominently; `"existing"` deposits into the wallet's own
+position on the pool, prompting when there is more than one). Two-phase SDK call —
+`getZapInDammV2DirectPoolParams` → `buildZapInDammV2Transaction` — returns an ordered bundle
+(`setupTransaction?` → `swapTransactions[]` → `ledgerTransaction` → `zapInTransaction` →
+`cleanUpTransaction`) sent via `sendOrderedTransactions`. The "other side" of the deposit is
+priced with the pool's own `cpAmm.getQuote` (a 1-unit reference quote — per the SDK's own param
+docs: "used for price calculation, not the actual amountIn"); `jupiterQuote` is always `null`,
+which provably rules out the SDK's Jupiter branch (it requires `jupiterQuote !== null` first, so
+the code path that would call Jupiter is unreachable). ~0.01-0.02 SOL (more with
+`positionMode: "new"`).
+
+### `zap-out`
+```bash
+pnpm studio zap-out --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required; for `protocol: "dlmm"` this is the lbPair address). Reads
+`zapOut`: `protocol` (`"damm-v2"` | `"dlmm"`), `outputMint` (must be one of the pool's two
+tokens), `slippageBps`. Removes ALL of the wallet's unlocked liquidity from its position on the
+pool (prompting when there is more than one), then converts whichever side is not `outputMint`
+into `outputMint` so the position exits into a single token. The removal and the swap MUST share
+one on-chain transaction — the swap reads a pre/post token-account balance delta to know how much
+the removal actually freed up, verified against the SDK's own
+`examples/removeDammV2LiquidityAndZapOut.ts` / `removeDlmmLiquidityAndZapOut.ts` and
+`tests/zapOutDammV2.test.ts` — so they are combined into a single step rather than sent as
+separate ordered steps. DLMM's `removeLiquidity` can still return several transactions for wide
+positions; only the last one is combined with the swap, and any earlier ones are sent first as
+their own ordered steps. Vested/permanent-locked liquidity is out of scope — only unlocked
+liquidity is removed. If the position is already single-sided in `outputMint`, the swap step is
+skipped automatically. ~0.001-0.002 SOL.
+
 ## Quick Reference
 
 | Action | Required flag | Config block(s) | ~Min SOL |
@@ -849,6 +914,8 @@ share in.
 | `fee-sharing-fund-from-dbc` | `--vault` + `--baseMint` | `feeSharingFundDbc` | 0.001 |
 | `fee-sharing-claim` | `--vault` | — | 0.001 |
 | `fee-sharing-get-status` | `--vault` (optional) | — (read-only) | 0 |
+| `zap-in-damm-v2` | `--poolAddress` | `zapInDammV2` | 0.01-0.02 |
+| `zap-out` | `--poolAddress` | `zapOut` | 0.001-0.002 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 
