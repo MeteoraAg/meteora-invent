@@ -640,5 +640,37 @@ export type ZapConfig = MeteoraConfigBase;
 
 /* Met Lock */
 
-// Empty for now — the met-lock SDK commit adds escrow/claim blocks.
-export type LockConfig = MeteoraConfigBase;
+export type LockConfig = MeteoraConfigBase & {
+  lockCreateEscrow?: LockCreateEscrowConfig | null;
+  lockEscrowMetadata?: LockEscrowMetadataConfig | null;
+  lockClaim?: LockClaimConfig | null;
+  lockList?: LockListConfig | null;
+};
+
+export interface LockCreateEscrowConfig {
+  recipient: string;
+  vestingStartTime: number; // unix seconds
+  cliffTime: number; // unix seconds
+  frequency: number; // seconds between unlock periods
+  cliffUnlockAmount: number; // human token units unlocked at cliffTime
+  amountPerPeriod: number; // human token units unlocked every `frequency` seconds after the cliff
+  numberOfPeriod: number; // total number of periods after the cliff
+  updateRecipientMode: number; // 0 NONE | 1 CREATOR_ONLY | 2 RECIPIENT_ONLY | 3 CREATOR_RECIPIENT
+  cancelMode: number; // 0 NONE | 1 CREATOR_ONLY | 2 RECIPIENT_ONLY | 3 CREATOR_RECIPIENT
+  isSenderMultiSig: boolean;
+}
+
+export interface LockEscrowMetadataConfig {
+  name: string;
+  description: string;
+  creatorEmail: string;
+  recipientEmail: string;
+}
+
+export interface LockClaimConfig {
+  maxAmount: number | null; // human token units; null = claim everything currently vested
+}
+
+export interface LockListConfig {
+  role: 'recipient' | 'creator';
+}

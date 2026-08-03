@@ -22,9 +22,10 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@1.4.1` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | via studio CLI | — |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | via studio CLI | — |
+| **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
 
 Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
-(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing — live in `references/other-products.md`
+(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock — live in `references/other-products.md`
 (deep docs: https://docs.meteora.ag/llms.txt).
 
 ## Decide the Path: ACT vs BUILD
@@ -45,6 +46,7 @@ position ops on arbitrary pools, vault/presale user flows).
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
 | Alpha/presale vault, locks, farms | ACT | `alpha-vault-create` / lock actions (`references/studio-actions.md`) |
+| Lock/vest tokens for a recipient (cliff + vesting) | ACT | `lock-create-vesting-escrow` (`references/studio-actions.md`) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
 | Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |

@@ -45,7 +45,12 @@
     "damm-v2-get-positions": "tsx src/actions/damm_v2/get_positions.ts",
     "damm-v1-swap": "tsx src/actions/damm_v1/swap.ts",
     "alpha-vault-create": "tsx src/actions/alpha_vault/create_alpha_vault.ts",
-    "presale-vault-create": "tsx src/actions/presale_vault/create_presale_vault.ts"
+    "presale-vault-create": "tsx src/actions/presale_vault/create_presale_vault.ts",
+    "lock-create-vesting-escrow": "tsx src/actions/lock/create_vesting_escrow.ts",
+    "lock-create-escrow-metadata": "tsx src/actions/lock/create_escrow_metadata.ts",
+    "lock-claim": "tsx src/actions/lock/claim.ts",
+    "lock-get-escrow": "tsx src/actions/lock/get_escrow.ts",
+    "lock-list-escrows": "tsx src/actions/lock/list_escrows.ts"
   },
   "keywords": [
     "studio",

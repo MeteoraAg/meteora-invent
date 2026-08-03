@@ -1,7 +1,7 @@
-# Other Products — Alpha Vault, Presale, Stake2Earn, Zap, Dynamic Vault, Fee Sharing
+# Other Products — Alpha Vault, Presale, Stake2Earn, Zap, Dynamic Vault, Fee Sharing, Met Lock
 
 > Compact SDK surfaces verified against the packages installed with the studio
-> (read from each package's shipped `.d.ts`, 2026-08-02). Creation flows for alpha/presale
+> (read from each package's shipped `.d.ts`, 2026-08-02 → 03). Creation flows for alpha/presale
 > vaults are ACT-path (`studio-actions.md`); this file covers the SDK surface — above all
 > the **read/verify calls** the studio doesn't expose. All are web3.js v1.
 > ⚠️ Anchor versions diverge (vault-sdk 0.28 · m3m3 0.29 · the rest 0.31) — never pass
@@ -100,3 +100,41 @@ Funding bridges pull straight from other protocols: `fundByClaimDammV2Fee`,
 `fundByClaimDbcCreatorTradingFee2` / `...PartnerTradingFee2` (use the `2` variants),
 `fundByWithdrawDbcMigrationFee`. User claim: `claimUserFee2({ feeVault, user, payer, receiver })`.
 Gotcha: ESM-first package (`"type": "module"` with a `.cjs` fallback).
+
+## Met Lock — `@meteora-ag/met-lock-sdk@1.0.1`
+
+Program `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn`. Standalone vesting/lock escrows for
+any SPL or Token-2022 mint — not coupled to any pool. Anchor 0.31. **`docs.md` (320 ln) has
+real errors — don't trust it over source/dist:** its `createVestingEscrowMetadata` "Example"
+block actually calls `client.claimV2(...)` (wrong function, right-looking params), its
+`createVestingEscrowV2` "Notes" require a `feeVault` signer copy-pasted from a different SDK
+(met-lock has no such concept), and it documents `deriveEscrow`/`deriveEscrowMetadata` as
+`async client.deriveEscrow(...)` methods when they're actually synchronous, standalone
+helper functions exported from the package. Mirror the SDK repo's own
+`createVestingEscrowV2.s.ts` / `claimV2.s.ts` scripts instead.
+
+```ts
+import { LockClient, deriveEscrow, calculateTotalLockedVestingAmount } from '@meteora-ag/met-lock-sdk'
+const client = new LockClient(connection, commitment)  // commitment is REQUIRED, no default
+const escrow = deriveEscrow(base.publicKey)             // sync PDA helper, NOT a client method
+const escrowState = await client.getEscrow(escrow)      // THROWS (doesn't return null) if missing
+```
+
+`LockClient`'s full surface is 5 methods: `getRootEscrow(rootEscrow)` / `getEscrow(escrow)`
+(both throw on a missing account), `createVestingEscrowMetadata(params)` (signers
+`[creator, payer]`), `createVestingEscrowV2(params)` (signers `[sender, base, payer]` — `base`
+is a fresh `Keypair` whose public key derives the escrow address), `claimV2(params)` (signers
+`[payer, recipient]`; the program caps `maxAmount` at what has actually vested, so u64::MAX
+means "claim everything"). PDA helpers are plain functions, not client methods:
+`deriveEscrow(base)`, `deriveEscrowMetadata(escrow)`, `deriveRootEscrow(base, mint, version)`,
+`deriveBase(rootEscrow, recipient)`. Token-2022 is detected by the caller, not the SDK: pass
+the mint's actual owner program as `tokenProgram`, and import `TOKEN_2022_PROGRAM_ID` from
+the same `@solana/spl-token` install the SDK resolves — `createVestingEscrowV2` branches on
+it with `==` (object identity, not `.equals()`). Helper `calculateTotalLockedVestingAmount(
+cliffUnlockAmount, amountPerPeriod, numberOfPeriod)` pre-checks a sender's balance before
+creating an escrow. Owner→escrow listing has no SDK helper: use
+`client.program.account.vestingEscrow.all()` with a memcmp filter (offset 8 = recipient,
+offset 72 = creator — both verified against the SDK repo's
+`sumCreatorLockVaultTotals.s.ts` script).
+
+Studio actions: `lock-*` — see `studio-actions.md`.

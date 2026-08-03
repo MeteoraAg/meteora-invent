@@ -9,5 +9,48 @@
   "keypairFilePath": "./keypair.json",
 
   /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
-  "computeUnitPriceMicroLamports": 100000
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* lockCreateEscrow is only used in the following actions:
+   * 1. lock-create-vesting-escrow (requires --baseMint flag)
+   * Locks `cliffUnlockAmount + amountPerPeriod * numberOfPeriod` of baseMint from the wallet
+   * into a new vesting escrow for `recipient`. A fresh "base" keypair is generated for you —
+   * the escrow address it derives is logged prominently; save it for every other lock-* action.
+   */
+  "lockCreateEscrow": {
+    "recipient": "YOUR_RECIPIENT_ADDRESS", // wallet that will receive the vested tokens
+    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from
+    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time
+    "frequency": 2592000, // seconds between unlock periods after the cliff (e.g. 2592000 = 30 days)
+    "cliffUnlockAmount": 2500, // human token units unlocked exactly at cliffTime
+    "amountPerPeriod": 2500, // human token units unlocked every `frequency` seconds after the cliff
+    "numberOfPeriod": 4, // total number of periods after the cliff
+    "updateRecipientMode": 0, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can change the recipient address later)
+    "cancelMode": 1, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can cancel the escrow)
+    "isSenderMultiSig": false // set true only if the sender's token account is owned by an off-curve authority (e.g. a multisig/PDA)
+  },
+
+  /* lockEscrowMetadata is only used in the following actions:
+   * 1. lock-create-escrow-metadata (requires --escrow flag)
+   */
+  "lockEscrowMetadata": {
+    "name": "YOUR_ESCROW_NAME", // display name for the vesting escrow
+    "description": "YOUR_ESCROW_DESCRIPTION", // human-readable description
+    "creatorEmail": "creator@example.com", // contact email for the escrow creator
+    "recipientEmail": "recipient@example.com" // contact email for the escrow recipient
+  },
+
+  /* lockClaim is only used in the following actions:
+   * 1. lock-claim (requires --escrow flag)
+   */
+  "lockClaim": {
+    "maxAmount": null // human token units to claim; null = claim everything currently vested
+  },
+
+  /* lockList is only used in the following actions:
+   * 1. lock-list-escrows
+   */
+  "lockList": {
+    "role": "recipient" // "recipient" = escrows where the wallet is the recipient | "creator" = escrows the wallet created
+  }
 }

@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 38 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 43 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -377,6 +377,73 @@ refunds, and tier-assignment mechanics are not yet covered; see
 https://docs.meteora.ag/helper-products/presale-vault/what-is-presale-vault.md and dry-run
 output before committing real funds.
 
+## Met Lock actions — config file: `studio/config/lock_config.jsonc`
+
+Standalone vesting/locking for any SPL or Token-2022 mint — program
+`LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn`, not coupled to any pool; a natural follow-up
+after any token launch ("lock the team allocation"). Verified against
+`@meteora-ag/met-lock-sdk@1.0.1`'s source + installed `.d.ts` — its shipped `docs.md` has
+known errors (see `other-products.md`), so these actions mirror the SDK repo's own
+`createVestingEscrowV2.s.ts` / `claimV2.s.ts` scripts instead.
+
+### `lock-create-vesting-escrow`
+```bash
+pnpm studio lock-create-vesting-escrow --baseMint <MINT>
+```
+Flags: `--baseMint` (required). Reads `lockCreateEscrow`: `recipient`, `vestingStartTime` /
+`cliffTime` (unix **seconds**), `frequency` (seconds between unlock periods),
+`cliffUnlockAmount` + `amountPerPeriod` (human token units, converted via the mint's
+decimals), `numberOfPeriod`, `updateRecipientMode` / `cancelMode` (0-3: NONE / CREATOR_ONLY /
+RECIPIENT_ONLY / CREATOR_RECIPIENT), `isSenderMultiSig`. Pre-checks the wallet's token
+balance against `cliffUnlockAmount + amountPerPeriod * numberOfPeriod` before building the
+transaction; Token-2022 mints are detected automatically (mint owner-program check).
+**Generates a fresh `base` keypair that co-signs once** — signers are
+`[sender=wallet, base, payer=wallet]` — and **the derived escrow address is logged
+prominently: save it**, every other `lock-*` action needs it via `--escrow`. wSOL note: this
+action does NOT wrap SOL for you — if `baseMint` is native SOL, the wallet's wSOL associated
+token account must already hold enough wrapped SOL, or the balance pre-check fails with a
+clear error (no silent auto-wrap). ~0.01 SOL.
+
+### `lock-create-escrow-metadata`
+```bash
+pnpm studio lock-create-escrow-metadata --escrow <ESCROW>
+```
+Flags: `--escrow` (required). Reads `lockEscrowMetadata`: `name`, `description`,
+`creatorEmail`, `recipientEmail`. Signers: `[creator=wallet, payer=wallet]` — the action
+checks the wallet is the escrow's creator before sending, and logs the derived
+escrow-metadata PDA.
+
+### `lock-claim`
+```bash
+pnpm studio lock-claim --escrow <ESCROW>
+```
+Flags: `--escrow` (required). Reads `lockClaim.maxAmount` (human token units; **omit/null =
+claim everything currently vested**, sent as u64::MAX under the hood — the program caps the
+actual transfer at what has vested). Signers: `[payer=wallet, recipient=wallet]` — the action
+checks the wallet is the escrow's recipient before sending.
+
+### `lock-get-escrow`
+```bash
+pnpm studio lock-get-escrow --escrow <ESCROW>
+```
+Flags: `--escrow` (required). **Read-only, no keypair loaded.** Prints recipient, creator,
+token mint + program, schedule (vesting start, cliff, frequency, periods), and computed
+**total / claimed / claimable** amounts (linear-vesting math applied to the escrow's raw
+fields — this isn't part of the SDK's own surface). The underlying `getEscrow()` call THROWS
+on a missing account; this action catches it and reports a clean "no escrow found" error
+instead of the raw exception.
+
+### `lock-list-escrows`
+```bash
+pnpm studio lock-list-escrows
+```
+Flags: none. Reads `lockList.role` (`"recipient"` | `"creator"`). Loads the wallet (needed to
+know whose escrows to list) but does **not** check its SOL balance — nothing is signed.
+`program.account.vestingEscrow.all` with a memcmp filter: offset 8 for recipient, offset 72
+for creator (both verified against the SDK repo's `sumCreatorLockVaultTotals.s.ts` script).
+Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow --escrow
+<ADDR>` for the decimal-formatted single view.
+
 ## Quick Reference
 
 | Action | Required flag | Config block(s) | ~Min SOL |
@@ -419,6 +486,11 @@ output before committing real funds.
 | `damm-v1-swap` | `--poolAddress` | `dammV1Swap` | 0.001 |
 | `alpha-vault-create` | `--baseMint` | `alphaVault` | 0.05 |
 | `presale-vault-create` | `--baseMint` | `presaleVault` | 0.05 |
+| `lock-create-vesting-escrow` | `--baseMint` | `lockCreateEscrow` | 0.01 |
+| `lock-create-escrow-metadata` | `--escrow` | `lockEscrowMetadata` | 0.002 |
+| `lock-claim` | `--escrow` | `lockClaim` | 0.001 |
+| `lock-get-escrow` | `--escrow` | — (read-only) | 0 |
+| `lock-list-escrows` | — | `lockList` | 0 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 
