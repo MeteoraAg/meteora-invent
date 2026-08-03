@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 49 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 56 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -430,6 +430,10 @@ degrades to vault-only output instead of erroring).
 
 ## Presale Vault actions — config file: `studio/config/presale_vault_config.jsonc`
 
+Creation (3 modes) plus the full buyer + creator lifecycle — deposit, withdraw, claim,
+overflow/failed-raise refunds, raise withdrawal, and unsold-token handling — verified against
+`@meteora-ag/presale@0.1.1`'s installed `.d.ts` + source.
+
 ### `presale-vault-create`
 ```bash
 pnpm studio presale-vault-create --baseMint <MINT>
@@ -441,10 +445,79 @@ conversion** (verified); buyer min/max deposit caps **in quote lamports**;
 Creator options (SDK 0.1.1): `presaleArgs.disableEarlierPresaleEndOnceCapReached`
 (default false), `lockedVestingArgs.immediateReleaseTimestamp` (0/omitted = at
 `presaleEndTime`), and fixed-price `fixedPricePresaleConfig.disableWithdraw` (default false).
-Scope note: this skill covers vault **creation only** — buyer claims, raise withdrawal,
-refunds, and tier-assignment mechanics are not yet covered; see
-https://docs.meteora.ag/helper-products/presale-vault/what-is-presale-vault.md and dry-run
-output before committing real funds.
+
+### `presale-vault-deposit`
+```bash
+pnpm studio presale-vault-deposit --vault <PRESALE>
+```
+Flags: `--vault` (required — the presale account pubkey, printed by `presale-vault-create`).
+Reads `presaleDeposit`: `amount` (quote human units), `registryIndex` (default `0`;
+**serialized as a u8 on-chain — must be an integer 0-255**). Ensures a buyer escrow exists
+first: permissionless presales get one built and sent automatically; a
+`permissioned_with_merkle_proof` presale auto-fetches the proof from the creator's
+permissioned-server metadata (best-effort — fails with a clear "ask the creator" error if no
+server/proof is published yet); `permissioned_with_authority` presales require the creator's
+operator to create the escrow server-side, so this action errors clearly instead of guessing.
+Guarded on the wrapper's `canDeposit()` plus the registry's min/max deposit caps.
+
+### `presale-vault-withdraw`
+```bash
+pnpm studio presale-vault-withdraw --vault <PRESALE>
+```
+Flags: `--vault` (required). Reads `presaleWithdraw`: `amount`, `registryIndex`. Only while the
+presale is still ongoing — **blocked entirely on FCFS presales, and on fixed-price presales
+created with `disableWithdraw: true`** (surfaced by name in the refusal message); prorata
+presales always allow it during the deposit window.
+
+### `presale-vault-claim`
+```bash
+pnpm studio presale-vault-claim --vault <PRESALE>
+```
+Flags: `--vault` (required). Reads `presaleClaim.registryIndex`. Prints total allocated,
+already-claimed, and pending-claimable-right-now (immediate release + linear vesting to date,
+computed against the live on-chain clock via `getOnChainTimestamp`) before claiming. Guarded on
+the wrapper's `canClaim()` (progress must be `Completed` and vesting must have started).
+
+### `presale-vault-withdraw-remaining-quote`
+```bash
+pnpm studio presale-vault-withdraw-remaining-quote --vault <PRESALE>
+```
+Flags: `--vault` (required). No config block — sweeps every registry the wallet has an escrow
+on and refunds whichever ones are eligible (prorata overflow once the presale is `Completed`, or
+the full deposit back once it's `Failed`), skipping and reporting the rest.
+
+### `presale-vault-creator-withdraw`
+```bash
+pnpm studio presale-vault-creator-withdraw --vault <PRESALE>
+```
+Flags: `--vault` (required, creator wallet only — checked client-side before sending). No
+required config block; optional `presaleCreatorWithdraw.collectFee: true` also calls
+`creatorCollectFee()` right after (logs a clear skip if not yet eligible). Withdraws raise
+proceeds (quote token) once `Completed`, or the unsold base-token supply back once `Failed` —
+guarded on `canCreatorWithdraw()`.
+
+### `presale-vault-handle-unsold`
+```bash
+pnpm studio presale-vault-handle-unsold --vault <PRESALE>
+```
+Flags: `--vault` (required). No config block. Permissionless crank — burns or
+refunds-to-creator the unsold base-token supply per the presale's `unsoldTokenAction`, once the
+raise has resolved (`Completed` or `Failed`); errors if the action has already been performed.
+
+### `presale-vault-get-status`
+```bash
+pnpm studio presale-vault-get-status --vault <PRESALE>
+```
+Flags: `--vault` (required). **Read-only** — keypair is optional (a missing/invalid keypair
+file degrades to presale-only output, same as `alpha-vault-get-status`). Prints progress
+state/%, mode, whitelist mode, totals, average token price, timings, every gate boolean, and a
+per-registry table (supply, deposits, caps, fee, price); with a usable wallet, also each of its
+escrows (deposited, claimable, pending, withdrawable-remaining-quote). **After the raise** —
+once progress is `Completed`, prints next-step hints: the creator runs
+`presale-vault-creator-withdraw` and then seeds a market with the raised quote + reserved
+supply (`dlmm-create-pool`, `damm-v2-create-balanced-pool`, `damm-v1-create-pool`, or a DBC
+config + pool for curve-style launches — no single composite action does this hand-off, by
+design); buyers run `presale-vault-claim`.
 
 ## Met Lock actions — config file: `studio/config/lock_config.jsonc`
 
@@ -561,6 +634,13 @@ Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow 
 | `alpha-vault-crank-fill` | `--vault` | — | 0.001 (per tx; may send several) |
 | `alpha-vault-get-status` | `--vault` or `--poolAddress` | — (read-only) | 0 |
 | `presale-vault-create` | `--baseMint` | `presaleVault` | 0.05 |
+| `presale-vault-deposit` | `--vault` | `presaleDeposit` | 0.002 |
+| `presale-vault-withdraw` | `--vault` | `presaleWithdraw` | 0.001 |
+| `presale-vault-claim` | `--vault` | `presaleClaim` | 0.001 |
+| `presale-vault-withdraw-remaining-quote` | `--vault` | — | 0.001 |
+| `presale-vault-creator-withdraw` | `--vault` | — (`presaleCreatorWithdraw` opt.) | 0.001 |
+| `presale-vault-handle-unsold` | `--vault` | — | 0.001 |
+| `presale-vault-get-status` | `--vault` | — (read-only) | 0 |
 | `lock-create-vesting-escrow` | `--baseMint` | `lockCreateEscrow` | 0.01 |
 | `lock-create-escrow-metadata` | `--escrow` | `lockEscrowMetadata` | 0.002 |
 | `lock-claim` | `--escrow` | `lockClaim` | 0.001 |

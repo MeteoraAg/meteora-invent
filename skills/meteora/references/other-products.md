@@ -39,7 +39,9 @@ BUILD-side code needed just to check a vault's state).
 
 ## Presale Vault — `@meteora-ag/presale@0.1.1`
 
-Program `4Xgt6XKZiowAGNdPWngVAwpYbSwAmbBnRBPtCFXhrypc`. **Pre-1.0 — expect churn.**
+Program `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` (the src IDL in the repo shows a
+different, non-deployed address — trust PRESALE_PROGRAM_ID from the package). **Pre-1.0 —
+expect churn.**
 Since 0.0.5 (changelog + source, verified): `presaleArgs` gained required
 `disableEarlierPresaleEndOnceCapReached` (keep FCFS/fixed-price running until end time even
 after the cap is hit) and `lockedVestingArgs` gained required `immediateReleaseTimestamp`
@@ -63,6 +65,9 @@ Buyer lifecycle (instance methods → `Transaction`): `createPermissionlessEscro
 `deposit({ owner, amount, registryIndex? })` → (after end) `claim({ owner, registryIndex })`
 / `withdrawRemainingQuote`. Creator: `creatorWithdraw`, `creatorCollectFee`,
 `performUnsoldBaseTokenAction`. Gotcha: `registryIndex` is a BN serialized as **u8**.
+
+Studio actions: `presale-vault-*` (create + full buyer/creator lifecycle + status) — see
+`studio-actions.md`.
 
 ## Stake2Earn (M3M3) — `@meteora-ag/m3m3@1.0.10`
 

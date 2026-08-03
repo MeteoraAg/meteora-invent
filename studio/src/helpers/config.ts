@@ -1033,6 +1033,44 @@ export const CONFIG_SCHEMA = {
       required: ['role'],
       additionalProperties: false,
     },
+    presaleDeposit: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+        registryIndex: { type: 'number' },
+      },
+      required: ['amount', 'registryIndex'],
+      additionalProperties: false,
+    },
+    presaleWithdraw: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+        registryIndex: { type: 'number' },
+      },
+      required: ['amount', 'registryIndex'],
+      additionalProperties: false,
+    },
+    presaleClaim: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        registryIndex: { type: 'number' },
+      },
+      required: ['registryIndex'],
+      additionalProperties: false,
+    },
+    presaleCreatorWithdraw: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        collectFee: { type: 'boolean' },
+      },
+      required: ['collectFee'],
+      additionalProperties: false,
+    },
   },
   required: ['rpcUrl', 'dryRun', 'keypairFilePath', 'computeUnitPriceMicroLamports'],
   additionalProperties: true,

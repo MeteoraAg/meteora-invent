@@ -610,6 +610,10 @@ export type PresaleConfig = MeteoraConfigBase & {
   createBaseToken: TokenConfig | null;
   presaleVault: PresaleVaultConfig | null;
   presaleVaultType: PresaleVaultTypeConfig;
+  presaleDeposit?: PresaleDepositConfig | null;
+  presaleWithdraw?: PresaleWithdrawConfig | null;
+  presaleClaim?: PresaleClaimConfig | null;
+  presaleCreatorWithdraw?: PresaleCreatorWithdrawConfig | null;
 };
 
 export enum PresaleVaultTypeConfig {
@@ -631,6 +635,24 @@ export interface FixedPricePresaleVaultConfig {
   price: number;
   rounding: 'up' | 'down';
   disableWithdraw?: boolean; // fixed-price only: block withdrawals after deposit (default false)
+}
+
+export interface PresaleDepositConfig {
+  amount: number; // quote token human units to deposit
+  registryIndex: number; // presale tier index; serialized as u8 on-chain (0-255)
+}
+
+export interface PresaleWithdrawConfig {
+  amount: number; // quote token human units to withdraw
+  registryIndex: number; // presale tier index; serialized as u8 on-chain (0-255)
+}
+
+export interface PresaleClaimConfig {
+  registryIndex: number; // presale tier index; serialized as u8 on-chain (0-255)
+}
+
+export interface PresaleCreatorWithdrawConfig {
+  collectFee: boolean; // also call creatorCollectFee() right after creatorWithdraw, when eligible
 }
 
 /* Dynamic Vault */

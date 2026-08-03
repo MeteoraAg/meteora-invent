@@ -68,5 +68,36 @@
       "immediateReleaseBps": 0, // Percentage of tokens released immediately in basis points (1000 = 10%, 0 = no immediate release)
       "immediateReleaseTimestamp": 0 // unix seconds when the immediate-release portion unlocks; 0/omitted = at presaleEndTime (SDK default)
     }
+  },
+
+  /* presaleDeposit is only used in the following actions:
+   * 1. presale-vault-deposit (requires --vault flag)
+   */
+  "presaleDeposit": {
+    "amount": 1, // amount to deposit, in quote token human units
+    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255; single-tier presales use 0)
+  },
+
+  /* presaleWithdraw is only used in the following actions:
+   * 1. presale-vault-withdraw (requires --vault flag; blocked on FCFS presales, and on
+   *    fixed-price presales created with disableWithdraw: true)
+   */
+  "presaleWithdraw": {
+    "amount": 1, // amount to withdraw, in quote token human units
+    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255)
+  },
+
+  /* presaleClaim is only used in the following actions:
+   * 1. presale-vault-claim (requires --vault flag)
+   */
+  "presaleClaim": {
+    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255)
+  },
+
+  /* presaleCreatorWithdraw is only used in the following actions:
+   * 1. presale-vault-creator-withdraw (requires --vault flag; creator wallet only)
+   */
+  "presaleCreatorWithdraw": {
+    "collectFee": true // also call creatorCollectFee() after creatorWithdraw, when eligible (no-op if not yet eligible)
   }
 }
