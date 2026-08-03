@@ -54,7 +54,7 @@ anything else not exposed as a studio action.
 | Stake DAMM v1 LP into a reward farm | ACT | `farm-stake` (`references/studio-actions.md`) |
 | Earn lending yield on idle tokens (Dynamic Vault) | ACT | `vault-deposit` (`references/studio-actions.md`) |
 | Split a fee stream between wallets (create/fund/claim fee vault) | ACT | `fee-sharing-create-vault` (`references/studio-actions.md`) |
-| Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-out` (`references/studio-actions.md` — DAMM v2 direct routes only; `zap-in-dlmm` deferred) |
+| Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-in-dlmm` / `zap-out` (`references/studio-actions.md` — DAMM v2 zap-in is direct-route only; DLMM zap-in is Jupiter-quoted, needs `JUPITER_API_KEY`/`JUPITER_API_URL` setup) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
 | Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |

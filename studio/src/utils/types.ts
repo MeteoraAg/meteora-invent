@@ -745,6 +745,7 @@ export interface FeeSharingFundDbcConfig {
 
 export type ZapConfig = MeteoraConfigBase & {
   zapInDammV2?: ZapInDammV2Config | null;
+  zapInDlmm?: ZapInDlmmConfig | null;
   zapOut?: ZapOutConfig | null;
 };
 
@@ -760,7 +761,31 @@ export interface ZapInDammV2Config {
   positionMode: 'new' | 'existing';
 }
 
-// DLMM zap-in is NOT implemented (deferred) — see studio-actions.md's Zap section for why.
+export interface ZapInDlmmConfig {
+  inputMint: string; // must be tokenX or tokenY of the lbPair — direct route only
+  amountIn: number; // inputMint human units, converted via the mint's own decimals
+  // Slippage tolerance (bps) for the rebalancing swap between the position's two sides. Unlike
+  // zapInDammV2, this swap is JUPITER-QUOTED: the SDK's estimateDlmmDirectSwap always calls
+  // Jupiter's live quote API and compares it against the pool's own bin quote, keeping whichever
+  // pays out more — there is no Jupiter-free mode for DLMM zap-in.
+  swapSlippageBps: number;
+  minDeltaId: number; // lower edge of the position's bin range, as an offset from the CURRENT active bin (e.g. -34)
+  maxDeltaId: number; // upper edge of the position's bin range, as an offset from the current active bin (e.g. 34)
+  strategyType: 0 | 1 | 2; // liquidity distribution across the range: 0 Spot | 1 Curve | 2 BidAsk
+  // "x" | "y" deposits only that side (skipping the swap on the other side entirely); null is a
+  // balanced two-sided deposit across the range.
+  singleSided: 'x' | 'y' | null;
+  // Tie-break for how the active bin itself splits between X and Y. Ignored — forced to match
+  // singleSided — whenever singleSided is not null (mirrors the SDK's own example).
+  favorXInActiveId: boolean;
+  maxActiveBinSlippage: number; // bins the active bin id may drift between quoting and landing on-chain
+  maxAccounts: number; // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+  maxTransferAmountExtendPercentage: number; // % buffer the SDK adds on top of the swap estimate's max-transfer ceiling
+  // NOTE: zap-in-dlmm ALWAYS creates a brand-new position (a throwaway keypair co-signs once) —
+  // the zap-sdk's buildZapInDlmmTransaction has no "existing position" mode; depositing into an
+  // existing DLMM position is a BUILD-path task (see SKILL.md / studio-actions.md).
+}
+
 export type ZapOutProtocolConfig = 'damm-v2' | 'dlmm';
 
 export interface ZapOutConfig {

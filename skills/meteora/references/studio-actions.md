@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 77 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 78 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -780,19 +780,14 @@ Single-token enter/exit for DAMM v2 and DLMM positions — program
 `zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Verified against `@meteora-ag/zap-sdk@1.3.2`'s
 installed `.d.ts` plus its own `examples/*.ts` and `tests/*.test.ts` (its `docs.md` only covers
 `zapOut*`/Jupiter helper functions, not zap-in — cross-checked against source instead).
-**Direct-pool routes only — Jupiter-routed (indirect) zaps are not covered by either action.**
+`zap-in-damm-v2` and `zap-out` are **direct-pool routes only — no Jupiter, ever** (each
+action's own note below says exactly how that's guaranteed); `zap-in-dlmm` is
+**Jupiter-quoted** — its rebalancing swap always compares a live Jupiter quote against the
+pool's own and keeps whichever pays out more, so it needs network access to Jupiter (see its
+own subsection for the — optional — key setup).
 
-**`zap-in-dlmm` is NOT implemented (deferred).** The SDK's `estimateDlmmDirectSwap` — the
-documented path to build `getZapInDlmmDirectParams`'s `directSwapEstimate` — unconditionally
-queries Jupiter's live quote API internally (`getBestSwapQuoteJupiterDlmm`, confirmed in both the
-published dist and the source) and may pick the Jupiter route over the DLMM pool's own quote,
-with no parameter to disable it — unlike DAMM v2's `jupiterQuote: null` escape hatch. Guaranteeing
-a Jupiter-free DLMM zap-in would mean re-implementing the SDK's own bin-liquidity balancing math
-from scratch, which would be unverified guesswork, not a supported SDK contract. `zap-out`'s DLMM
-branch has no such issue (`zapOutThroughDlmm` never touches Jupiter) and ships normally below.
-
-`zap-in-damm-v2` and `zap-out` build an ORDERED bundle of transactions and send it through the
-shared `sendOrderedTransactions` helper (`studio/src/helpers/transaction.ts`, generic — any future
+All three build/send an ORDERED bundle of transactions through the shared
+`sendOrderedTransactions` helper (`studio/src/helpers/transaction.ts`, generic — any future
 multi-tx flow can reuse it). Under `dryRun` it simulates **every** step in order even after an
 earlier one fails, so a single dry run surfaces every problem it can find at once, then throws a
 combined report naming each failed step if any did. For a real send it goes step-by-step with a
@@ -819,6 +814,44 @@ docs: "used for price calculation, not the actual amountIn"); `jupiterQuote` is 
 which provably rules out the SDK's Jupiter branch (it requires `jupiterQuote !== null` first, so
 the code path that would call Jupiter is unreachable). ~0.01-0.02 SOL (more with
 `positionMode: "new"`).
+
+### `zap-in-dlmm`
+```bash
+pnpm studio zap-in-dlmm --poolAddress <LBPAIR>
+```
+Flags: `--poolAddress` (required — the lbPair address). Reads `zapInDlmm`: `inputMint` (must
+already be tokenX or tokenY of the lbPair — throws otherwise, same direct-route-only
+requirement as `zap-in-damm-v2`), `amountIn` (human units), `swapSlippageBps`, `minDeltaId` /
+`maxDeltaId` (the position's bin range, as an offset from the CURRENT active bin, e.g. `-34`/
+`34`), `strategyType` (`0` Spot | `1` Curve | `2` BidAsk), `singleSided` (`"x"` | `"y"` | `null`
+— deposit only one side, skipping the swap on the other), `favorXInActiveId` (tie-break for the
+active bin's own X/Y split; forced to match `singleSided` whenever it isn't `null`),
+`maxActiveBinSlippage`, `maxAccounts`, `maxTransferAmountExtendPercentage`. **ALWAYS creates a
+brand-new position** — a throwaway keypair co-signs once and the resulting position address is
+logged prominently; depositing into an *existing* DLMM position stays BUILD-path (see
+`dlmm.md`) — verified against the SDK source: `buildZapInDlmmTransaction` unconditionally calls
+the private `zapInDlmmForUninitializedPosition`, and the "already-initialized position"
+instruction is only reachable through the separate, much heavier `rebalanceDlmmPosition` flow
+(remove all liquidity → swap → re-add), a different operation.
+
+**Jupiter-quoted, unlike `zap-in-damm-v2`.** The SDK's `estimateDlmmDirectSwap` unconditionally
+calls Jupiter's live quote API to price the rebalancing swap between the position's two sides
+(`getBestSwapQuoteJupiterDlmm`), comparing it against the pool's own bin quote and keeping
+whichever pays out more — there is no `jupiterQuote: null` escape hatch like DAMM v2's. Both the
+quote phase (`estimateDlmmDirectSwap`) and, when Jupiter's quote wins, the build phase
+(`getZapInDlmmDirectParams`) call out to Jupiter. Client resolution order:
+`JUPITER_API_URL` / `JUPITER_API_KEY` in `studio/.env` (loaded the same way `generate-keypair`
+reads `PRIVATE_KEY`) override the zap-sdk's own default endpoint (`https://api.jup.ag`, per the
+installed `.d.ts`/dist) — both env vars are **optional**: that default already accepts keyless
+requests at a low, shared rate limit; an API key (get one at `https://developers.jup.ag/portal`)
+only raises the ceiling. A quote/build failure throws `"Jupiter quote failed — set
+JUPITER_API_KEY ... or JUPITER_API_URL ..."` with the underlying error attached, so a
+rate-limit/auth failure is never a silent hang.
+
+Three-phase SDK call — `estimateDlmmDirectSwap` → `getZapInDlmmDirectParams` →
+`buildZapInDlmmTransaction` — returns the same ordered-bundle shape as `zap-in-damm-v2`
+(`setupTransaction?` → `swapTransactions[]` → `ledgerTransaction` → `zapInTransaction` →
+`cleanUpTransaction`), sent via `sendOrderedTransactions`. ~0.01-0.02 SOL.
 
 ### `zap-out`
 ```bash
@@ -974,6 +1007,7 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `fee-sharing-claim` | `--vault` | — | 0.001 |
 | `fee-sharing-get-status` | `--vault` (optional) | — (read-only) | 0 |
 | `zap-in-damm-v2` | `--poolAddress` | `zapInDammV2` | 0.01-0.02 |
+| `zap-in-dlmm` | `--poolAddress` | `zapInDlmm` | 0.01-0.02 |
 | `zap-out` | `--poolAddress` | `zapOut` | 0.001-0.002 |
 | `farm-stake` | `--farm` or `--poolAddress` | `farmStake` | 0.002 |
 | `farm-unstake` | `--farm` | `farmUnstake` | 0.001 |

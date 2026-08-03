@@ -88,14 +88,19 @@ status) — see `studio-actions.md`.
 
 ## Zap — `@meteora-ag/zap-sdk@1.3.2`
 
-Program `zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Single-token in/out of DAMM v2 and
-DLMM positions, optionally routing through Jupiter (**Jupiter API key required**).
-`new Zap(connection, { jupiterApiUrl?, jupiterApiKey? })` — one config object (the README's
-3-arg example is stale). Two-phase: `getZapInDammV2DirectPoolParams(...)` →
-`buildZapInDammV2Transaction(...)`; same for DLMM (`...Dlmm...`); `zapOut*` variants; also
-`rebalanceDlmmPosition(params)`. Build results are **multi-transaction bundles**
-(`setupTransaction`, `swapTransactions[]`, `zapInTransaction`, `cleanUpTransaction`) — send in order.
-Studio actions: `zap-*` (direct pool routes) — see `studio-actions.md`.
+Program `zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Single-token in/out of DAMM v2 and DLMM
+positions. `new Zap(connection, { jupiterApiUrl?, jupiterApiKey? })` — one config object (the
+README's 3-arg example is stale); both fields are optional — the SDK defaults to Jupiter's own
+keyless endpoint (`https://api.jup.ag`) at a shared, low rate limit, an API key
+(`https://developers.jup.ag/portal`) only raises it. Two-phase: `getZapInDammV2DirectPoolParams(...)`
+→ `buildZapInDammV2Transaction(...)`; same for DLMM (`...Dlmm...`); `zapOut*` variants; also
+`rebalanceDlmmPosition(params)`. DLMM zap-in's own `estimateDlmmDirectSwap` unconditionally
+calls Jupiter's quote API to price its rebalancing swap — DAMM v2's direct route never touches
+Jupiter (see `studio-actions.md`'s Zap section for how each is verified). Build results are
+**multi-transaction bundles** (`setupTransaction`, `swapTransactions[]`, `zapInTransaction`,
+`cleanUpTransaction`) — send in order.
+Studio actions: `zap-in-damm-v2` (direct), `zap-in-dlmm` (Jupiter-quoted), `zap-out` (direct) —
+see `studio-actions.md`.
 
 ## Dynamic Vault — `@meteora-ag/vault-sdk@2.3.1`
 

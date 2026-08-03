@@ -29,6 +29,33 @@
     "positionMode": "new" // "new" | "existing"
   },
 
+  /* zapInDlmm is only used in the following actions:
+   * 1. zap-in-dlmm (requires --poolAddress flag; this is the lbPair address)
+   * JUPITER-QUOTED: unlike zapInDammV2, the DLMM zap-in estimator (estimateDlmmDirectSwap)
+   * always calls Jupiter's live quote API to price the rebalancing swap between the position's
+   * two sides, comparing it against the pool's own bin quote and using whichever pays out more —
+   * there is no Jupiter-free escape hatch for DLMM zap-in. Needs network access to Jupiter; see
+   * studio/.env.example for the optional JUPITER_API_KEY / JUPITER_API_URL — the SDK's own
+   * keyless default endpoint already works, just at a lower shared rate limit.
+   * DIRECT ROUTE ONLY: inputMint must already be tokenX or tokenY of the lbPair.
+   * ALWAYS creates a brand-new position (a throwaway keypair co-signs once and the resulting
+   * position address is logged prominently) — depositing into an existing DLMM position is a
+   * BUILD-path task (see the meteora skill's dlmm.md), not covered by this action.
+   */
+  "zapInDlmm": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are zapping in with; must be tokenX or tokenY of the lbPair
+    "amountIn": 0.1, // amount of inputMint to zap in, in human token units (converted via the mint's own decimals)
+    "swapSlippageBps": 150, // slippage tolerance in basis points (150 = 1.5%) for the Jupiter/pool rebalancing-swap quote
+    "minDeltaId": -34, // lower edge of the position's bin range, as an offset from the CURRENT active bin (negative = below active)
+    "maxDeltaId": 34, // upper edge of the position's bin range, as an offset from the current active bin (positive = above active)
+    "strategyType": 0, // liquidity distribution across the range: 0 Spot | 1 Curve | 2 BidAsk
+    "singleSided": null, // "x" | "y" | null — deposit only tokenX or only tokenY (skips the swap entirely); null = balanced two-sided deposit
+    "favorXInActiveId": false, // tie-break for the active bin's own X/Y split; ignored (forced to match singleSided) whenever singleSided isn't null
+    "maxActiveBinSlippage": 50, // bins the active bin id may drift between quoting and landing on-chain
+    "maxAccounts": 50, // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+    "maxTransferAmountExtendPercentage": 0 // % buffer added on top of the swap estimate's max-transfer ceiling
+  },
+
   /* zapOut is only used in the following actions:
    * 1. zap-out (requires --poolAddress flag; for "dlmm" this is the lbPair address)
    * Removes ALL of the wallet's unlocked liquidity from its position on the pool, then

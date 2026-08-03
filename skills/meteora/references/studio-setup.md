@@ -36,6 +36,8 @@ RPC endpoint, keypair path, and dry-run mode all live in the protocol config fil
 - Public devnet: `https://api.devnet.solana.com`
 - Premium (recommended): [Helius](https://www.helius.dev/), QuickNode, Triton
 
+**Optional:** `JUPITER_API_KEY` (and `JUPITER_API_URL`) in `studio/.env` — only needed to raise the rate limit on `zap-in-dlmm`'s live Jupiter quotes; every other action ignores them.
+
 ## Get a Wallet
 
 The studio signs with `studio/keypair.json`, produced by `generate-keypair` from a

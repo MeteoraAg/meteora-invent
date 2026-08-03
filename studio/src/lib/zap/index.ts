@@ -1,6 +1,11 @@
 import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
 import { Wallet } from '@coral-xyz/anchor';
-import { Zap } from '@meteora-ag/zap-sdk';
+import {
+  Zap,
+  estimateDlmmDirectSwap,
+  DlmmSingleSided,
+  DEFAULT_JUPITER_API_URL,
+} from '@meteora-ag/zap-sdk';
 import {
   CpAmm,
   getTokenProgram as getDammV2TokenProgram,
@@ -8,7 +13,7 @@ import {
   getCurrentPoint,
   type PoolState,
 } from '@meteora-ag/cp-amm-sdk';
-import DLMM, { getTokenProgramId } from '@meteora-ag/dlmm';
+import DLMM, { getTokenProgramId, StrategyType } from '@meteora-ag/dlmm';
 import {
   getAccount,
   getAssociatedTokenAddressSync,
@@ -321,6 +326,273 @@ export async function zapInDammV2(
   });
   steps.push({ label: 'ledger update', tx: bundle.ledgerTransaction, signers: [] });
   steps.push({ label: 'zap in', tx: bundle.zapInTransaction, signers: [] });
+  steps.push({ label: 'clean up', tx: bundle.cleanUpTransaction, signers: [] });
+
+  await sendOrderedTransactions(
+    connection,
+    steps,
+    wallet.payer,
+    config.dryRun,
+    config.computeUnitPriceMicroLamports ?? 0
+  );
+}
+
+/**
+ * Jupiter client config resolution order for `zapInDlmm`'s live quote calls: an explicit
+ * `JUPITER_API_URL` / `JUPITER_API_KEY` in `studio/.env` (loaded by the action script the same
+ * way `generate_keypair.ts` loads `PRIVATE_KEY`) override the zap-sdk's own default. Verified
+ * against the installed `@meteora-ag/zap-sdk@1.3.2` dist: the default endpoint is
+ * `DEFAULT_JUPITER_API_URL` (`"https://api.jup.ag"`) and the default API key is `""` — Jupiter's
+ * own docs (developers.jup.ag, checked live) confirm that endpoint accepts unauthenticated
+ * ("keyless") requests at a shared, low rate limit, so neither env var is required to get a
+ * quote at all; an API key only raises the ceiling. Returning `undefined` (not an empty string)
+ * for an unset var lets the SDK fall back to ITS OWN default instead of us hard-coding it again.
+ */
+function resolveJupiterConfig(): { jupiterApiUrl?: string; jupiterApiKey?: string } {
+  return {
+    jupiterApiUrl: process.env.JUPITER_API_URL || undefined,
+    jupiterApiKey: process.env.JUPITER_API_KEY || undefined,
+  };
+}
+
+/**
+ * `zapInDlmm`'s quote/build phase talks to Jupiter's live API, and the underlying error rarely
+ * says why it failed. Verified end-to-end against a live mainnet pool (see studio-actions.md's
+ * Zap section / this repo's functional-proof notes): the QUOTE phase (`estimateDlmmDirectSwap`)
+ * degrades gracefully when Jupiter's quote endpoint alone is unreachable — internally it falls
+ * back to the DLMM pool's own bin quote and only throws a generic "Failed to get ... swap quote"
+ * once THAT also fails — but the BUILD phase does not have that safety net: once Jupiter's quote
+ * has already won the comparison, `getZapInDlmmDirectParams` commits to fetching Jupiter's
+ * swap-instructions for that exact quote (`buildJupiterSwapTransaction` ->
+ * `getJupiterSwapInstruction`), which throws hard (`response.status` + body, no DLMM fallback)
+ * if that specific call fails. Either failure is worth the same actionable hint, so both call
+ * sites below are wrapped with it.
+ */
+function wrapJupiterQuoteFailure(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  return new Error(
+    'Jupiter quote failed — set JUPITER_API_KEY in studio/.env (get one at ' +
+      'https://developers.jup.ag/portal) or JUPITER_API_URL for a custom endpoint. ' +
+      `Underlying error: ${message}`
+  );
+}
+
+/**
+ * Zap a single input token into a BRAND-NEW DLMM position — Jupiter-quoted, unlike
+ * `zapInDammV2`'s direct route. Verified against the installed `@meteora-ag/zap-sdk@1.3.2`
+ * `.d.ts`, its compiled source, and its own `examples/zapInDlmmDirect(SingleSided).ts` (its
+ * `docs.md` only covers `zapOut*`/Jupiter helpers, not zap-in — cross-checked against source
+ * instead, same as `zapInDammV2`).
+ *
+ * Reads config.zapInDlmm: inputMint (must be tokenX or tokenY of the lbPair — direct route
+ * only, same requirement as zapInDammV2), amountIn (human units of inputMint), swapSlippageBps,
+ * minDeltaId/maxDeltaId (the position's bin range, as an offset from the CURRENT active bin —
+ * e.g. -34/34), strategyType (0 Spot | 1 Curve | 2 BidAsk), singleSided ("x" | "y" | null),
+ * favorXInActiveId (the active bin's own X/Y tie-break; forced to match singleSided whenever
+ * it's set — mirrors the SDK's own `zapInDlmmDirectSingleSided.ts` example), maxActiveBinSlippage,
+ * maxAccounts, maxTransferAmountExtendPercentage.
+ *
+ * ALWAYS creates a new position (a throwaway keypair co-signs once, and the resulting position
+ * address is logged prominently) — verified against the SDK source: `buildZapInDlmmTransaction`
+ * unconditionally calls the private `zapInDlmmForUninitializedPosition` (whose embedded IDL
+ * marks `position` as a fresh `signer` account, matching `Keypair.generate()` in the SDK's own
+ * examples). The companion instruction for an already-initialized position
+ * (`zapInDlmmForInitializedPosition`) is only reachable through the separate, much heavier
+ * `rebalanceDlmmPosition` flow (remove ALL liquidity -> swap -> re-add) — a different operation,
+ * out of scope here; depositing into an existing DLMM position stays a BUILD-path task (see
+ * `studio-actions.md` / `SKILL.md`'s "DLMM add-to-existing-position / rebalance" note).
+ *
+ * No Jupiter-free guarantee here (unlike zapInDammV2's `jupiterQuote: null` escape hatch):
+ * `estimateDlmmDirectSwap` calls Jupiter's live quote API (`getBestSwapQuoteJupiterDlmm`)
+ * whenever the deposit actually needs a rebalancing swap — i.e. whenever the input token's
+ * natural split across the target bin range isn't already what the strategy wants, which is the
+ * common case for a single-token deposit — and compares it against the pool's own bin quote,
+ * keeping whichever pays out more; there is no parameter to force the DLMM-only route. When
+ * Jupiter's quote wins, the build phase (`getZapInDlmmDirectParams`) also calls Jupiter's
+ * swap-instructions endpoint to build that swap transaction.
+ *
+ * Three-phase SDK call: `estimateDlmmDirectSwap` -> `getZapInDlmmDirectParams` ->
+ * `buildZapInDlmmTransaction`. Response is the same ordered multi-transaction bundle shape as
+ * `zapInDammV2` — setupTransaction? -> swapTransactions[] -> ledgerTransaction ->
+ * zapInTransaction -> cleanUpTransaction — sent in that exact order via the shared
+ * `sendOrderedTransactions` helper.
+ */
+export async function zapInDlmm(
+  config: ZapConfig,
+  connection: Connection,
+  wallet: Wallet,
+  poolAddress: PublicKey
+) {
+  if (!config.zapInDlmm) {
+    throw new Error('Missing zapInDlmm in configuration');
+  }
+  const {
+    inputMint,
+    amountIn,
+    swapSlippageBps,
+    minDeltaId,
+    maxDeltaId,
+    strategyType,
+    singleSided,
+    favorXInActiveId,
+    maxActiveBinSlippage,
+    maxAccounts,
+    maxTransferAmountExtendPercentage,
+  } = config.zapInDlmm;
+
+  if (!(amountIn > 0)) {
+    throw new Error(`zapInDlmm.amountIn must be > 0 (got ${amountIn})`);
+  }
+  if (strategyType !== 0 && strategyType !== 1 && strategyType !== 2) {
+    throw new Error(
+      `zapInDlmm.strategyType must be 0 (Spot), 1 (Curve), or 2 (BidAsk) (got ${strategyType})`
+    );
+  }
+  if (singleSided !== null && singleSided !== 'x' && singleSided !== 'y') {
+    throw new Error(
+      `zapInDlmm.singleSided must be "x", "y", or null (got ${JSON.stringify(singleSided)})`
+    );
+  }
+  if (minDeltaId > maxDeltaId) {
+    throw new Error(
+      `zapInDlmm.minDeltaId (${minDeltaId}) must be <= zapInDlmm.maxDeltaId (${maxDeltaId})`
+    );
+  }
+
+  console.log('\n> Initializing Zap-in DLMM (Jupiter-quoted)...');
+  await assertFunded(connection, wallet.publicKey);
+
+  const jupiterConfig = resolveJupiterConfig();
+  console.log(
+    `- Jupiter endpoint: ${jupiterConfig.jupiterApiUrl ?? DEFAULT_JUPITER_API_URL}` +
+      (jupiterConfig.jupiterApiKey
+        ? ' (using JUPITER_API_KEY)'
+        : ' (keyless — set JUPITER_API_KEY in studio/.env for a higher rate limit)')
+  );
+
+  const dlmm = await DLMM.create(connection, poolAddress);
+  const inputTokenMint = new PublicKey(inputMint);
+
+  if (
+    !inputTokenMint.equals(dlmm.lbPair.tokenXMint) &&
+    !inputTokenMint.equals(dlmm.lbPair.tokenYMint)
+  ) {
+    throw new Error(
+      `zapInDlmm.inputMint (${inputTokenMint.toString()}) is not tokenX or tokenY of lbPair ` +
+        `${poolAddress.toString()} (tokenX=${dlmm.lbPair.tokenXMint.toString()}, ` +
+        `tokenY=${dlmm.lbPair.tokenYMint.toString()}). Direct-route zap-in requires the input ` +
+        "mint to already be one of the pool's two tokens."
+    );
+  }
+
+  const { tokenXProgram, tokenYProgram } = getTokenProgramId(dlmm.lbPair);
+  const isInputX = inputTokenMint.equals(dlmm.lbPair.tokenXMint);
+  const inputTokenProgram = isInputX ? tokenXProgram : tokenYProgram;
+  const inputDecimals = isInputX ? dlmm.tokenX.mint.decimals : dlmm.tokenY.mint.decimals;
+  const amountInLamports = getAmountInLamports(amountIn, inputDecimals);
+
+  console.log(`- Pool ${poolAddress.toString()}`);
+  console.log(
+    `- Input mint ${inputTokenMint.toString()} (${isInputX ? 'tokenX' : 'tokenY'}, ${inputDecimals} decimals)`
+  );
+  console.log(`- Amount in: ${amountIn} (${amountInLamports.toString()} base units)`);
+  console.log(
+    `- Active bin: ${dlmm.lbPair.activeId}, target range [${dlmm.lbPair.activeId + minDeltaId}, ` +
+      `${dlmm.lbPair.activeId + maxDeltaId}]`
+  );
+  if (
+    dlmm.lbPair.tokenXMint.equals(SOL_TOKEN_MINT) ||
+    dlmm.lbPair.tokenYMint.equals(SOL_TOKEN_MINT)
+  ) {
+    console.log(
+      '- Note: this pool pairs with native SOL — the zap SDK transiently wraps/unwraps a small ' +
+        'amount of SOL as part of its setup/clean-up steps even when the input side is not SOL; ' +
+        'keep a little extra SOL headroom beyond fees.'
+    );
+  }
+
+  await assertHoldsAtLeast(
+    connection,
+    wallet.publicKey,
+    inputTokenMint,
+    inputTokenProgram,
+    amountInLamports,
+    inputDecimals,
+    amountIn,
+    'depositing'
+  );
+
+  const singleSidedMode: DlmmSingleSided | undefined =
+    singleSided === 'x' ? DlmmSingleSided.X : singleSided === 'y' ? DlmmSingleSided.Y : undefined;
+  // The active bin must be depositable with whichever side the deposit is single-sided in, or
+  // the on-chain instruction has nothing to put there — mirrors the SDK's own
+  // examples/zapInDlmmDirectSingleSided.ts, which derives this the same way.
+  const resolvedFavorXInActiveId = singleSided === null ? favorXInActiveId : singleSided === 'x';
+
+  console.log(
+    '\n> Requesting a swap quote for the rebalancing swap (Jupiter or the pool itself, whichever pays more)...'
+  );
+  const estimate = await estimateDlmmDirectSwap({
+    amountIn: amountInLamports,
+    inputTokenMint,
+    lbPair: poolAddress,
+    connection,
+    swapSlippageBps,
+    minDeltaId,
+    maxDeltaId,
+    strategy: strategyType as StrategyType,
+    singleSided: singleSidedMode,
+    config: jupiterConfig,
+  }).catch((error) => {
+    throw wrapJupiterQuoteFailure(error);
+  });
+
+  const zap = new Zap(connection, jupiterConfig);
+
+  const positionKeypair = Keypair.generate();
+  console.log(`\n>>> Position: ${positionKeypair.publicKey.toString()}`);
+  console.log('>>> Save this — it identifies the position this zap deposited into.');
+
+  const directParams = await zap
+    .getZapInDlmmDirectParams({
+      user: wallet.publicKey,
+      maxActiveBinSlippage,
+      favorXInActiveId: resolvedFavorXInActiveId,
+      maxAccounts,
+      maxTransferAmountExtendPercentage,
+      directSwapEstimate: estimate.result,
+      ...estimate.context,
+    })
+    .catch((error) => {
+      throw wrapJupiterQuoteFailure(error);
+    });
+
+  const bundle = await zap.buildZapInDlmmTransaction({
+    ...directParams,
+    position: positionKeypair.publicKey,
+  });
+
+  const steps: OrderedTransactionStep[] = [];
+  if (bundle.setupTransaction) {
+    steps.push({
+      label: 'setup (wrap SOL / create ATAs)',
+      tx: bundle.setupTransaction,
+      signers: [],
+    });
+  }
+  bundle.swapTransactions.forEach((tx, i) => {
+    steps.push({
+      label: `rebalance swap ${i + 1}/${bundle.swapTransactions.length}`,
+      tx,
+      signers: [],
+    });
+  });
+  steps.push({ label: 'ledger update', tx: bundle.ledgerTransaction, signers: [] });
+  steps.push({
+    label: 'zap in (initializes the new position)',
+    tx: bundle.zapInTransaction,
+    signers: [positionKeypair],
+  });
   steps.push({ label: 'clean up', tx: bundle.cleanUpTransaction, signers: [] });
 
   await sendOrderedTransactions(
