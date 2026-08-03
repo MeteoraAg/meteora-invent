@@ -1,11 +1,11 @@
-# Other Products — Alpha Vault, Presale, Stake2Earn, Zap, Dynamic Vault, Fee Sharing, Met Lock
+# Other Products — Alpha Vault, Presale, Stake2Earn, Zap, Dynamic Vault, Fee Sharing, Met Lock, Pool Farms
 
 > Compact SDK surfaces verified against the packages installed with the studio
 > (read from each package's shipped `.d.ts`, 2026-08-02 → 03). Creation flows for alpha/presale
 > vaults are ACT-path (`studio-actions.md`); this file covers the SDK surface — above all
 > the **read/verify calls** the studio doesn't expose. All are web3.js v1.
-> ⚠️ Anchor versions diverge (vault-sdk 0.28 · m3m3 0.29 · the rest 0.31) — never pass
-> `Program`/`BN` objects across these SDK boundaries.
+> ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · the rest 0.31) —
+> never pass `Program`/`BN` objects across these SDK boundaries.
 
 ## Alpha Vault — `@meteora-ag/alpha-vault@1.1.16`
 
@@ -161,3 +161,68 @@ offset 72 = creator — both verified against the SDK repo's
 `sumCreatorLockVaultTotals.s.ts` script).
 
 Studio actions: `lock-*` — see `studio-actions.md`.
+
+## Pool Farms — `@meteora-ag/farming-sdk@1.0.18`
+
+Program `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`. DAMM v1 LP staking/reward farms —
+every farm's `stakingMint` is a DAMM v1 pool's LP mint; no DAMM v2/DLMM equivalent exists.
+**Anchor 0.28 pinned**, and `@solana/web3.js` pinned to `~1.78.3` — the narrowest version pin
+of any Meteora SDK in this studio (verified against the installed `package.json`). Left as-is,
+that pin forces an isolated, non-deduped `@solana/web3.js` install whose own `rpc-websockets`
+dependency collides with the newer one the rest of the workspace hoists, crashing on the
+package's very first `import` with `ERR_PACKAGE_PATH_NOT_EXPORTED` (reproduced on both Node 22
+and 24) — this repo works around it with a root `pnpm.overrides` entry,
+`"@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4"` (`package.json`), deduping the SDK onto
+the same `@solana/web3.js` install every other SDK here already uses safely. A side effect:
+`PublicKey`/`Transaction`/`BN` values now round-trip through this SDK's public API without
+needing `as any` boundary casts (verified — `studio/src/lib/farming` has none).
+
+```ts
+import { PoolFarmImpl } from '@meteora-ag/farming-sdk'
+const farm = await PoolFarmImpl.create(connection, farmAddress)   // no wallet — build-tx only
+farm.poolState   // stakingMint, rewardAMint/rewardBMint, paused, totalStaked, rewardDuration(End), ...
+```
+User ops (all → a single `Transaction`, with `feePayer` and a `"finalized"`-commitment
+blockhash already set by the SDK — refresh both right before sending anyway):
+`deposit(owner, amount: BN)` (auto-creates the `user` account inline on first stake),
+`withdraw(owner, amount: BN)`, `claim(owner)`. Static
+`claimAll(connection, owner, farmAddresses, opt?)` → `Transaction[]`, chunked 2 farms per tx
+(`MAX_CLAIM_ALL_ALLOWED`). Despite the parameter being named `farmMints` throughout this SDK
+(`getUserBalances`, `getClaimableRewards`, `claimAll`), it is actually an array of **farm
+addresses** (verified against the compiled source — it feeds straight into
+`program.account.pool.fetchMultiple`), never staking-mint/LP addresses.
+
+**Two verified read bugs — do not call either directly:**
+- `getUserBalance(owner)` does `fetchNullable(pda).balanceStaked` with no null guard — throws a
+  raw `TypeError` for any wallet that has never staked in the farm.
+- `getUserState(owner)` derives the correct `user` PDA via its own (correct, public)
+  `getUserPda(owner)` and then ignores it, fetching `owner` — the wallet address — instead. It
+  reads the wrong account entirely, silently returning null/garbage even for an active staker.
+
+Safe replacement (what every `farm-*` studio action uses): call the SDK's own `getUserPda(owner)`
+yourself, then read that PDA directly off the farm's Anchor `program` — marked `private` in the
+`.d.ts`, so reaching it needs an `as any` cast (same boundary-cast convention used elsewhere in
+this studio for reaching across an SDK's own version/internals boundary). The static
+`getClaimableRewards(owner, farmAddresses, connection)` → `Map<farmAddressB58, {rewardA,
+rewardB}>` is itself null-safe for a never-staked wallet (it just omits that farm from the
+returned map) and is the right way to compute claimable rewards. It deep-imports
+`chunkedGetMultipleAccountInfos` from `@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils` at
+runtime — an undeclared peer dependency this package never lists in its own `package.json` —
+but studio already depends on `@meteora-ag/dynamic-amm-sdk` directly, so it resolves (verified:
+the whole package imports cleanly end to end, including this deep path).
+
+Farm discovery: `getFarmAddressesByPoolAddress(poolAddress, cluster?)` /
+`getFarmAddressesByLp(lpAddress, cluster?)` → `{farmAddress, APY, expired}[]` are **REST calls**
+to `amm.meteora.ag` (mainnet) or a devnet mirror — there is no on-chain PDA derivation from just
+the pool, and `FARMING_API_ENDPOINT` has no `localhost` entry at all, so these always fail on a
+local validator or offline. Both THROW (never return an empty array) when the API is
+unreachable or has nothing for that pool/LP — catch and degrade to asking for the farm address
+directly instead of surfacing the raw exception.
+
+Farm creation is **not wrapped by the SDK** — `initializePool` / `fund` / `authorizeFunder`
+would need to be called directly off the exported `IDL`, with the `pool`/vault PDAs
+self-derived (seeds aren't part of this older Anchor 0.28 IDL's client metadata — the only
+reference for them is the program's Rust CLI, not this SDK or its `.d.ts`). Deliberately out
+of scope here — no studio action wraps it.
+
+Studio actions: `farm-*` (stake/unstake/claim/status) — see `studio-actions.md`.

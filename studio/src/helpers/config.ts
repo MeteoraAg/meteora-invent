@@ -1201,6 +1201,24 @@ export const CONFIG_SCHEMA = {
       required: ['protocol', 'outputMint', 'slippageBps'],
       additionalProperties: false,
     },
+    farmStake: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    farmUnstake: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
   },
   required: ['rpcUrl', 'dryRun', 'keypairFilePath', 'computeUnitPriceMicroLamports'],
   additionalProperties: true,

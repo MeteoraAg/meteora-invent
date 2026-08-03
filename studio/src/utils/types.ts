@@ -698,8 +698,18 @@ export interface DynamicVaultWithdrawConfig {
 
 /* Pool Farms (reward-pool) */
 
-// Empty for now — the farming SDK commit adds stake/unstake/claim blocks.
-export type FarmingConfig = MeteoraConfigBase;
+export type FarmingConfig = MeteoraConfigBase & {
+  farmStake?: FarmStakeConfig | null;
+  farmUnstake?: FarmUnstakeConfig | null;
+};
+
+export interface FarmStakeConfig {
+  amount: number; // DAMM v1 LP (staking mint) human units to stake
+}
+
+export interface FarmUnstakeConfig {
+  amount: number | null; // DAMM v1 LP (staking mint) human units to unstake; null = unstake everything currently staked
+}
 
 /* Dynamic Fee Sharing */
 

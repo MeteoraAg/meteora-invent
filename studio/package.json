@@ -80,7 +80,11 @@
     "fee-sharing-claim": "tsx src/actions/fee_sharing/claim.ts",
     "fee-sharing-get-status": "tsx src/actions/fee_sharing/get_status.ts",
     "zap-in-damm-v2": "tsx src/actions/zap/zap_in_damm_v2.ts",
-    "zap-out": "tsx src/actions/zap/zap_out.ts"
+    "zap-out": "tsx src/actions/zap/zap_out.ts",
+    "farm-stake": "tsx src/actions/farming/stake.ts",
+    "farm-unstake": "tsx src/actions/farming/unstake.ts",
+    "farm-claim": "tsx src/actions/farming/claim.ts",
+    "farm-get-status": "tsx src/actions/farming/get_status.ts"
   },
   "keywords": [
     "studio",

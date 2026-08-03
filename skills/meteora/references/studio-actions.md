@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 73 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 77 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -839,6 +839,65 @@ their own ordered steps. Vested/permanent-locked liquidity is out of scope — o
 liquidity is removed. If the position is already single-sided in `outputMint`, the swap step is
 skipped automatically. ~0.001-0.002 SOL.
 
+## Pool Farm actions — config file: `studio/config/farming_config.jsonc`
+
+DAMM v1 LP staking/reward farms — program `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`.
+Verified against the installed `@meteora-ag/farming-sdk@1.0.18`'s `.d.ts` + compiled source
+(the local reward-pool checkout is an older, feature-branch 1.0.17 whose dist ships no
+types — the npm package is the source of truth here). **DAMM v1 farms only** — every farm's
+`stakingMint` is a DAMM v1 pool's LP mint; there is no DAMM v2/DLMM equivalent.
+`--poolAddress` resolution on any of the actions below calls `getFarmAddressesByPoolAddress`,
+a **REST call to `amm.meteora.ag`** (or its devnet mirror) with no localnet/offline fallback —
+pass `--farm` directly when there's no network access or the pool isn't indexed yet. **Farm
+creation (`farm-create`) is NOT implemented** — the SDK doesn't wrap it (would need a
+hand-rolled `program.methods.initializePool`/`fund`/`authorizeFunder` off the exported IDL,
+deliberately deferred; see `other-products.md`).
+
+### `farm-stake`
+```bash
+pnpm studio farm-stake --farm <FARM>
+pnpm studio farm-stake --poolAddress <POOL>   # resolves the farm via the farming REST API
+```
+Flags: `--farm` or `--poolAddress` (one required — with `--poolAddress`, more than one farm
+found for the pool is listed in full and the action stops asking you to pass `--farm`
+directly, since different farms on the same pool can pay out different reward tokens). Reads
+`farmStake.amount` (staking-mint/DAMM v1 LP human units, converted via the mint's own
+decimals). `deposit()` creates the wallet's `user` account inline on first stake — no separate
+init step needed. ~0.002 SOL.
+
+### `farm-unstake`
+```bash
+pnpm studio farm-unstake --farm <FARM>
+```
+Flags: `--farm` (required). Reads `farmUnstake.amount` (staking-mint human units; **`null` =
+unstake everything currently staked**, resolved via a safe on-chain fetch of the wallet's
+`user` account rather than the SDK's own buggy accessors — see `other-products.md`). Refuses
+clearly instead of sending a doomed transaction when the wallet has never staked in this farm
+— unlike `deposit()`, the SDK's `withdraw()` does not auto-create a `user` account. ~0.001 SOL.
+
+### `farm-claim`
+```bash
+pnpm studio farm-claim --farm <FARM>
+```
+Flags: `--farm` (required). No config block — claims everything currently claimable. Prints
+pending reward A / reward B first (`PoolFarmImpl.getClaimableRewards`, itself safe for a
+never-staked wallet) and refuses with a clear message instead of a no-op transaction when both
+are zero, or when the wallet has never staked in this farm at all. ~0.001 SOL.
+
+### `farm-get-status`
+```bash
+pnpm studio farm-get-status --farm <FARM>
+pnpm studio farm-get-status --poolAddress <POOL>
+```
+Flags: `--farm` or `--poolAddress` (one required; same REST resolution + multi-farm listing as
+`farm-stake`). **Read-only** — keypair is optional (a missing/invalid keypair file degrades to
+farm-only output, same as `vault-get-status`). Prints the farm's staking mint, reward A/B
+mints, paused flag, total staked, reward duration + end time, and the raw internal reward
+rates; with a usable wallet, also that wallet's staked balance and claimable reward A/B —
+both via the same safe fetch / `getClaimableRewards` calls `farm-unstake`/`farm-claim` use,
+never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getUserState`
+(fetches the wrong address entirely).
+
 ## Quick Reference
 
 | Action | Required flag | Config block(s) | ~Min SOL |
@@ -916,6 +975,10 @@ skipped automatically. ~0.001-0.002 SOL.
 | `fee-sharing-get-status` | `--vault` (optional) | — (read-only) | 0 |
 | `zap-in-damm-v2` | `--poolAddress` | `zapInDammV2` | 0.01-0.02 |
 | `zap-out` | `--poolAddress` | `zapOut` | 0.001-0.002 |
+| `farm-stake` | `--farm` or `--poolAddress` | `farmStake` | 0.002 |
+| `farm-unstake` | `--farm` | `farmUnstake` | 0.001 |
+| `farm-claim` | `--farm` | — | 0.001 |
+| `farm-get-status` | `--farm` or `--poolAddress` | — (read-only) | 0 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 

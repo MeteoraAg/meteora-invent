@@ -9,5 +9,26 @@
   "keypairFilePath": "./keypair.json",
 
   /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
-  "computeUnitPriceMicroLamports": 100000
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* farmStake is only used in the following actions:
+   * 1. farm-stake (requires --farm flag; or --poolAddress to resolve via the farming REST
+   *    API — lists every farm on the pool and asks you to pass --farm if there is more than
+   *    one, since different farms on the same pool can pay out different reward tokens)
+   * DAMM v1 Pool Farms only — the farm's `stakingMint` is always a DAMM v1 pool's LP mint.
+   */
+  "farmStake": {
+    "amount": 1 // amount to stake, in the farm's staking-mint (DAMM v1 LP) human units
+  },
+
+  /* farmUnstake is only used in the following actions:
+   * 1. farm-unstake (requires --farm flag)
+   * null = unstake everything currently staked in this farm (read via a safe on-chain
+   * fetch — see other-products.md's Pool Farms section for the two SDK read bugs this
+   * avoids); otherwise a specific amount, in the same staking-mint human units as
+   * farmStake.amount, which must not exceed the wallet's current staked balance.
+   */
+  "farmUnstake": {
+    "amount": null // null = unstake all, or a staking-mint human-unit amount
+  }
 }

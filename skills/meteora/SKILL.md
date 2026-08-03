@@ -23,6 +23,7 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | via studio CLI | — |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | via studio CLI | — |
 | **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
+| **Pool Farms** | DAMM v1 LP staking/reward farms | Stake DAMM v1 LP tokens to earn a separate reward token | `@meteora-ag/farming-sdk@1.0.18` | `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1` |
 
 Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
 (M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock — live in `references/other-products.md`
@@ -50,6 +51,7 @@ position ops on arbitrary pools, vault/presale user flows).
 | Join / claim a presale (deposit, claim, refunds) | ACT | `presale-vault-deposit` → `presale-vault-claim` (`references/studio-actions.md`) |
 | Lock/vest tokens for a recipient (cliff + vesting) | ACT | `lock-create-vesting-escrow` (`references/studio-actions.md`) |
 | Stake for fees on a DAMM v1 memecoin pool (M3M3) | ACT | `stake2earn-stake` → `stake2earn-claim-fee` (`references/studio-actions.md`) |
+| Stake DAMM v1 LP into a reward farm | ACT | `farm-stake` (`references/studio-actions.md`) |
 | Earn lending yield on idle tokens (Dynamic Vault) | ACT | `vault-deposit` (`references/studio-actions.md`) |
 | Split a fee stream between wallets (create/fund/claim fee vault) | ACT | `fee-sharing-create-vault` (`references/studio-actions.md`) |
 | Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-out` (`references/studio-actions.md` — DAMM v2 direct routes only; `zap-in-dlmm` deferred) |
