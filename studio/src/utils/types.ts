@@ -483,6 +483,9 @@ export type DbcTransferPoolCreator = {
 export type AlphaVaultConfig = MeteoraConfigBase & {
   createBaseToken: TokenConfig | null;
   alphaVault: FcfsAlphaVaultConfig | ProrataAlphaVaultConfig | null;
+  alphaVaultDeposit?: AlphaVaultDepositConfig | null;
+  alphaVaultWithdraw?: AlphaVaultWithdrawConfig | null;
+  alphaVaultClaim?: AlphaVaultClaimConfig | null;
 };
 
 export interface FcfsAlphaVaultConfig {
@@ -529,6 +532,18 @@ export interface ProrataAlphaVaultConfig {
   chunkSize?: number;
   kvProofFilepath?: string;
   cloudflareKvProofUpload?: CloudflareKvProofUploadConfig;
+}
+
+export interface AlphaVaultDepositConfig {
+  amount: number; // quote token human units to deposit
+}
+
+export interface AlphaVaultWithdrawConfig {
+  amount: number; // quote token human units to withdraw (prorata vaults, deposit phase only)
+}
+
+export interface AlphaVaultClaimConfig {
+  closeEscrowWhenDone: boolean; // close the escrow account (reclaim rent) once fully claimed
 }
 
 export enum AlphaVaultTypeConfig {

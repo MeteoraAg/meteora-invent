@@ -59,5 +59,26 @@
     //   "accountId": "YOUR_ACCOUNT_ID",
     //   "apiKey": "YOUR_API_KEY"
     // }
+  },
+
+  /* alphaVaultDeposit is only used in the following actions:
+   * 1. alpha-vault-deposit (requires --vault or --poolAddress flag)
+   */
+  "alphaVaultDeposit": {
+    "amount": 1 // amount to deposit, in quote token human units
+  },
+
+  /* alphaVaultWithdraw is only used in the following actions:
+   * 1. alpha-vault-withdraw (requires --vault flag; prorata vaults only, deposit phase only)
+   */
+  "alphaVaultWithdraw": {
+    "amount": 1 // amount to withdraw, in quote token human units
+  },
+
+  /* alphaVaultClaim is only used in the following actions:
+   * 1. alpha-vault-claim (requires --vault flag)
+   */
+  "alphaVaultClaim": {
+    "closeEscrowWhenDone": false // set true to close the escrow account (reclaim rent) once every bought token has been claimed
   }
 }

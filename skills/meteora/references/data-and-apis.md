@@ -48,8 +48,10 @@ curl -s "https://dlmm.datapi.meteora.ag/portfolio/open?user=<WALLET>" | jq '.'
 Each base URL serves a Swagger UI with the full schemas — fetch it when a param is unknown
 rather than guessing. Notes: REST data is indexed (may lag a few seconds); don't use it for
 pre-trade exactness. No dedicated DBC REST API is published — use the DBC SDK `state`
-service. There is also no REST read for alpha vault state — verify vaults on the explorer
-or via `@meteora-ag/alpha-vault` (not yet covered by this skill).
+service. There is also still no REST read for alpha vault state, but the SDK is now covered
+by this skill and has an ACT-path verification call: `pnpm studio alpha-vault-get-status
+--vault <VAULT>` (or `--poolAddress <POOL>`) — see `other-products.md` for the underlying
+SDK surface.
 
 ## SDK state fetchers (exact, RPC-based)
 
@@ -66,6 +68,7 @@ or via `@meteora-ag/alpha-vault` (not yet covered by this skill).
 | DAMM v1 pool | `AmmImpl.create(connection, pool)` → `updateState()` → `poolInfo` |
 | DAMM v1 pools by token | `AmmImpl.searchPoolsByToken(connection, mint)` |
 | DAMM v1 lock escrow / fees | `pool.getUserLockEscrow(owner)` |
+| Alpha Vault state (vault + per-wallet escrow) | ACT: `pnpm studio alpha-vault-get-status --vault <VAULT>` (or `--poolAddress <POOL>`) · SDK: `AlphaVault.create(connection, vault)` → `.vault`, `.vaultState` · `interactionState(escrow)` |
 
 Warning: `getLbPairs()`, `getAllPools()`, `getPools()` (all-accounts scans) are heavy
 `getProgramAccounts` calls — use the REST APIs or by-mint filters for discovery instead.

@@ -46,6 +46,7 @@ position ops on arbitrary pools, vault/presale user flows).
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
 | Alpha/presale vault, locks, farms | ACT | `alpha-vault-create` / lock actions (`references/studio-actions.md`) |
+| Participate in a launch vault (deposit / claim / refund) | ACT | `alpha-vault-deposit` → `alpha-vault-claim` (`references/studio-actions.md`) |
 | Lock/vest tokens for a recipient (cliff + vesting) | ACT | `lock-create-vesting-escrow` (`references/studio-actions.md`) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |

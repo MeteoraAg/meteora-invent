@@ -13,7 +13,7 @@ Program `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` (mainnet + devnet; **expor
 string keyed by cluster, not PublicKey**). Enums: `PoolType { DLMM=0, DAMM=1, DAMMV2=2 }`,
 `VaultMode { PRORATA=0, FCFS=1 }`, `VaultState { PREPARING..ENDED }`.
 
-**Verify a vault (closes the ACT-path verification gap):**
+**Verify a vault (BUILD path — the ACT path is `alpha-vault-get-status`, below):**
 ```ts
 import AlphaVault from '@meteora-ag/alpha-vault'
 // Given only the POOL address there is no pure PDA derivation (the 'base' seed is the
@@ -28,8 +28,14 @@ const state = await av.interactionState(escrow)   // { depositInfo, claimInfo, a
                                                   //   canDeposit, canClaim, canWithdraw, ... }
 ```
 User ops (all → `Transaction`): `deposit(maxAmount, owner, merkleProof?)`, `withdraw`,
-`withdrawRemainingQuote`, `claimToken`, `closeEscrow`. Crank: `fillVault(payer)`.
+`withdrawRemainingQuote`, `claimToken`, `closeEscrow`. Crank: `fillVault(payer)` — loop until
+it returns null. `getMerkleProofForDeposit(owner)` fetches a permissioned vault's proof from
+Meteora's proof API and can return null (not on the whitelist yet, or no proof published).
 Gotcha: the package bundles a second Anchor 0.28 copy for its DLMM/DAMM v1 programs.
+
+Studio actions: `alpha-vault-*` (create + deposit/withdraw/claim/crank/status) — see
+`studio-actions.md`. `alpha-vault-get-status` is now the ACT-path verification call (no
+BUILD-side code needed just to check a vault's state).
 
 ## Presale Vault — `@meteora-ag/presale@0.1.1`
 

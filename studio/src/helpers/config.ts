@@ -482,6 +482,33 @@ export const CONFIG_SCHEMA = {
         'whitelistMode',
       ],
     },
+    alphaVaultDeposit: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    alphaVaultWithdraw: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    alphaVaultClaim: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        closeEscrowWhenDone: { type: 'boolean' },
+      },
+      required: ['closeEscrowWhenDone'],
+      additionalProperties: false,
+    },
     lockLiquidity: {
       type: 'object',
       nullable: true,

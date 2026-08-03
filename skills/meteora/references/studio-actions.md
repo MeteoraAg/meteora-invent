@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-All 43 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
+All 49 studio actions, verified against `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
 ## How the CLI works (read this first)
@@ -343,9 +343,13 @@ Flags: `--poolAddress` (required). Reads `dammV1Swap`: `inputMint` (one of the p
 mints — validated), `amountIn` (human units), `slippage` (percent). Quotes, then simulates
 or sends per `dryRun`.
 
-## Vault actions
+## Alpha Vault actions — config file: `studio/config/alpha_vault_config.jsonc`
 
-### `alpha-vault-create` — config file: `studio/config/alpha_vault_config.jsonc`
+Creation (4 variants + merkle infra) plus the full depositor lifecycle — deposit, withdraw,
+claim, refund, and the permissionless crank that buys from the pool — verified against
+`@meteora-ag/alpha-vault@1.1.16`'s installed `.d.ts` + source.
+
+### `alpha-vault-create`
 ```bash
 pnpm studio alpha-vault-create --baseMint <MINT>
 ```
@@ -361,7 +365,72 @@ no vesting), `escrowFee`, `whitelistMode` (`permissionless` |
 Only needed separately if the pool wasn't created with `hasAlphaVault: true` (DLMM/DAMM v2
 pool creation can do it inline from their own config files).
 
-### `presale-vault-create` — config file: `studio/config/presale_vault_config.jsonc`
+### `alpha-vault-deposit`
+```bash
+pnpm studio alpha-vault-deposit --vault <VAULT>
+pnpm studio alpha-vault-deposit --poolAddress <POOL>   # resolves the vault via memcmp on Vault.pool
+```
+Flags: `--vault` or `--poolAddress` (one required — `--poolAddress` scans
+`getProgramAccounts` for a `Vault.pool` match and uses the first result). Reads
+`alphaVaultDeposit.amount` (quote human units). For `permissioned_with_merkle_proof` vaults
+the proof is fetched automatically from Meteora's proof API — a wallet with no usable proof
+fails clearly instead of hitting an on-chain revert. Pre-checks `interactionState().canDeposit`
++ `availableQuota` first and reports exactly why a blocked deposit is blocked: wrong vault
+phase, not whitelisted, or the deposit cap already reached.
+
+### `alpha-vault-withdraw`
+```bash
+pnpm studio alpha-vault-withdraw --vault <VAULT>
+```
+Flags: `--vault` (required). Reads `alphaVaultWithdraw.amount` (quote human units).
+Prorata-mode vaults only, and only while still in the depositing phase — guarded on
+`canWithdraw` (FCFS vaults and vaults past the deposit window are rejected with the reason).
+
+### `alpha-vault-claim`
+```bash
+pnpm studio alpha-vault-claim --vault <VAULT>
+```
+Flags: `--vault` (required). No amount to configure — claims everything currently vested
+(`claimInfo.totalClaimable`), guarded so "nothing to claim yet" is reported clearly instead of
+a revert. Set `alphaVaultClaim.closeEscrowWhenDone: true` to also close the escrow (reclaim
+rent) afterwards — only takes effect on a real (non-dry-run) claim, and only once vesting has
+ended with everything claimed.
+
+### `alpha-vault-withdraw-remaining-quote`
+```bash
+pnpm studio alpha-vault-withdraw-remaining-quote --vault <VAULT>
+```
+Flags: `--vault` (required). No config block. Refunds an escrow's unused ("remaining")
+deposit once the vault has finished buying from the pool — the prorata overflow refund;
+guarded on `canWithdrawRemainingQuote` (also blocks a second withdrawal once already
+refunded).
+
+### `alpha-vault-crank-fill`
+```bash
+pnpm studio alpha-vault-crank-fill --vault <VAULT>
+```
+Flags: `--vault` (required). Permissionless — any funded wallet can crank. Loops
+`fillVault(payer)` until it returns null (vault fully filled, or the pool ran out of the
+liquidity it needed), refreshing vault state between sends so each iteration sees the latest
+totals. **Under `dryRun` this only simulates the first transaction and stops** — cranking is
+a multi-transaction sequence where each step depends on the previous one having actually
+landed, so it cannot be simulated end to end.
+
+### `alpha-vault-get-status`
+```bash
+pnpm studio alpha-vault-get-status --vault <VAULT>
+pnpm studio alpha-vault-get-status --poolAddress <POOL>
+```
+Flags: `--vault` or `--poolAddress` (one required). **Read-only.** Prints pool/mode/phase,
+whitelist mode, caps, and running totals (deposited, swapped, bought, refunded, claimed) from
+the vault account. If a usable keypair exists at `keypairFilePath` it also prints that
+wallet's `interactionState()` booleans (`canDeposit`/`canWithdraw`/`canClaim`/...) plus
+deposit/claim numbers — no keypair is required otherwise (a missing/invalid keypair file
+degrades to vault-only output instead of erroring).
+
+## Presale Vault actions — config file: `studio/config/presale_vault_config.jsonc`
+
+### `presale-vault-create`
 ```bash
 pnpm studio presale-vault-create --baseMint <MINT>
 ```
@@ -485,6 +554,12 @@ Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow 
 | `damm-v1-lock-liquidity-stake2earn` | `--baseMint` | `dammV1LockLiquidity` + `stake2EarnFarm` | 0.01 |
 | `damm-v1-swap` | `--poolAddress` | `dammV1Swap` | 0.001 |
 | `alpha-vault-create` | `--baseMint` | `alphaVault` | 0.05 |
+| `alpha-vault-deposit` | `--vault` or `--poolAddress` | `alphaVaultDeposit` | 0.002 |
+| `alpha-vault-withdraw` | `--vault` | `alphaVaultWithdraw` | 0.001 |
+| `alpha-vault-claim` | `--vault` | — (`alphaVaultClaim` opt.) | 0.001 |
+| `alpha-vault-withdraw-remaining-quote` | `--vault` | — | 0.001 |
+| `alpha-vault-crank-fill` | `--vault` | — | 0.001 (per tx; may send several) |
+| `alpha-vault-get-status` | `--vault` or `--poolAddress` | — (read-only) | 0 |
 | `presale-vault-create` | `--baseMint` | `presaleVault` | 0.05 |
 | `lock-create-vesting-escrow` | `--baseMint` | `lockCreateEscrow` | 0.01 |
 | `lock-create-escrow-metadata` | `--escrow` | `lockEscrowMetadata` | 0.002 |
