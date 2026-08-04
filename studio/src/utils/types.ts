@@ -699,6 +699,7 @@ export interface DynamicVaultWithdrawConfig {
 export type FarmingConfig = MeteoraConfigBase & {
   farmStake?: FarmStakeConfig | null;
   farmUnstake?: FarmUnstakeConfig | null;
+  farmClaimAll?: FarmClaimAllConfig | null;
 };
 
 export interface FarmStakeConfig {
@@ -707,6 +708,14 @@ export interface FarmStakeConfig {
 
 export interface FarmUnstakeConfig {
   amount: number | null; // DAMM v1 LP (staking mint) human units to unstake; null = unstake everything currently staked
+}
+
+export interface FarmClaimAllConfig {
+  // Farm ADDRESSES to batch-claim from in one run (NOT staking-mint/LP addresses — despite the
+  // SDK naming this parameter `farmMints` throughout, verified against the compiled source that
+  // it is fed straight into program.account.pool.fetchMultiple). Batched 2 farms per transaction
+  // by PoolFarmImpl.claimAll (MAX_CLAIM_ALL_ALLOWED) — see other-products.md's Pool Farms section.
+  farms: string[];
 }
 
 /* Dynamic Fee Sharing */

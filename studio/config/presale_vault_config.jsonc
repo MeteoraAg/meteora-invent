@@ -78,7 +78,13 @@
    */
   "presaleDeposit": {
     "amount": 1, // amount to deposit, in quote token human units
-    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255; single-tier presales use 0)
+    // presale tier index (u8 on-chain: 0-255; single-tier presales use 0).
+    // NOTE (permissionless whitelistMode only): a wallet's FIRST-EVER escrow can only be
+    // created at registry 0 — create_permissionless_escrow hardcodes that seed on-chain, so
+    // depositing into a nonzero registryIndex before an escrow already exists there fails fast
+    // with a clear pre-flight error rather than a raw on-chain revert. Not a concern once an
+    // escrow already exists, or for merkle-proof/authority-whitelisted presales.
+    "registryIndex": 0
   },
 
   /* presaleWithdraw is only used in the following actions:

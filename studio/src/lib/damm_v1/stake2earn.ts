@@ -6,6 +6,13 @@ import {
   sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import { Wallet } from '@coral-xyz/anchor';
+import {
+  getAccount,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+  TokenAccountNotFoundError,
+  TokenInvalidAccountOwnerError,
+} from '@solana/spl-token';
 import { DammV1Config, Stake2EarnFarmConfig, LockLiquidityAllocation } from '../../utils/types';
 import { DEFAULT_SEND_TX_MAX_RETRIES, STAKE2EARN_PROGRAM_IDS } from '../../utils/constants';
 import StakeForFee, { deriveFeeVault, U64_MAX } from '@meteora-ag/m3m3';
@@ -262,11 +269,67 @@ async function loadStakeForFee(
 }
 
 /**
+ * Confirm `owner` holds at least `amountLamports` of the stake mint in its associated token
+ * account. Stake2Earn's `stake()` derives the staker's source ATA with no tokenProgram override
+ * and hardcodes `tokenProgram: TOKEN_PROGRAM_ID` on the instruction itself (verified against the
+ * compiled SDK) — the same classic-Token-Program assumption `farming/index.ts`'s own
+ * `assertHoldsAtLeast` makes for its (also DAMM v1 LP) staking mint.
+ */
+async function assertHoldsAtLeast(
+  connection: Connection,
+  owner: PublicKey,
+  mint: PublicKey,
+  amountLamports: BN,
+  decimals: number,
+  humanAmount: number,
+  verb: string
+): Promise<void> {
+  const ata = getAssociatedTokenAddressSync(mint, owner, true, TOKEN_PROGRAM_ID);
+  let balance = new BN(0);
+  try {
+    const account = await getAccount(connection, ata, connection.commitment);
+    balance = new BN(account.amount.toString());
+  } catch (error) {
+    if (
+      !(error instanceof TokenAccountNotFoundError) &&
+      !(error instanceof TokenInvalidAccountOwnerError)
+    ) {
+      throw error;
+    }
+  }
+  if (balance.lt(amountLamports)) {
+    throw new Error(
+      `Wallet ${owner.toString()} holds ${getAmountInTokens(balance, decimals)} of the stake ` +
+        `mint ${mint.toString()} but ${verb} ${humanAmount} needs ` +
+        `${getAmountInTokens(amountLamports, decimals)} — fund the wallet's stake-mint token ` +
+        'account first.'
+    );
+  }
+}
+
+/**
  * StakeForFee.getUnstakeByUser destructures the first result of an internal
  * stakeEscrow.all(owner, feeVault) memcmp scan with no length check (verified against the
  * compiled SDK) — a wallet with no stake escrow at all on this farm makes it throw a raw
- * "Cannot destructure property 'publicKey' of undefined" TypeError instead of returning an
- * empty list. Wrapped here so every caller sees a clean empty array in that case.
+ * TypeError instead of returning an empty list (observed on the installed SDK/Node as "Cannot
+ * read properties of undefined (reading 'publicKey')"; older V8 phrasing for the same
+ * destructure-of-undefined shape reads "Cannot destructure property 'publicKey' of
+ * undefined") — matched below by shape, not by exact wording.
+ */
+function isEmptyStakeEscrowDestructureBug(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    /publicKey/.test(error.message) &&
+    (/destructure/i.test(error.message) || /cannot read propert/i.test(error.message))
+  );
+}
+
+/**
+ * Wraps StakeForFee.getUnstakeByUser so a wallet with no stake escrow at all sees a clean empty
+ * array (see isEmptyStakeEscrowDestructureBug above) while any OTHER failure — RPC/network
+ * errors included — is rethrown with context instead of being swallowed into a misleading "no
+ * pending unstakes", matching the sibling loaders' (loadFarm/loadDynamicVault/loadStakeForFee)
+ * precedent of preserving and surfacing the real error.
  */
 async function getPendingUnstakes(
   connection: Connection,
@@ -275,8 +338,14 @@ async function getPendingUnstakes(
 ): ReturnType<typeof StakeForFee.getUnstakeByUser> {
   try {
     return await StakeForFee.getUnstakeByUser(connection, owner, feeVaultKey);
-  } catch {
-    return [];
+  } catch (error) {
+    if (isEmptyStakeEscrowDestructureBug(error)) {
+      return [];
+    }
+    throw new Error(
+      `Failed to fetch pending unstake requests for wallet ${owner.toString()} on fee vault ` +
+        `${feeVaultKey.toString()}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -337,6 +406,9 @@ export async function stake(
     throw new Error('Missing stake2EarnStake in configuration');
   }
   const { amount } = config.stake2EarnStake;
+  if (!(amount > 0)) {
+    throw new Error(`stake2EarnStake.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Stake2Earn stake...');
   await assertFunded(connection, wallet.publicKey);
@@ -361,6 +433,15 @@ export async function stake(
   }
 
   const amountLamports = getAmountInLamports(amount, decimals);
+  await assertHoldsAtLeast(
+    connection,
+    wallet.publicKey,
+    stakeForFee.accountStates.feeVault.stakeMint,
+    amountLamports,
+    decimals,
+    amount,
+    'staking'
+  );
   console.log(`- Staking up to ${amount} (${amountLamports.toString()} base units)`);
 
   const stakeTx = await stakeForFee.stake(amountLamports, wallet.publicKey);
@@ -384,6 +465,10 @@ export async function claimFee(
 ): Promise<void> {
   if (!config.stake2EarnClaim) {
     throw new Error('Missing stake2EarnClaim in configuration');
+  }
+  const maxFeeRaw = config.stake2EarnClaim.maxFee;
+  if (maxFeeRaw !== null && maxFeeRaw !== undefined && !(Number(maxFeeRaw) > 0)) {
+    throw new Error(`stake2EarnClaim.maxFee must be null or > 0 (got ${maxFeeRaw})`);
   }
 
   console.log('\n> Initializing Stake2Earn claim-fee...');
@@ -415,7 +500,6 @@ export async function claimFee(
     );
   }
 
-  const maxFeeRaw = config.stake2EarnClaim.maxFee;
   let maxFee: BN;
   if (maxFeeRaw === null || maxFeeRaw === undefined) {
     maxFee = U64_MAX;
@@ -453,6 +537,9 @@ export async function unstakeStart(
     throw new Error('Missing stake2EarnUnstake in configuration');
   }
   const { amount } = config.stake2EarnUnstake;
+  if (!(amount > 0)) {
+    throw new Error(`stake2EarnUnstake.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Stake2Earn unstake request...');
   await assertFunded(connection, wallet.publicKey);

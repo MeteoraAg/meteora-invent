@@ -30,5 +30,15 @@
    */
   "farmUnstake": {
     "amount": null // null = unstake all, or a staking-mint human-unit amount
+  },
+
+  /* farmClaimAll is only used in the following actions:
+   * 1. farm-claim-all (no CLI flag — batches every farm address listed below in one run)
+   * Claims rewards from every farm in `farms`, batching up to 2 farms per transaction (the
+   * SDK's own MAX_CLAIM_ALL_ALLOWED) via PoolFarmImpl.claimAll. Entries are FARM addresses (the
+   * same address --farm / farm-get-status take), NOT staking-mint/LP addresses.
+   */
+  "farmClaimAll": {
+    "farms": [] // e.g. ["<farm address 1>", "<farm address 2>"]
   }
 }

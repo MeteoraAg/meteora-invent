@@ -55,6 +55,13 @@ export function defaultAlphaVaultProgramId(): PublicKey {
  * a known vault address, using the same program-id -> cluster resolution as the create-path
  * actions (createMerkleProofMetadata, etc.) — reused here so participant/status ops stay
  * consistent with vault creation.
+ *
+ * Wraps `AlphaVault.create` in a try/catch: a nonexistent vault address makes the SDK's
+ * `getMultipleAccountsInfo(...)` return `null` for that account, and it reads `.data` off that
+ * with no null guard (verified against the compiled source) — a raw `TypeError: Cannot read
+ * properties of null (reading 'data')` instead of an actionable message. Every write action in
+ * `participant.ts` plus `status.ts`'s `getStatus` route through this one function, so fixing it
+ * here covers all of them (mirrors the `Presale.create` wrap in `presale_vault/status.ts`).
  */
 export async function loadAlphaVault(
   connection: Connection,
@@ -62,7 +69,14 @@ export async function loadAlphaVault(
   alphaVaultProgramId: PublicKey = defaultAlphaVaultProgramId()
 ): Promise<AlphaVault> {
   const cluster = getClusterFromProgramId(alphaVaultProgramId);
-  return AlphaVault.create(connection, vault, { cluster: cluster as Cluster });
+  try {
+    return await AlphaVault.create(connection, vault, { cluster: cluster as Cluster });
+  } catch {
+    throw new Error(
+      `No alpha vault at ${vault.toString()} — check the address, or discover one with ` +
+        '--poolAddress <pool>.'
+    );
+  }
 }
 
 /**

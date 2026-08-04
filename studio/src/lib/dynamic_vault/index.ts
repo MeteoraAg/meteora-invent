@@ -54,6 +54,9 @@ export async function deposit(
     throw new Error('Missing dynamicVaultDeposit in configuration');
   }
   const { amount } = config.dynamicVaultDeposit;
+  if (!(amount > 0)) {
+    throw new Error(`dynamicVaultDeposit.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Dynamic Vault deposit...');
   const payerBalance = await assertFunded(connection, wallet.publicKey);
@@ -158,6 +161,9 @@ export async function withdraw(
     throw new Error('Missing dynamicVaultWithdraw in configuration');
   }
   const { amount } = config.dynamicVaultWithdraw;
+  if (!(amount > 0)) {
+    throw new Error(`dynamicVaultWithdraw.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Dynamic Vault withdraw...');
   await assertFunded(connection, wallet.publicKey);

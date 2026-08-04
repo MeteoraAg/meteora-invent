@@ -309,3 +309,71 @@ export async function claim(
 
   await simulateOrSend(connection, wallet, config.dryRun, claimTx, 'claim');
 }
+
+/**
+ * Batch-claim rewards across every farm listed in config.farmClaimAll.farms (farm ADDRESSES,
+ * not staking-mint/LP addresses — see the config type's own note).
+ * `PoolFarmImpl.claimAll` batches up to MAX_CLAIM_ALL_ALLOWED (2) farms per transaction and
+ * returns one `Transaction` per chunk; each chunk claims a disjoint set of farms, so — unlike
+ * alpha-vault's crank loop — chunks do NOT depend on one another landing first and can each be
+ * simulated (dry run) or sent independently. Reward amounts are printed in RAW base units (not
+ * converted to human units) to avoid an extra getMint round trip per farm per reward side; run
+ * farm-get-status on an individual farm for its human-readable reward decimals.
+ */
+export async function claimAll(config: FarmingConfig, connection: Connection, wallet: Wallet) {
+  if (!config.farmClaimAll || config.farmClaimAll.farms.length === 0) {
+    throw new Error(
+      'Missing farmClaimAll.farms in configuration (needs at least one farm address)'
+    );
+  }
+
+  console.log('\n> Initializing Pool Farm claim-all...');
+  await assertFunded(connection, wallet.publicKey);
+
+  const farms = config.farmClaimAll.farms.map((farm) => new PublicKey(farm));
+  console.log(`- Farms (${farms.length}): ${farms.map((farm) => farm.toString()).join(', ')}`);
+
+  const claimableByFarm = await PoolFarmImpl.getClaimableRewards(
+    wallet.publicKey,
+    farms,
+    connection
+  );
+  let anyClaimable = false;
+  for (const farm of farms) {
+    const claimable = claimableByFarm.get(farm.toString());
+    const rewardA = claimable?.rewardA ?? new BN(0);
+    const rewardB = claimable?.rewardB ?? new BN(0);
+    if (!rewardA.isZero() || !rewardB.isZero()) {
+      anyClaimable = true;
+    }
+    console.log(
+      `  - ${farm.toString()}: reward A raw ${rewardA.toString()}, reward B raw ${rewardB.toString()}` +
+        (rewardA.isZero() && rewardB.isZero() ? ' (nothing pending)' : '')
+    );
+  }
+  if (!anyClaimable) {
+    throw new Error(
+      `Nothing to claim yet for wallet ${wallet.publicKey.toString()} across the ${farms.length} ` +
+        'farm(s) in farmClaimAll.farms.'
+    );
+  }
+
+  const cluster = guessFarmingCluster(config.rpcUrl);
+  const claimAllTxs = await PoolFarmImpl.claimAll(connection, wallet.publicKey, farms, {
+    cluster,
+  });
+  console.log(`- SDK batched this into ${claimAllTxs.length} transaction(s) (max 2 farms per tx)`);
+
+  for (let i = 0; i < claimAllTxs.length; i++) {
+    const tx = claimAllTxs[i]!;
+    await refreshBlockhash(connection, tx, wallet.publicKey);
+    modifyComputeUnitPriceIx(tx, config.computeUnitPriceMicroLamports ?? 0);
+    await simulateOrSend(
+      connection,
+      wallet,
+      config.dryRun,
+      tx,
+      `claim-all (${i + 1}/${claimAllTxs.length})`
+    );
+  }
+}

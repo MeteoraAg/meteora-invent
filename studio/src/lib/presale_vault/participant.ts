@@ -63,14 +63,22 @@ export async function simulateOrSend(
 
 /**
  * Deposit into a presale. Reads config.presaleDeposit (amount in quote human units,
- * registryIndex). Ensures a buyer escrow exists first:
- *  - permissionless: builds + sends/simulates `createPermissionlessEscrow` as its own tx.
- *  - permissioned_with_merkle_proof: best-effort auto-fetch via the SDK's
- *    `createPermissionedEscrowWithAutoFetchMerkleProofFromMetadata` (returns a raw
- *    TransactionInstruction — wrapped into a Transaction here); fails with a clear,
- *    creator-managed-flow error if no proof/server is published yet.
- *  - permissioned_with_authority: errors clearly — new escrows there can only be created by
- *    the presale's operator via a server-side partially-signed flow this CLI does not run.
+ * registryIndex). `Presale.deposit()` itself creates a missing buyer escrow as a bundled
+ * pre-instruction in the SAME transaction for Permissionless/PermissionWithMerkleProof modes
+ * (verified against the installed `@meteora-ag/presale@0.1.1` compiled SDK's `Presale.deposit()`
+ * — no separate create-escrow transaction is built or sent here):
+ *  - permissionless: `deposit()` calls `getOrCreatePermissionlessEscrowIx` internally. That
+ *    helper — and the on-chain `create_permissionless_escrow` instruction itself (IDL-verified:
+ *    the escrow PDA's seeds hardcode registry index 0, not an instruction arg) — can only ever
+ *    create a FIRST escrow at registry 0, so a first-time deposit targeting a nonzero
+ *    registryIndex is refused pre-flight below with an actionable error instead of silently
+ *    creating the wrong escrow and failing deep inside the deposit instruction.
+ *  - permissioned_with_merkle_proof: `deposit()` auto-fetches the proof via the SDK's own
+ *    internal helper; a failure (no proof/server published yet) is caught below and re-thrown
+ *    with a clear, creator-managed-flow error.
+ *  - permissioned_with_authority: errors clearly before ever calling `deposit()` — new escrows
+ *    there can only be created by the presale's operator via a server-side partially-signed
+ *    flow this CLI does not run.
  */
 export async function deposit(
   config: PresaleConfig,
@@ -82,6 +90,9 @@ export async function deposit(
     throw new Error('Missing presaleDeposit in configuration');
   }
   const { amount, registryIndex: registryIndexRaw } = config.presaleDeposit;
+  if (!(amount > 0)) {
+    throw new Error(`presaleDeposit.amount must be > 0 (got ${amount})`);
+  }
   assertValidRegistryIndex(registryIndexRaw);
   const registryIndex = new BN(registryIndexRaw);
 
@@ -162,60 +173,35 @@ export async function deposit(
     );
   }
 
+  const whitelistMode: WhitelistMode = presale.presaleAccount.whitelistMode;
   if (!existing) {
-    const whitelistMode: WhitelistMode = presale.presaleAccount.whitelistMode;
     console.log('- No escrow found yet for this wallet/registry.');
 
     if (whitelistMode === WhitelistMode.Permissionless) {
-      console.log('- Whitelist mode is permissionless — creating the escrow first...');
-      const createEscrowTx = await presale.createPermissionlessEscrow({
-        owner: wallet.publicKey,
-        payer: wallet.publicKey,
-      });
-      modifyComputeUnitPriceIx(createEscrowTx, config.computeUnitPriceMicroLamports ?? 0);
-      await simulateOrSend(connection, wallet, config.dryRun, createEscrowTx, 'create-escrow');
-    } else if (whitelistMode === WhitelistMode.PermissionWithMerkleProof) {
-      console.log(
-        '- Whitelist mode is permissioned_with_merkle_proof — attempting to auto-fetch the ' +
-          "proof from the presale's permissioned-server metadata..."
-      );
-      try {
-        const createEscrowIx =
-          await presale.createPermissionedEscrowWithAutoFetchMerkleProofFromMetadata({
-            owner: wallet.publicKey,
-            payer: wallet.publicKey,
-            registryIndex,
-            // Ignored/overwritten internally: the SDK fetches the real cap from the merkle
-            // proof server response. Required here only because the outer wrapper method's
-            // own param type doesn't omit it (only the inner helper it delegates to does).
-            depositCap: new BN(0),
-          });
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(
-          connection.commitment
-        );
-        const createEscrowTx = new Transaction({
-          blockhash,
-          lastValidBlockHeight,
-          feePayer: wallet.publicKey,
-        }).add(createEscrowIx);
-        modifyComputeUnitPriceIx(createEscrowTx, config.computeUnitPriceMicroLamports ?? 0);
-        await simulateOrSend(
-          connection,
-          wallet,
-          config.dryRun,
-          createEscrowTx,
-          'create-merkle-escrow'
-        );
-      } catch (err) {
+      // Program-level constraint (IDL-verified): create_permissionless_escrow's escrow PDA
+      // hardcodes registry index 0 in its seeds — there is no instruction arg to target any
+      // other registry. A brand-new permissionless escrow can therefore only ever be created
+      // at registry 0, no matter what registryIndex this deposit is configured for.
+      if (!registryIndex.isZero()) {
         throw new Error(
-          `Could not create a merkle-proof escrow automatically for ${wallet.publicKey.toString()} ` +
-            `on presale ${vault.toString()}: ${err instanceof Error ? err.message : String(err)}\n` +
-            'This presale is permissioned_with_merkle_proof — proof creation/publishing is ' +
-            'creator-managed (the creator publishes a permissioned-server endpoint and a merkle ' +
-            'root config). Ask the presale creator to confirm this wallet is whitelisted and that ' +
-            'the proof server is live.'
+          `Presale ${vault.toString()} is permissionless and wallet ${wallet.publicKey.toString()} ` +
+            `has no escrow yet on registry ${registryIndex.toString()}. A permissionless presale's ` +
+            'FIRST escrow for a wallet can only ever be created at registry index 0 (a fixed ' +
+            'on-chain constraint, not a config choice) — deposit into registry 0 first, or ask the ' +
+            'presale creator whether this tier should instead use permissioned_with_merkle_proof ' +
+            '/ permissioned_with_authority.'
         );
       }
+      console.log(
+        '- Whitelist mode is permissionless — presale.deposit() will create the registry-0 ' +
+          'escrow as part of the same deposit transaction below.'
+      );
+    } else if (whitelistMode === WhitelistMode.PermissionWithMerkleProof) {
+      console.log(
+        '- Whitelist mode is permissioned_with_merkle_proof — presale.deposit() will attempt to ' +
+          "auto-fetch the proof from the presale's permissioned-server metadata and bundle the " +
+          'escrow creation into the same deposit transaction below.'
+      );
     } else {
       throw new Error(
         `Presale ${vault.toString()} is permissioned_with_authority — new escrows there can only ` +
@@ -227,11 +213,28 @@ export async function deposit(
     }
   }
 
-  const depositTx = await presale.deposit({
-    owner: wallet.publicKey,
-    amount: amountLamports,
-    registryIndex,
-  });
+  // presale.deposit() bundles escrow creation (when missing) as a pre-instruction in this SAME
+  // transaction for Permissionless/PermissionWithMerkleProof — no separate create-escrow tx.
+  let depositTx;
+  try {
+    depositTx = await presale.deposit({
+      owner: wallet.publicKey,
+      amount: amountLamports,
+      registryIndex,
+    });
+  } catch (err) {
+    if (!existing && whitelistMode === WhitelistMode.PermissionWithMerkleProof) {
+      throw new Error(
+        `Could not create a merkle-proof escrow automatically for ${wallet.publicKey.toString()} ` +
+          `on presale ${vault.toString()}: ${err instanceof Error ? err.message : String(err)}\n` +
+          'This presale is permissioned_with_merkle_proof — proof creation/publishing is ' +
+          'creator-managed (the creator publishes a permissioned-server endpoint and a merkle ' +
+          'root config). Ask the presale creator to confirm this wallet is whitelisted and that ' +
+          'the proof server is live.'
+      );
+    }
+    throw err;
+  }
   modifyComputeUnitPriceIx(depositTx, config.computeUnitPriceMicroLamports ?? 0);
   await simulateOrSend(connection, wallet, config.dryRun, depositTx, 'deposit');
 }
@@ -252,6 +255,9 @@ export async function withdraw(
     throw new Error('Missing presaleWithdraw in configuration');
   }
   const { amount, registryIndex: registryIndexRaw } = config.presaleWithdraw;
+  if (!(amount > 0)) {
+    throw new Error(`presaleWithdraw.amount must be > 0 (got ${amount})`);
+  }
   assertValidRegistryIndex(registryIndexRaw);
   const registryIndex = new BN(registryIndexRaw);
 
@@ -456,6 +462,101 @@ export async function withdrawRemainingQuote(
       `No escrow for wallet ${wallet.publicKey.toString()} on presale ${vault.toString()} currently ` +
         'has remaining quote to withdraw (either nothing overflowed, the presale has not resolved ' +
         'yet, or it has already been withdrawn). Re-check with presale-vault-get-status.'
+    );
+  }
+}
+
+/**
+ * Close buyer escrow(s) on a presale, reclaiming their rent. No config block: sweeps every
+ * registry the wallet has an escrow on and closes whichever ones the SDK's own
+ * `EscrowWrapper.canClose()` says are eligible — mirrors the alpha-vault `closeEscrowWhenDone`
+ * precedent (`alpha_vault/participant.ts`), but as its own standalone action since a presale
+ * wallet can hold one escrow per registry (rather than a single vault-wide escrow). Per the
+ * installed SDK: an Ongoing/Failed escrow is closable once its deposit (and any fee) is back to
+ * zero; a Completed escrow is closable once everything allocated to it has been claimed (and,
+ * for prorata presales, any remaining quote already withdrawn). Ineligible escrows are reported
+ * with their state, not closed.
+ */
+export async function closeEscrow(
+  config: PresaleConfig,
+  connection: Connection,
+  wallet: Wallet,
+  vault: PublicKey
+) {
+  console.log('\n> Initializing Presale close-escrow...');
+  await assertFunded(connection, wallet.publicKey);
+
+  const presale = await Presale.create(connection, vault, PRESALE_PROGRAM_ID);
+  const w = presale.getParsedPresale();
+
+  console.log(`- Presale ${vault.toString()}`);
+  console.log(`- Progress: ${PresaleProgress[w.getPresaleProgressState()]}`);
+
+  const escrows = await presale.getPresaleEscrowByOwner(wallet.publicKey);
+  if (escrows.length === 0) {
+    throw new Error(
+      `No escrows found for wallet ${wallet.publicKey.toString()} on presale ${vault.toString()} — ` +
+        'nothing to close.'
+    );
+  }
+
+  let anyClosed = false;
+  for (const escrow of escrows) {
+    const registryIndex = new BN(escrow.getEscrowAccount().registryIndex);
+    const closable = escrow.canClose(w);
+
+    console.log(
+      `\n- Registry ${registryIndex.toString()}: deposit ${escrow.getDepositUiAmount()}, ` +
+        `claimed ${escrow.getClaimedUiAmount()} — ${closable ? 'closable' : 'not yet closable'}`
+    );
+
+    if (!closable) {
+      continue;
+    }
+    anyClosed = true;
+
+    const closeTx = await presale.closeEscrow({
+      owner: wallet.publicKey,
+      registryIndex,
+    });
+    modifyComputeUnitPriceIx(closeTx, config.computeUnitPriceMicroLamports ?? 0);
+    await simulateOrSend(
+      connection,
+      wallet,
+      config.dryRun,
+      closeTx,
+      `close-escrow (registry ${registryIndex.toString()})`
+    );
+  }
+
+  if (!anyClosed) {
+    const progress = w.getPresaleProgressState();
+    const reasons: string[] = [];
+    if (progress === PresaleProgress.Ongoing) {
+      reasons.push(
+        'the presale is still ongoing and at least one escrow still holds a deposit or unpaid fee'
+      );
+    } else if (progress === PresaleProgress.Failed) {
+      reasons.push(
+        'at least one escrow still has an un-withdrawn deposit — withdraw it first with ' +
+          'presale-vault-withdraw-remaining-quote'
+      );
+    } else if (progress === PresaleProgress.Completed) {
+      reasons.push(
+        'at least one escrow has not yet claimed everything allocated to it (claim first with ' +
+          'presale-vault-claim), or — for prorata presales — has not withdrawn its remaining ' +
+          'quote yet (presale-vault-withdraw-remaining-quote)'
+      );
+    } else {
+      reasons.push(
+        `presale progress is ${PresaleProgress[progress]} — escrows are not closable before the ` +
+          'presale starts'
+      );
+    }
+    throw new Error(
+      `No escrow for wallet ${wallet.publicKey.toString()} on presale ${vault.toString()} is ` +
+        `closable right now:\n` +
+        reasons.map((reason) => `  - ${reason}`).join('\n')
     );
   }
 }

@@ -67,6 +67,17 @@ export async function createVestingEscrow(
     cancelMode,
     isSenderMultiSig,
   } = config.lockCreateEscrow;
+  if (!(cliffUnlockAmount >= 0)) {
+    throw new Error(`lockCreateEscrow.cliffUnlockAmount must be >= 0 (got ${cliffUnlockAmount})`);
+  }
+  if (!(amountPerPeriod >= 0)) {
+    throw new Error(`lockCreateEscrow.amountPerPeriod must be >= 0 (got ${amountPerPeriod})`);
+  }
+  if (!Number.isInteger(numberOfPeriod) || numberOfPeriod < 0) {
+    throw new Error(
+      `lockCreateEscrow.numberOfPeriod must be a non-negative integer (got ${numberOfPeriod})`
+    );
+  }
 
   console.log('\n> Initializing Met Lock vesting escrow...');
   const payerBalance = await connection.getBalance(wallet.publicKey);
@@ -109,6 +120,12 @@ export async function createVestingEscrow(
   console.log(
     `- Total locked amount: ${getAmountInTokens(totalLockedAmount, decimals)} (${totalLockedAmount.toString()} base units)`
   );
+  if (totalLockedAmount.lten(0)) {
+    throw new Error(
+      'lockCreateEscrow would lock 0 tokens total (cliffUnlockAmount + amountPerPeriod * ' +
+        'numberOfPeriod == 0) — set at least one of them to a positive amount.'
+    );
+  }
 
   // Pre-check the sender actually holds enough of the base mint before building the tx — the
   // on-chain failure otherwise is a generic transfer error with no context.
@@ -285,6 +302,13 @@ export async function claim(
 ) {
   if (!config.lockClaim) {
     throw new Error('Missing lockClaim in configuration');
+  }
+  if (
+    config.lockClaim.maxAmount !== null &&
+    config.lockClaim.maxAmount !== undefined &&
+    !(config.lockClaim.maxAmount > 0)
+  ) {
+    throw new Error(`lockClaim.maxAmount must be null or > 0 (got ${config.lockClaim.maxAmount})`);
   }
 
   console.log('\n> Initializing Met Lock claim...');

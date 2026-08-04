@@ -190,6 +190,9 @@ export async function fund(
     throw new Error('Missing feeSharingFund in configuration');
   }
   const { amount } = config.feeSharingFund;
+  if (!(amount > 0)) {
+    throw new Error(`feeSharingFund.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Dynamic Fee Sharing fund...');
   const payerBalance = await assertFunded(connection, wallet.publicKey);

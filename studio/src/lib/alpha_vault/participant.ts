@@ -42,6 +42,9 @@ export async function deposit(
     throw new Error('Missing alphaVaultDeposit in configuration');
   }
   const { amount } = config.alphaVaultDeposit;
+  if (!(amount > 0)) {
+    throw new Error(`alphaVaultDeposit.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Alpha Vault deposit...');
   await assertFunded(connection, wallet.publicKey);
@@ -151,6 +154,9 @@ export async function withdraw(
     throw new Error('Missing alphaVaultWithdraw in configuration');
   }
   const { amount } = config.alphaVaultWithdraw;
+  if (!(amount > 0)) {
+    throw new Error(`alphaVaultWithdraw.amount must be > 0 (got ${amount})`);
+  }
 
   console.log('\n> Initializing Alpha Vault withdraw...');
   await assertFunded(connection, wallet.publicKey);
