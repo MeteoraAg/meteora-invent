@@ -71,7 +71,7 @@ export async function createFcfsPresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
@@ -214,7 +214,7 @@ export async function createProrataPresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
@@ -372,7 +372,7 @@ export async function createFixedPricePresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
