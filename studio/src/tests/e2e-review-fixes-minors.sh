@@ -39,6 +39,12 @@
 #          clean "No alpha vault at ..." error instead of a raw TypeError. Proven directly — no
 #          vault needs to exist at all for this one.
 #
+# Also proves three later pre-flight timestamp guards (a follow-up pass, not part of the M1-M9
+# set above): damm_v1's stake2EarnFarm.startFeeDistributeTimestamp (Section D), presale's
+# presaleArgs.presaleEndTime (Section A), and lock's vestingStartTime/cliffTime ordering
+# (Section B) — each proven to fail with its new message on a stale/invalid config value, then
+# to succeed once corrected. See the inline comments at each site below.
+#
 # SAFETY (mirrors e2e-helper-smoke.sh / e2e-review-fixes-fee-sharing.sh — read before editing):
 #   - Never edits studio/.env, studio/keypair.json, or any studio/config/*.jsonc "in place"
 #     without a net: each is backed up to "<file>.e2e-backup" before being touched (only if the
@@ -452,12 +458,30 @@ echo "############################################################"
 patch_literal "$PRESALE_CONFIG" '"rpcUrl": "https://api.devnet.solana.com"' '"rpcUrl": "http://localhost:8899"'
 patch_literal "$PRESALE_CONFIG" '"presaleSupply": 100000000000000,' '"presaleSupply": 1000000000,'
 
+# Prove the new presaleEndTime pre-flight guard (assertPresaleTimesAreValid in
+# lib/presale_vault/index.ts) fires on the template's still-stale default (1760954400, already
+# in the past) before we patch it to a valid value below.
+expect_failure_containing "presale-vault-create --baseMint (stale presaleEndTime default)" \
+  "presale_vault_config.jsonc presaleArgs.presaleEndTime" \
+  pnpm studio presale-vault-create --baseMint "$PRESALE_MINT"
+
 # The program enforces MINIMUM_PRESALE_DURATION = 60s (constants.rs) between start and end —
 # presaleStartTime is 0 (the program treats that as "now", per
 # get_presale_start_time_without_going_backwards), so this must clear 60s with margin.
 PRESALE_END_TIME="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 75)"
 patch_literal "$PRESALE_CONFIG" '"presaleEndTime": 1760954400,' "\"presaleEndTime\": ${PRESALE_END_TIME},"
 echo "==> presaleEndTime set to ${PRESALE_END_TIME} (~75s from now)"
+
+# Also prove the same guard's presaleStartTime-relationship half: a real (nonzero) future
+# presaleStartTime AFTER presaleEndTime must be rejected too, or the state machine jumps
+# straight from NotStarted to Completed/Failed, skipping Ongoing entirely. Reverted immediately
+# after so the real creation below still uses presaleStartTime: 0 (start now).
+PRESALE_FUTURE_START="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 3600)"
+patch_literal "$PRESALE_CONFIG" '"presaleStartTime": 0,' "\"presaleStartTime\": ${PRESALE_FUTURE_START},"
+expect_failure_containing "presale-vault-create --baseMint (presaleEndTime <= presaleStartTime)" \
+  "must be after presaleArgs.presaleStartTime" \
+  pnpm studio presale-vault-create --baseMint "$PRESALE_MINT"
+patch_literal "$PRESALE_CONFIG" "\"presaleStartTime\": ${PRESALE_FUTURE_START}," '"presaleStartTime": 0,'
 
 # The template's default deposit amount (1 SOL) equals presaleMinimumCap exactly, which would
 # make the presale Completed, not Failed, once presaleEndTime passes. Depositing less than
@@ -635,6 +659,27 @@ expect_failure_containing "fee-sharing-fund (amount = 0, nonexistent vault)" \
   "feeSharingFund.amount must be > 0" \
   pnpm studio fee-sharing-fund --vault "$PLACEHOLDER_3"
 
+# Met Lock: vestingStartTime > cliffTime must be rejected pre-flight (met-lock-sdk's own
+# InvalidVestingStartTime, error 6009) — proven here while cliffUnlockAmount is still the
+# template's valid default (2500), so the new guard below is what actually fires, not the
+# amount guard further down.
+patch_literal "$LOCK_CONFIG" '"vestingStartTime": 1755421200,' '"vestingStartTime": 1763197201,'
+expect_failure_containing "lock-create-vesting-escrow (vestingStartTime > cliffTime)" \
+  "lockCreateEscrow.vestingStartTime" \
+  pnpm studio lock-create-vesting-escrow --baseMint "$PRESALE_MINT"
+
+# Fix it to a valid future, correctly-ordered pair and a real recipient, then prove the flow
+# now succeeds end to end (wallet A holds plenty of PRESALE_MINT left over from Section A's
+# mint step — the presale only consumed a small fraction of MINT_SUPPLY_HUMAN as supply).
+LOCK_VESTING_START="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 5)"
+LOCK_CLIFF_TIME="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 3600)"
+patch_literal "$LOCK_CONFIG" '"vestingStartTime": 1763197201,' "\"vestingStartTime\": ${LOCK_VESTING_START},"
+patch_literal "$LOCK_CONFIG" '"cliffTime": 1763197200,' "\"cliffTime\": ${LOCK_CLIFF_TIME},"
+patch_literal "$LOCK_CONFIG" '"recipient": "YOUR_RECIPIENT_ADDRESS"' "\"recipient\": \"${WALLET_PUBKEY}\""
+patch_literal "$LOCK_CONFIG" '"dryRun": true' '"dryRun": false'
+run_step "lock-create-vesting-escrow --baseMint (valid vestingStartTime <= cliffTime)" \
+  pnpm studio lock-create-vesting-escrow --baseMint "$PRESALE_MINT"
+
 # Met Lock: negative cliffUnlockAmount, and a negative lockClaim.maxAmount against a nonexistent
 # escrow (guard fires before the escrow lookup).
 patch_literal "$LOCK_CONFIG" '"cliffUnlockAmount": 2500,' '"cliffUnlockAmount": -1,'
@@ -668,16 +713,6 @@ patch_literal "$DAMM_V1_CONFIG" '"dryRun": true' '"dryRun": false'
 # damm-v1-lock-liquidity — replace them with something that at least parses as a real address.
 patch_literal "$DAMM_V1_CONFIG" '"address": "YOUR_ADDRESS_1"' "\"address\": \"${WALLET_PUBKEY}\""
 patch_literal "$DAMM_V1_CONFIG" '"address": "YOUR_ADDRESS_2"' "\"address\": \"${WALLET_PUBKEY}\""
-# Incidental finding (not one of this pass's M1-M9 items, so only worked around here, not fixed
-# in the shipped template): stake2EarnFarm.startFeeDistributeTimestamp ships as a fixed PAST
-# unix timestamp. The stake-for-fee program computes
-# `start_fee_distribute_timestamp.checked_sub(current_timestamp)` (initialize_vault.rs:46-48)
-# with NO clamping — once real time passes that fixed timestamp, this underflows (u64) and
-# InitializeVault always fails with AnchorError MathOverflow (6015). Patched here to "now" so
-# damm-v1-create-stake2earn-farm can succeed regardless of when this script runs.
-FARM_START_FEE_TS="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 0)"
-patch_literal "$DAMM_V1_CONFIG" '"startFeeDistributeTimestamp": 1753441790' \
-  "\"startFeeDistributeTimestamp\": ${FARM_START_FEE_TS}"
 
 DAMM_V1_POOL=""
 if run_step "damm-v1-create-pool --baseMint" pnpm studio damm-v1-create-pool --baseMint "$DAMM_V1_MINT"; then
@@ -689,6 +724,28 @@ if [[ -z "$DAMM_V1_POOL" ]]; then
   exit 1
 fi
 echo "==> DAMM v1 pool: ${DAMM_V1_POOL}"
+
+# stake2EarnFarm.startFeeDistributeTimestamp ships as a fixed PAST unix timestamp. The
+# stake-for-fee program's InitializeVault instruction computes
+# `start_fee_distribute_timestamp.checked_sub(current_timestamp)` with NO clamping — once real
+# time passes that fixed timestamp, this underflows (u64) and InitializeVault always fails with
+# AnchorError MathOverflow (6015). This is now caught pre-flight
+# (assertStake2EarnStartTimestampIsValid in lib/damm_v1/stake2earn.ts) instead of surfacing as
+# that opaque on-chain error — proven here against the template's still-stale default, then
+# fixed by the same patch as before (still needed: the guard does not change what a *valid*
+# timestamp is, it just fails fast and clearly on an invalid one).
+expect_failure_containing "damm-v1-create-stake2earn-farm (stale startFeeDistributeTimestamp default)" \
+  "stake2EarnFarm.startFeeDistributeTimestamp" \
+  pnpm studio damm-v1-create-stake2earn-farm --baseMint "$DAMM_V1_MINT"
+
+# Offset 0 (exactly "now" at computation time) races the on-chain clock: building this tx
+# (pool-account fetch, ATA/lock-escrow lookups, blockhash, send + confirm) takes long enough
+# that the on-chain timestamp had already ticked past a zero-margin value by the time the
+# instruction actually executed, reproducing the exact MathOverflow (6015) this guard targets
+# — confirmed empirically on localnet. 30s of margin comfortably clears that latency.
+FARM_START_FEE_TS="$(cd "$STUDIO_DIR" && node -e "$FUTURE_TS_JS" 30)"
+patch_literal "$DAMM_V1_CONFIG" '"startFeeDistributeTimestamp": 1753441790' \
+  "\"startFeeDistributeTimestamp\": ${FARM_START_FEE_TS}"
 
 run_step "damm-v1-create-stake2earn-farm --baseMint" \
   pnpm studio damm-v1-create-stake2earn-farm --baseMint "$DAMM_V1_MINT"
