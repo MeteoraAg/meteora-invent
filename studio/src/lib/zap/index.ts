@@ -11,6 +11,7 @@ import {
   getTokenProgram as getDammV2TokenProgram,
   getTokenDecimals as getDammV2TokenDecimals,
   getCurrentPoint,
+  derivePositionAddress,
   type PoolState,
 } from '@meteora-ag/cp-amm-sdk';
 import DLMM, { getTokenProgramId, StrategyType } from '@meteora-ag/dlmm';
@@ -28,6 +29,7 @@ import {
   getAmountInTokens,
   promptForSelection,
   sendOrderedTransactions,
+  combineTransactions,
   OrderedTransactionStep,
 } from '../../helpers';
 import { SOL_TOKEN_MINT } from '../../utils/constants';
@@ -199,13 +201,20 @@ export async function zapInDammV2(
 
   const zap = new Zap(connection);
 
-  // Resolve the position to deposit into.
+  // Resolve the position to deposit into. `positionNftKeypair` stays undefined for
+  // "existing" mode (nothing to create/co-sign); `positionAddress` is the on-chain position
+  // PDA either way — computed directly via `derivePositionAddress` for "new" mode (a pure,
+  // deterministic function of the mint, verified exported by the installed cp-amm-sdk) so it
+  // is available for logging/recovery purposes even before the position actually exists.
   let positionNftMint: PublicKey;
+  let positionNftKeypair: Keypair | undefined;
+  let positionAddress: PublicKey;
   const preambleSteps: OrderedTransactionStep[] = [];
 
   if (positionMode === 'new') {
-    const positionNftKeypair = Keypair.generate();
+    positionNftKeypair = Keypair.generate();
     positionNftMint = positionNftKeypair.publicKey;
+    positionAddress = derivePositionAddress(positionNftMint);
 
     console.log(
       `- Creating a fresh, empty DAMM v2 position (NFT mint ${positionNftMint.toString()})`
@@ -242,6 +251,7 @@ export async function zapInDammV2(
       chosen = userPositions[selectedIndex]!;
     }
     positionNftMint = chosen.positionState.nftMint;
+    positionAddress = chosen.position;
     console.log(`- Depositing into existing position ${chosen.position.toString()}`);
   }
 
@@ -316,6 +326,116 @@ export async function zapInDammV2(
     console.log('>>> Save this — it identifies the position this zap deposited into.');
   }
 
+  const combinedSigners = positionNftKeypair ? [positionNftKeypair] : [];
+  const steps: OrderedTransactionStep[] = buildDammV2ZapInSteps(
+    preambleSteps,
+    bundle,
+    combinedSigners
+  );
+
+  await sendOrderedTransactions(
+    connection,
+    steps,
+    wallet.payer,
+    config.dryRun,
+    config.computeUnitPriceMicroLamports ?? 0,
+    {
+      retrySafety: 'not-idempotent',
+      recoveryAddress: positionAddress.toString(),
+    }
+  );
+}
+
+/**
+ * Builds the ordered step list for a DAMM v2 direct-route zap-in bundle. `preambleSteps` is
+ * either `[]` (positionMode "existing") or a single "create position" step (positionMode
+ * "new"); `bundle` is the SDK's response from `buildZapInDammV2Transaction`.
+ *
+ * EMPIRICAL F4 FIX (verified on localnet — see studio/src/tests/e2e-review-fixes-zap.sh, two
+ * rounds of empirical evidence):
+ *
+ * Round 1 finding: `sendOrderedTransactions`' dry-run simulates each step independently
+ * against UNCHANGED chain state, so any step whose accounts are only created/initialized by
+ * an EARLIER step fails simulation once that earlier step is only simulated too (never
+ * actually landing on-chain). Confirmed empirically: dry-running the ORIGINAL 5-separate-step
+ * bundle failed "zap in" simulation with Anchor error 3007 `AccountOwnedByWrongProgram` on the
+ * `ledger` account (created by the immediately-preceding "ledger update" step) — and, for
+ * positionMode "new", the same problem applies in principle to the `position` account created
+ * by the separate preceding "create position" step (the reviewer's original hypothesis).
+ *
+ * Round 1 attempted fix (REVERTED): combining create-position + setup + ledger + zap-in +
+ * clean-up into ONE transaction resolves the dry-run problem (confirmed — the account
+ * -ownership error disappeared) but empirically BREAKS A REAL SEND for the template's default
+ * pool config: `damm_v2_config.jsonc`'s default `baseFeeMode: 2` (Rate Limiter) rejects it
+ * on-chain with `AnchorError ... FailToValidateSingleSwapInstruction` (error 6049) — the
+ * rate-limiter fee mode requires the swap-performing instruction to be the ONLY thing in its
+ * transaction (`zapInDammV2` CPIs into cp-amm's `Swap2` internally to do the rebalance swap,
+ * confirmed in the simulation logs), which is almost certainly WHY the SDK's own response
+ * shape keeps `zapInTransaction` as its own separate field in the first place — not merely a
+ * transaction-size convenience. Combining zap-in with anything else is therefore NOT safe in
+ * general, regardless of size headroom.
+ *
+ * Actual fix: combine ONLY create-position (if any) + setup + ledger into ONE transaction —
+ * none of those three invoke the rate-limited swap path (confirmed: CreatePosition ran fine
+ * alongside other instructions in the round-1 experiment; only the ZapInDammV2 instruction
+ * itself tripped the check), so this is safe and resolves both dependency problems above
+ * without touching zap-in's isolation. "zap in" and "clean up" stay in their OWN untouched
+ * transactions exactly as the SDK built them, marked `dependsOnPriorStep: true` so dry-run
+ * honestly DEFERS simulating them (they still depend on the combined step having actually
+ * landed, which a simulation never does) instead of either misreporting a failure (the
+ * original bug) or falsely claiming full verification. A live send is unaffected either way —
+ * all steps still send for real, in order.
+ *
+ * Whenever `bundle.swapTransactions` is non-empty — believed unreachable for this action today
+ * (studio always calls `getZapInDammV2DirectPoolParams` with `jupiterQuote: null`, and the
+ * installed zap-sdk's `dammV2Quote` branch, the only one reachable with a null jupiterQuote,
+ * never populates `swapTransactions` — verified by reading the compiled SDK source) — this
+ * falls back to the fully-separate, fully-deferred step list instead of assuming it is safe to
+ * combine a not-yet-landed swap's output into the same transaction as anything reading it.
+ */
+function buildDammV2ZapInSteps(
+  preambleSteps: OrderedTransactionStep[],
+  bundle: {
+    setupTransaction?: Transaction;
+    swapTransactions: Transaction[];
+    ledgerTransaction: Transaction;
+    zapInTransaction: Transaction;
+    cleanUpTransaction: Transaction;
+  },
+  combinedSigners: Keypair[]
+): OrderedTransactionStep[] {
+  if (bundle.swapTransactions.length === 0) {
+    const mergeable = [...preambleSteps.map((step) => step.tx)];
+    if (bundle.setupTransaction) {
+      mergeable.push(bundle.setupTransaction);
+    }
+    mergeable.push(bundle.ledgerTransaction);
+
+    return [
+      {
+        label:
+          preambleSteps.length > 0
+            ? 'create position + setup + ledger (combined into one transaction)'
+            : 'setup + ledger (combined into one transaction)',
+        tx: combineTransactions(mergeable),
+        signers: combinedSigners,
+      },
+      {
+        label: 'zap in',
+        tx: bundle.zapInTransaction,
+        signers: [],
+        dependsOnPriorStep: true,
+      },
+      {
+        label: 'clean up',
+        tx: bundle.cleanUpTransaction,
+        signers: [],
+        dependsOnPriorStep: true,
+      },
+    ];
+  }
+
+  // Defensive fallback — see this function's doc. Not exercised by studio's own code today.
   const steps: OrderedTransactionStep[] = [...preambleSteps];
   if (bundle.setupTransaction) {
     steps.push({
@@ -329,19 +449,28 @@ export async function zapInDammV2(
       label: `internal rebalance swap ${i + 1}/${bundle.swapTransactions.length}`,
       tx,
       signers: [],
+      dependsOnPriorStep: i > 0,
     });
   });
-  steps.push({ label: 'ledger update', tx: bundle.ledgerTransaction, signers: [] });
-  steps.push({ label: 'zap in', tx: bundle.zapInTransaction, signers: [] });
-  steps.push({ label: 'clean up', tx: bundle.cleanUpTransaction, signers: [] });
-
-  await sendOrderedTransactions(
-    connection,
-    steps,
-    wallet.payer,
-    config.dryRun,
-    config.computeUnitPriceMicroLamports ?? 0
-  );
+  steps.push({
+    label: 'ledger update',
+    tx: bundle.ledgerTransaction,
+    signers: [],
+    dependsOnPriorStep: true,
+  });
+  steps.push({
+    label: 'zap in',
+    tx: bundle.zapInTransaction,
+    signers: [],
+    dependsOnPriorStep: true,
+  });
+  steps.push({
+    label: 'clean up',
+    tx: bundle.cleanUpTransaction,
+    signers: [],
+    dependsOnPriorStep: true,
+  });
+  return steps;
 }
 
 /**
@@ -586,6 +715,91 @@ export async function zapInDlmm(
     position: positionKeypair.publicKey,
   });
 
+  const steps: OrderedTransactionStep[] = buildDlmmZapInSteps(bundle, positionKeypair);
+
+  await sendOrderedTransactions(
+    connection,
+    steps,
+    wallet.payer,
+    config.dryRun,
+    config.computeUnitPriceMicroLamports ?? 0,
+    {
+      retrySafety: 'not-idempotent',
+      recoveryAddress: positionKeypair.publicKey.toString(),
+    }
+  );
+}
+
+/**
+ * Builds the ordered step list for a DLMM zap-in bundle. Same empirically-verified F4 bug as
+ * `buildDammV2ZapInSteps` (see its doc, including the ROUND 1 finding/revert): the "zap in"
+ * instruction's `ledger` account is created by the immediately-preceding "ledger update" step,
+ * so `sendOrderedTransactions`' per-step-independent dry-run simulation fails it with an
+ * uninitialized-account error unless that dependency is removed.
+ *
+ * This function deliberately never combines "zap in" itself with anything else, for two
+ * independent reasons, either of which is sufficient on its own:
+ * 1. DAMM v2's `zapInDammV2` instruction was empirically found to internally CPI into a
+ *    rate-limited swap that on-chain REJECTS being combined with any other instruction in the
+ *    same transaction (`FailToValidateSingleSwapInstruction`, cp-amm error 6049 — see
+ *    `buildDammV2ZapInSteps`'s doc for the full empirical trail). DLMM is a different program
+ *    with a different fee model and has not been observed to have the identical restriction,
+ *    but this has NOT been verified empirically for DLMM (Jupiter-dependent, cannot run on
+ *    localnet — see this file's zap-in-dlmm doc), so the same conservative isolation is kept
+ *    here rather than assumed safe.
+ * 2. DLMM zap-in's rebalancing swap is genuinely common (per this file's `zapInDlmm` doc:
+ *    needed whenever the deposit isn't already balanced for the target range) and can be
+ *    Jupiter-routed — Jupiter routes can already sit close to the transaction size ceiling on
+ *    their own, so combining a real swap transaction into the same transaction as anything
+ *    else is not safe to assume fits.
+ *
+ * So: combine ONLY setup + ledger into one transaction when there is no swap to worry about
+ * (neither invokes anything swap-related); "zap in" and "clean up" always stay in their OWN
+ * untouched transactions exactly as the SDK built them, marked `dependsOnPriorStep: true` so
+ * dry-run honestly DEFERS simulating them (they still depend on the combined step's real
+ * effect) instead of misreporting a failure. A live send always runs every step for real, in
+ * order, regardless of this flag.
+ */
+function buildDlmmZapInSteps(
+  bundle: {
+    setupTransaction?: Transaction;
+    swapTransactions: Transaction[];
+    ledgerTransaction: Transaction;
+    zapInTransaction: Transaction;
+    cleanUpTransaction: Transaction;
+  },
+  positionKeypair: Keypair
+): OrderedTransactionStep[] {
+  if (bundle.swapTransactions.length === 0) {
+    const mergeable = [bundle.ledgerTransaction];
+    if (bundle.setupTransaction) {
+      mergeable.unshift(bundle.setupTransaction);
+    }
+    return [
+      {
+        label: bundle.setupTransaction
+          ? 'setup + ledger (combined into one transaction)'
+          : 'ledger update',
+        tx: combineTransactions(mergeable),
+        signers: [],
+      },
+      {
+        label: 'zap in (initializes the new position)',
+        tx: bundle.zapInTransaction,
+        signers: [positionKeypair],
+        dependsOnPriorStep: true,
+      },
+      {
+        label: 'clean up',
+        tx: bundle.cleanUpTransaction,
+        signers: [],
+        dependsOnPriorStep: true,
+      },
+    ];
+  }
+
+  // A real rebalancing swap is part of this bundle — keep steps separate (safe regardless of
+  // transaction size) and defer dry-run simulation of whatever depends on it landing for real.
   const steps: OrderedTransactionStep[] = [];
   if (bundle.setupTransaction) {
     steps.push({
@@ -599,23 +813,28 @@ export async function zapInDlmm(
       label: `rebalance swap ${i + 1}/${bundle.swapTransactions.length}`,
       tx,
       signers: [],
+      dependsOnPriorStep: i > 0,
     });
   });
-  steps.push({ label: 'ledger update', tx: bundle.ledgerTransaction, signers: [] });
+  steps.push({
+    label: 'ledger update',
+    tx: bundle.ledgerTransaction,
+    signers: [],
+    dependsOnPriorStep: true,
+  });
   steps.push({
     label: 'zap in (initializes the new position)',
     tx: bundle.zapInTransaction,
     signers: [positionKeypair],
+    dependsOnPriorStep: true,
   });
-  steps.push({ label: 'clean up', tx: bundle.cleanUpTransaction, signers: [] });
-
-  await sendOrderedTransactions(
-    connection,
-    steps,
-    wallet.payer,
-    config.dryRun,
-    config.computeUnitPriceMicroLamports ?? 0
-  );
+  steps.push({
+    label: 'clean up',
+    tx: bundle.cleanUpTransaction,
+    signers: [],
+    dependsOnPriorStep: true,
+  });
+  return steps;
 }
 
 /**
@@ -771,7 +990,14 @@ async function zapOutDammV2(
       [{ label: 'remove liquidity', tx: removeLiquidityTx, signers: [] }],
       wallet.payer,
       config.dryRun,
-      config.computeUnitPriceMicroLamports ?? 0
+      config.computeUnitPriceMicroLamports ?? 0,
+      {
+        // Idempotent: unlike zap-in, zap-out never mints a fresh keypair — a re-run re-reads
+        // this SAME position's CURRENT unlocked liquidity from chain state, so it converges
+        // (removes whatever is left) instead of repeating an already-landed removal.
+        retrySafety: 'idempotent',
+        recoveryAddress: chosen.position.toString(),
+      }
     );
     return;
   }
@@ -829,7 +1055,11 @@ async function zapOutDammV2(
     ],
     wallet.payer,
     config.dryRun,
-    config.computeUnitPriceMicroLamports ?? 0
+    config.computeUnitPriceMicroLamports ?? 0,
+    {
+      retrySafety: 'idempotent',
+      recoveryAddress: chosen.position.toString(),
+    }
   );
 }
 
@@ -928,7 +1158,14 @@ async function zapOutDlmm(
       steps,
       wallet.payer,
       config.dryRun,
-      config.computeUnitPriceMicroLamports ?? 0
+      config.computeUnitPriceMicroLamports ?? 0,
+      {
+        // Idempotent: no fresh keypair is ever minted, and a re-run re-reads THIS position's
+        // current remaining liquidity from chain state, so it converges instead of repeating
+        // an already-landed removal.
+        retrySafety: 'idempotent',
+        recoveryAddress: chosen.publicKey.toString(),
+      }
     );
     return;
   }
@@ -966,6 +1203,10 @@ async function zapOutDlmm(
     steps,
     wallet.payer,
     config.dryRun,
-    config.computeUnitPriceMicroLamports ?? 0
+    config.computeUnitPriceMicroLamports ?? 0,
+    {
+      retrySafety: 'idempotent',
+      recoveryAddress: chosen.publicKey.toString(),
+    }
   );
 }

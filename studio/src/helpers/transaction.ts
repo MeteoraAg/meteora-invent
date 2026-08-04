@@ -164,6 +164,31 @@ export async function handleSendTxs(
 }
 
 /**
+ * Merge several already-built Transactions' instructions into ONE Transaction, in order.
+ * Solana executes a transaction's instructions sequentially against continuously-updated
+ * account state, so an account CREATED by instruction N (e.g. `createPosition`, or the
+ * ledger-account init inside a zap bundle) is already fully usable by instruction N+1 in the
+ * SAME transaction — both for a real send AND for `simulateTransaction`. Combining dependent
+ * steps this way is what lets `sendOrderedTransactions`' dry-run path (which simulates each
+ * STEP independently against unchanged chain state) honestly verify a bundle whose later
+ * steps reference accounts an earlier step creates, instead of the later step's simulation
+ * always failing against an account that (in isolation) was never actually created — see
+ * zapInDammV2/zapInDlmm in lib/zap for the concrete case this fixed (verified empirically on
+ * localnet; see studio/src/tests/e2e-review-fixes-zap.sh).
+ *
+ * Does not set feePayer or sign anything — callers still do that on the returned Transaction
+ * exactly as they would on any single step's `tx` before handing it to
+ * `sendOrderedTransactions`.
+ */
+export function combineTransactions(txs: Transaction[]): Transaction {
+  const combined = new Transaction();
+  for (const tx of txs) {
+    combined.add(...tx.instructions);
+  }
+  return combined;
+}
+
+/**
  * One step of an ordered, must-run-in-sequence transaction bundle (e.g. a zap's
  * setup -> swap(s) -> ledger -> zap-in -> clean-up chain). `signers` lists every
  * KEYPAIR that *might* need to co-sign this specific step beyond the payer (e.g. a
@@ -175,6 +200,49 @@ export interface OrderedTransactionStep {
   label: string;
   tx: Transaction;
   signers: Keypair[];
+  /**
+   * Set when this step's transaction reads or requires an account that only exists/is only
+   * correctly populated once an EARLIER step's transaction has actually landed on-chain (a
+   * real send), such that a DRY RUN of this step in isolation — against otherwise-unchanged
+   * chain state, since simulating an earlier step never actually commits it — cannot honestly
+   * validate it and would misreport a false failure. When true, `sendOrderedTransactions`'
+   * dry-run path SKIPS simulating this step and prints an explanatory "deferred" line instead
+   * of a false failure; a live (non-dry-run) send is completely unaffected — the step still
+   * sends for real, in order, like any other. Prefer restructuring the bundle so the
+   * dependency disappears (see `combineTransactions`) whenever that is possible: a skipped
+   * step is unverified, not verified-safe.
+   */
+  dependsOnPriorStep?: boolean;
+}
+
+/** See `sendOrderedTransactions`'s `retry` parameter. */
+export type RetrySafety = 'idempotent' | 'not-idempotent';
+
+/**
+ * What `sendOrderedTransactions` should tell the user if a live send aborts partway through,
+ * required from every caller (no default) so the helper never has to guess whether ITS
+ * caller is safe to blindly re-run — it cannot know that on its own.
+ */
+export interface OrderedTransactionsRetryInfo {
+  /**
+   * - 'idempotent': the caller re-derives its ENTIRE plan from CURRENT on-chain state on every
+   *   invocation (e.g. zap-out re-reads the position's remaining liquidity each run), so
+   *   re-running the same command after an abort is the correct recovery path — it converges
+   *   instead of repeating an already-landed action.
+   * - 'not-idempotent': the caller manufactures new state on every invocation (e.g. zap-in
+   *   mints a fresh position keypair every run) and/or would otherwise repeat an already-landed
+   *   side effect (e.g. re-deposit into the same existing position). Re-running after an abort
+   *   is NOT a safe default here — it can perform a SECOND real action (e.g. a second deposit)
+   *   instead of resuming.
+   */
+  retrySafety: RetrySafety;
+  /**
+   * A human-meaningful, PUBLIC address to print in the abort message so the user knows what
+   * to inspect before deciding whether to re-run (e.g. the position this bundle deposits
+   * into/creates). Omit when the bundle has no single such identifier. NEVER pass a secret
+   * key or anything sensitive here — this value is printed verbatim.
+   */
+  recoveryAddress?: string;
 }
 
 /**
@@ -232,22 +300,28 @@ function resolveStepSigners(tx: Transaction, candidates: Keypair[]): Keypair[] {
  * - `dryRun`: simulates EVERY step in order via `runSimulateTransaction`, even after an
  *   earlier step fails, so a single dry run reports every problem it can find at once;
  *   throws a combined error listing all failed steps if any did (with per-step reasons)
- *   after printing all per-step results.
+ *   after printing all per-step results. A step with `dependsOnPriorStep: true` is instead
+ *   SKIPPED with an explanatory line (see that field's doc) — prefer eliminating the
+ *   dependency with `combineTransactions` over relying on this escape hatch.
  * - live send: sends sequentially with a FRESH blockhash fetched right before each step
  *   (`connection.getLatestBlockhash`) and `DEFAULT_SEND_TX_MAX_RETRIES` retries, ABORTING
  *   immediately on the first failure — continuing after a real failure could send steps
- *   out of order against unexpected on-chain state. The thrown error names the failed
- *   step and every step that was NOT sent, plus a resume hint: earlier steps already
- *   landed on-chain, so re-running the same command (which rebuilds the bundle from
- *   current on-chain state) is the right recovery — not blind restart-from-scratch
- *   assumptions.
+ *   out of order against unexpected on-chain state. The thrown error (also printed via
+ *   `console.error` before being thrown, so it survives even if a caller's own catch logs
+ *   less) names the failed step, every step that was NOT sent, and `retry.recoveryAddress`
+ *   if one was given — and its resume guidance branches on `retry.retrySafety` instead of
+ *   ever asserting a blanket "re-run to resume" guarantee this helper cannot back up on its
+ *   own (see `OrderedTransactionsRetryInfo`). NEVER prints a secret key.
+ *
+ * @param retry required per-caller recovery guidance — see `OrderedTransactionsRetryInfo`.
  */
 export async function sendOrderedTransactions(
   connection: Connection,
   steps: OrderedTransactionStep[],
   payer: Keypair,
   dryRun: boolean,
-  computeUnitPriceMicroLamports: number
+  computeUnitPriceMicroLamports: number,
+  retry: OrderedTransactionsRetryInfo
 ): Promise<void> {
   const emptySteps = steps.filter((step) => step.tx.instructions.length === 0);
   const runnable = steps.filter((step) => step.tx.instructions.length > 0);
@@ -271,12 +345,25 @@ export async function sendOrderedTransactions(
 
   if (dryRun) {
     const failures: string[] = [];
+    const deferred: string[] = [];
     for (let i = 0; i < runnable.length; i++) {
       const step = runnable[i];
       if (!step) {
         throw new Error(`Ordered step at index ${i} is undefined`);
       }
       const stepNumber = i + 1;
+
+      if (step.dependsOnPriorStep) {
+        console.log(
+          `\n> [${stepNumber}/${runnable.length}] Deferring simulation of "${step.label}": it ` +
+            'depends on an earlier step that only actually takes effect once sent for real, so ' +
+            'simulating it in isolation (against otherwise-unchanged chain state) cannot honestly ' +
+            'verify it. It will run for real, in its place, on a live (non-dry-run) send.'
+        );
+        deferred.push(`${stepNumber}. "${step.label}"`);
+        continue;
+      }
+
       step.tx.feePayer = payer.publicKey;
       modifyComputeUnitPriceIx(step.tx, computeUnitPriceMicroLamports);
       const signers = resolveStepSigners(step.tx, [payer, ...step.signers]);
@@ -301,7 +388,17 @@ export async function sendOrderedTransactions(
           '\nFix the failing step(s) above, then re-run with dryRun once every step simulates clean.'
       );
     }
-    console.log(`\n>>> All ${runnable.length} step(s) simulated successfully.`);
+    const verifiedCount = runnable.length - deferred.length;
+    if (deferred.length > 0) {
+      console.log(
+        `\n>>> ${verifiedCount}/${runnable.length} step(s) simulated successfully; ${deferred.length} ` +
+          'step(s) deferred (not a failure — see above) because they depend on an earlier step that ' +
+          'only lands during a real send:\n' +
+          deferred.join('\n')
+      );
+    } else {
+      console.log(`\n>>> All ${runnable.length} step(s) simulated successfully.`);
+    }
     return;
   }
 
@@ -329,12 +426,33 @@ export async function sendOrderedTransactions(
         remainingLabels.length > 0
           ? `Step(s) ${stepNumber + 1}-${runnable.length} were NOT sent: ${remainingLabels.join(' -> ')}.`
           : 'This was the last step.';
-      throw new Error(
+
+      // NEVER include a secret key here — recoveryAddress is documented as public-only.
+      const recoveryLine = retry.recoveryAddress
+        ? `Recovery reference address: ${retry.recoveryAddress}.`
+        : 'No single recovery reference address applies to this bundle.';
+
+      const resumeGuidance =
+        retry.retrySafety === 'idempotent'
+          ? 'Re-running the same command IS safe here: it re-reads current on-chain state and ' +
+            'resumes/converges from wherever this left off, rather than repeating an already-landed ' +
+            'action.'
+          : 'Re-running the same command does NOT resume this — it builds a brand-new bundle from ' +
+            'scratch (e.g. a fresh position keypair) and WILL repeat any action that already landed, ' +
+            'such as a second real deposit. Before doing anything else: inspect current on-chain ' +
+            'state with a READ-ONLY action (e.g. damm-v2-get-positions / dlmm-get-positions)' +
+            `${retry.recoveryAddress ? ` for ${retry.recoveryAddress}` : ''} and confirm whether the ` +
+            'deposit already landed. If it did, do NOT re-run this command — for DAMM v2, set ' +
+            'positionMode to "existing" (selecting that position if prompted) to continue safely ' +
+            'instead of creating another one.';
+
+      const failureSummary =
         `Aborted at step ${stepNumber}/${runnable.length} ("${step.label}"): ${message}\n` +
-          `${remainingNote} Step(s) 1-${stepNumber} above already landed on-chain — do not assume a ` +
-          'clean slate. Re-run the same command to resume: it rebuilds a fresh ordered bundle from ' +
-          'current on-chain state rather than blindly restarting from step 1.'
-      );
+        `${remainingNote} Step(s) 1-${stepNumber} above already landed on-chain — do not assume a ` +
+        `clean slate.\n${recoveryLine}\n${resumeGuidance}`;
+
+      console.error(`\n>>> ${failureSummary}`);
+      throw new Error(failureSummary);
     }
   }
 
