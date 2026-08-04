@@ -16,6 +16,10 @@ import {
 import { DammV1Config, Stake2EarnFarmConfig, LockLiquidityAllocation } from '../../utils/types';
 import { DEFAULT_SEND_TX_MAX_RETRIES, STAKE2EARN_PROGRAM_IDS } from '../../utils/constants';
 import StakeForFee, { deriveFeeVault, U64_MAX } from '@meteora-ag/m3m3';
+// Reuse the presale SDK's on-chain-clock reader (a generic Sysvar Clock decode with no
+// presale-specific coupling — see @meteora-ag/presale's own implementation: it just reads and
+// decodes SYSVAR_CLOCK_PUBKEY) instead of re-deriving that byte layout a second time here.
+import { getOnChainTimestamp } from '@meteora-ag/presale';
 import BN from 'bn.js';
 import {
   fromAllocationsToAmount,
@@ -31,6 +35,43 @@ import {
   createProgram,
   getAssociatedTokenAccount,
 } from '@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils';
+
+/**
+ * Guard `stake2EarnFarm.startFeeDistributeTimestamp` against a value the stake-for-fee (m3m3)
+ * program's InitializeVault instruction cannot accept.
+ *
+ * Verified against @meteora-ag/m3m3@1.0.10's IDL (not just inferred): `InitializeVaultParams`
+ * stores `start_fee_distribute_timestamp` as `Option<u64>`, while the on-chain `Configuration`
+ * account stores it back as `i64` — consistent with the handler reading the on-chain Clock and
+ * computing a duration via `start_fee_distribute_timestamp.checked_sub(current_timestamp)` with
+ * no clamping (as documented from an earlier localnet run in
+ * e2e-review-fixes-minors.sh). A `startFeeDistributeTimestamp` behind the current on-chain time
+ * makes that u64 subtraction underflow, and the IDL's error #6015 is exactly `MathOverflow` —
+ * matching the AnchorError this fix works around. This is unconditional: `secondsToFullUnlock`
+ * cannot compensate for it — that field only governs the fee-release decay rate *after*
+ * distribution starts (see the SDK's own `getFarmReleasedFees`), and plays no part in
+ * InitializeVault's timestamp math.
+ */
+async function assertStake2EarnStartTimestampIsValid(
+  connection: Connection,
+  startFeeDistributeTimestamp: number
+): Promise<void> {
+  const nowSec = Number(await getOnChainTimestamp(connection));
+  if (startFeeDistributeTimestamp < nowSec) {
+    const behindSeconds = nowSec - startFeeDistributeTimestamp;
+    throw new Error(
+      `damm_v1_config.jsonc stake2EarnFarm.startFeeDistributeTimestamp is ${startFeeDistributeTimestamp} ` +
+        `(${new Date(startFeeDistributeTimestamp * 1000).toISOString()}), which is ${behindSeconds} ` +
+        `second(s) behind the current on-chain clock (${nowSec}, ${new Date(nowSec * 1000).toISOString()}). ` +
+        "The stake-for-fee program's InitializeVault instruction computes " +
+        '`start_fee_distribute_timestamp.checked_sub(current_timestamp)` with no clamping, so any value ' +
+        'behind the on-chain clock underflows that u64 subtraction and always fails on-chain with ' +
+        'AnchorError MathOverflow (6015) — no matter how the rest of the config looks. Fix it by setting ' +
+        'startFeeDistributeTimestamp to at least the current on-chain time, e.g. ' +
+        'Math.floor(Date.now() / 1000) + 86400 for 24h from now.'
+    );
+  }
+}
 
 /**
  * Create a DammV1 pool with Stake2Earn
@@ -68,6 +109,8 @@ export async function createDammV1Stake2EarnPool(
     console.log(`>>> M3M3 farm is already existed. Skip creating new farm.`);
     return;
   }
+
+  await assertStake2EarnStartTimestampIsValid(connection, config.startFeeDistributeTimestamp);
 
   console.log(`>> Creating M3M3 fee farm...`);
   const topListLength = config.topListLength;
