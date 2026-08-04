@@ -9,7 +9,9 @@
 #       resuming. Fixed by adding a required `retry: { retrySafety, recoveryAddress }` param:
 #       zap-in call sites pass `retrySafety: 'not-idempotent'` and the position address, and
 #       the abort message now says plainly that re-running does NOT resume and names what to
-#       inspect first — proven below via a REAL forced mid-bundle abort.
+#       inspect first — proven below via a REAL forced mid-bundle abort on a zap-in-COMPATIBLE
+#       (fee-scheduler) pool; see the PRE-FLIGHT GUARD note below for why a rate-limiter pool
+#       can no longer be used to force this (it now gets refused before anything is built).
 #   F4: with the shipped default `positionMode: "new"`, dry-run used to simulate each step of
 #       the zap-in bundle INDEPENDENTLY against unchanged chain state. EMPIRICALLY CONFIRMED
 #       on localnet (see the two findings below) that this failed the "zap in" step's
@@ -22,23 +24,39 @@
 #       instead of misreporting a failure — proven below via a before/after dry-run and a full
 #       live send that actually lands a real deposit.
 #
-# SEPARATE FINDING (not fixed here, out of scope, documented for whoever owns DAMM v2 pool
-# config / the zap-sdk relationship next): while chasing F4's live-send proof, discovered that
-# `damm_v2_config.jsonc`'s TEMPLATE DEFAULT `baseFeeMode: 2` (Rate Limiter) makes ANY real send
-# of zap-in-damm-v2's "zap in" step fail on-chain with `AnchorError ... FailToValidateSingleSwap
-# Instruction` (cp-amm error 6049), REGARDLESS of transaction structure (confirmed: still fails
-# even with "zap in" fully isolated in its own transaction, alone). This looks like a
+# PRE-FLIGHT GUARD (this WAS the "separate finding" in an earlier revision of this script;
+# it has since been FIXED, not merely documented — see `assertPoolIsZapInCompatible` in
+# studio/src/lib/zap/index.ts, commit 4eef9d9): while chasing F4's live-send proof, testing
+# turned up that `damm_v2_config.jsonc`'s TEMPLATE DEFAULT `baseFeeMode: 2` (Rate Limiter)
+# makes ANY real send of zap-in-damm-v2's "zap in" step fail on-chain with `AnchorError ...
+# FailToValidateSingleSwapInstruction` (cp-amm error 6049), REGARDLESS of transaction structure
+# (confirmed: still fails even with "zap in" fully isolated in its own transaction, alone) — a
 # fundamental incompatibility between the zap program's CPI-based swap and the Rate Limiter fee
-# mode's on-chain validation, not a dry-run/mid-bundle-ordering issue — it is USED below as a
-# convenient, deterministic way to force step 3's real F3 abort, and is otherwise left
-# unfixed/unmodified (rate-limiter pool config is not owned by this fix).
+# mode's on-chain validation, not a dry-run/mid-bundle-ordering issue. A dry run can't surface
+# this (zap-in is one of the steps `dependsOnPriorStep` legitimately defers until a live send),
+# so `zapInDammV2` now decodes the pool's base-fee handler and REFUSES up front — before
+# building or sending anything — the moment it sees a Rate Limiter pool. That means the
+# rate-limiter pool can no longer be used to force a MID-BUNDLE F3 abort (the guard now
+# intercepts it earlier than that); instead it is repurposed below as PART A, proving the guard
+# itself fires with its actionable message before any transaction is sent. F3's mid-bundle
+# abort proof moves to PART B, forced instead on the zap-in-COMPATIBLE fee-scheduler pool via
+# `maxSqrtPriceChangeBps: 0` — verified against the zap-program repo's own source
+# (programs/zap/src/instructions/ix_zap_in_damm_v2.rs): the on-chain check is
+# `require!(sqrt_price_change_bps <= max_sqrt_price_change_bps, ...)`, and `get_price_change_bps`
+# (in that program's utils/damm_v2_utils.rs) rounds the observed change UP (`div_ceil`) before
+# comparing, so ANY nonzero swap reports at least 1 bps of change — which
+# can never be <= 0. The zap-in bundle's deposit is guaranteed to trigger a real swap here
+# (a fresh, empty position funded 100% single-sided in one input mint cannot be balanced
+# without one), so this fails deterministically, after the earlier "create position + setup +
+# ledger" step has already landed for real — a genuine mid-bundle abort, unlike the rate
+# limiter case above.
 #
 # This script builds real chain state the existing e2e-*.sh scripts don't touch: a throwaway
 # SPL mint -> TWO real balanced DAMM v2 pools (one left at the template's default Rate Limiter
-# fee mode specifically to force the F3 abort deterministically; one switched to a Linear Fee
-# Scheduler so F4's fix can be proven with an actual successful end-to-end deposit, not just a
-# clean simulation) -> zap-in-damm-v2 exercised in both positionMode "existing" and "new",
-# dry-run and live-send.
+# fee mode specifically so PART A can prove the pre-flight guard refuses it; one switched to a
+# Linear Fee Scheduler so F4's fix can be proven with an actual successful end-to-end deposit,
+# then reused for PART B's forced mid-bundle abort) -> zap-in-damm-v2 exercised in both
+# positionMode "existing" and "new", dry-run and live-send.
 #
 # SAFETY (mirrors e2e-helper-smoke.sh / e2e-review-fixes-fee-sharing.sh — read before editing):
 #   - Never edits studio/.env, studio/keypair.json, studio/config/damm_v2_config.jsonc or
@@ -441,18 +459,18 @@ patch_literal "$DAMM_V2_CONFIG" '"newPositionOwner": "YOUR_NEW_POSITION_OWNER_AD
 # ---------------------------------------------------------------------------
 # 5. POOL_RATELIMITER: left at the template's DEFAULT baseFeeMode (2, Rate Limiter) — only
 #    quoteAmount needs to go from null to a real number for a balanced pool. This pool is used
-#    ONLY to force a deterministic, real, mid-bundle abort for the F3 proof (see the header
-#    comment's "SEPARATE FINDING").
+#    ONLY to prove the PRE-FLIGHT GUARD (PART A below) refuses a rate-limiter pool before
+#    anything is built or sent (see the header comment's "PRE-FLIGHT GUARD" note).
 # ---------------------------------------------------------------------------
 patch_literal "$DAMM_V2_CONFIG" '"quoteAmount": null,' '"quoteAmount": 1,'
 
 POOL_RATELIMITER=""
-if run_step "damm-v2-create-balanced-pool --baseMint <MINT> (rate-limiter fee mode, for F3)" \
+if run_step "damm-v2-create-balanced-pool --baseMint <MINT> (rate-limiter fee mode, for the pre-flight guard)" \
   pnpm studio damm-v2-create-balanced-pool --baseMint "$MINT"; then
   POOL_RATELIMITER="$(echo "$LAST_OUTPUT" | grep '> Pool address:' | tail -1 | sed -E 's/.*Pool address: *//' | tr -d '[:space:]')"
 fi
 if [[ -z "$POOL_RATELIMITER" ]]; then
-  echo "ERROR: no rate-limiter DAMM v2 pool — cannot continue the F3 proof without one."
+  echo "ERROR: no rate-limiter DAMM v2 pool — cannot continue the pre-flight guard proof without one."
   RESULTS+=("FAIL  damm-v2-create-balanced-pool (rate-limiter pool, no address captured)")
   FAILURES=$((FAILURES + 1))
   exit 1
@@ -460,37 +478,34 @@ fi
 echo "==> DAMM v2 pool (rate-limiter fee mode): ${POOL_RATELIMITER}"
 
 # ---------------------------------------------------------------------------
-# 6. F3 PROOF — force a REAL mid-bundle abort and check the new abort wording.
-#    zap_config.jsonc's shipped defaults already are dryRun: true, positionMode: "new"; only
-#    rpcUrl needs patching, then dryRun flips to false for a REAL send (a dry run never aborts
-#    mid-bundle — it defers/simulates every step and only throws a combined report at the end).
+# 6. PRE-FLIGHT GUARD PROOF (PART A) — `assertPoolIsZapInCompatible` must refuse this
+#    rate-limiter pool with its actionable message, and must do so BEFORE any transaction is
+#    sent. zap_config.jsonc's shipped defaults already are dryRun: true, positionMode: "new";
+#    only rpcUrl needs patching, then dryRun flips to false so this is a genuine attempt at a
+#    REAL send — proving the guard blocks it pre-flight rather than merely being skipped
+#    because dry-run never sends anything anyway.
 # ---------------------------------------------------------------------------
 patch_literal "$ZAP_CONFIG" '"rpcUrl": "https://api.devnet.solana.com"' '"rpcUrl": "http://localhost:8899"'
 patch_literal "$ZAP_CONFIG" '"dryRun": true' '"dryRun": false'
 
-run_step_expect_fail "zap-in-damm-v2 (F3: real send against a rate-limiter pool, forces abort at \"zap in\")" \
-  'Aborted at step 2/3 ("zap in")' \
+run_step_expect_fail "zap-in-damm-v2 (pre-flight guard: rate-limiter pool refused before any send)" \
+  'Stopping now, before any transaction is sent.' \
   pnpm studio zap-in-damm-v2 --poolAddress "$POOL_RATELIMITER"
-F3_OUTPUT="$LAST_OUTPUT"
+GUARD_OUTPUT="$LAST_OUTPUT"
 
-assert_contains "F3: names the failed step and that step 3 (clean up) was NOT sent" \
-  'Step(s) 3-3 were NOT sent: clean up.' "$F3_OUTPUT"
-assert_contains "F3: states earlier step(s) already landed on-chain" \
-  'already landed on-chain — do not assume a clean slate' "$F3_OUTPUT"
-assert_contains "F3: prints a recovery reference address (public position address)" \
-  'Recovery reference address:' "$F3_OUTPUT"
-assert_contains "F3: explicitly says re-running does NOT resume" \
-  'does NOT resume this' "$F3_OUTPUT"
-assert_contains "F3: warns re-running WILL repeat the action (second real deposit)" \
-  'WILL repeat any action that already landed, such as a second real deposit' "$F3_OUTPUT"
-assert_contains "F3: tells the user to inspect state with a read-only action first" \
-  'damm-v2-get-positions / dlmm-get-positions' "$F3_OUTPUT"
-assert_contains "F3: tells the user how to continue safely (positionMode existing)" \
-  'set positionMode to "existing"' "$F3_OUTPUT"
-assert_not_contains "F3: the OLD false blanket resume claim is gone" \
-  'Re-run the same command to resume: it rebuilds a fresh ordered bundle' "$F3_OUTPUT"
-assert_not_contains "F3: never prints a secret/private key material" \
-  'PRIVATE_KEY' "$F3_OUTPUT"
+assert_contains "guard: names the incompatible fee mode" \
+  'uses the Rate Limiter base-fee mode' "$GUARD_OUTPUT"
+assert_contains "guard: names the on-chain error it would otherwise hit" \
+  'error 6049 (FailToValidateSingleSwapInstruction)' "$GUARD_OUTPUT"
+assert_contains "guard: tells the user the actionable alternative for an existing pool" \
+  'add liquidity directly with damm-v2-add-liquidity instead of zapping' "$GUARD_OUTPUT"
+assert_not_contains "guard: never prints a secret/private key material" \
+  'PRIVATE_KEY' "$GUARD_OUTPUT"
+
+run_step "damm-v2-get-positions (confirms the guard sent nothing: still exactly the pool-creation position)" \
+  pnpm studio damm-v2-get-positions --poolAddress "$POOL_RATELIMITER"
+RATELIMITER_POSITION_COUNT="$(echo "$LAST_OUTPUT" | grep -c '^> Position ')"
+assert_eq "guard: no transaction was sent by the blocked attempt (position count still 1)" "1" "$RATELIMITER_POSITION_COUNT"
 
 # ---------------------------------------------------------------------------
 # 7. POOL_LINEAR: switch to baseFeeMode 0 (Linear Fee Scheduler) with real, comfortably-sized
@@ -599,6 +614,48 @@ else
   RESULTS+=("FAIL  F4 live send: new position unlocked liquidity (unparsed)")
   FAILURES=$((FAILURES + 1))
 fi
+
+# ---------------------------------------------------------------------------
+# 10. F3 PROOF (PART B) — force a REAL mid-bundle abort on a ZAP-IN-COMPATIBLE pool
+#     (POOL_LINEAR, still positionMode "new" + dryRun false from step 9) and check the new
+#     abort wording. `maxSqrtPriceChangeBps: 0` leaves zero headroom for the internal
+#     rebalancing swap's own price impact — verified against the zap program's own source
+#     (see the header comment's "PRE-FLIGHT GUARD" note): the on-chain check rounds the
+#     observed sqrt-price change UP before comparing it to this ceiling, so ANY real swap
+#     exceeds a ceiling of 0. A fresh, empty position ("new" mode) funded 100% single-sided
+#     (zap_config.jsonc's default inputMint is native SOL, one of POOL_LINEAR's two mints)
+#     cannot be balanced without a real swap, so this fails deterministically every run. Step 1
+#     ("create position + setup + ledger", no swap involved) still lands for real; step 2
+#     ("zap in") is where the on-chain program rejects it — a genuine mid-bundle abort, unlike
+#     the pre-flight guard in PART A above (which never lets step 1 happen at all).
+# ---------------------------------------------------------------------------
+patch_literal "$ZAP_CONFIG" '"maxSqrtPriceChangeBps": 100,' '"maxSqrtPriceChangeBps": 0,'
+
+run_step_expect_fail "zap-in-damm-v2 (F3 part B: real send against a zap-in-compatible pool, maxSqrtPriceChangeBps=0 forces abort at \"zap in\")" \
+  'Aborted at step 2/3 ("zap in")' \
+  pnpm studio zap-in-damm-v2 --poolAddress "$POOL_LINEAR"
+F3_OUTPUT="$LAST_OUTPUT"
+
+assert_contains "F3: names the failed step and that step 3 (clean up) was NOT sent" \
+  'Step(s) 3-3 were NOT sent: clean up.' "$F3_OUTPUT"
+assert_contains "F3: states earlier step(s) already landed on-chain" \
+  'already landed on-chain — do not assume a clean slate' "$F3_OUTPUT"
+assert_contains "F3: prints a recovery reference address (public position address)" \
+  'Recovery reference address:' "$F3_OUTPUT"
+assert_contains "F3: explicitly says re-running does NOT resume" \
+  'does NOT resume this' "$F3_OUTPUT"
+assert_contains "F3: warns re-running WILL repeat the action (second real deposit)" \
+  'WILL repeat any action that already landed, such as a second real deposit' "$F3_OUTPUT"
+assert_contains "F3: tells the user to inspect state with a read-only action first" \
+  'damm-v2-get-positions / dlmm-get-positions' "$F3_OUTPUT"
+assert_contains "F3: tells the user how to continue safely (positionMode existing)" \
+  'set positionMode to "existing"' "$F3_OUTPUT"
+assert_not_contains "F3: the OLD false blanket resume claim is gone" \
+  'Re-run the same command to resume: it rebuilds a fresh ordered bundle' "$F3_OUTPUT"
+assert_not_contains "F3: never prints a secret/private key material" \
+  'PRIVATE_KEY' "$F3_OUTPUT"
+
+patch_literal "$ZAP_CONFIG" '"maxSqrtPriceChangeBps": 0,' '"maxSqrtPriceChangeBps": 100,'
 
 echo ""
 echo "==> Done. Created on localnet this run: baseMint1=${MINT} poolRateLimiter=${POOL_RATELIMITER} baseMint2=${MINT2} poolLinear=${POOL_LINEAR}"

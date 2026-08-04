@@ -12,7 +12,7 @@ import {
   getTokenDecimals as getDammV2TokenDecimals,
   getCurrentPoint,
   derivePositionAddress,
-  getBaseFeeHandlerFromBorshData,
+  getBaseFeeHandlerFromPodAlignedData,
   FeeRateLimiter,
   type PoolState,
 } from '@meteora-ag/cp-amm-sdk';
@@ -63,12 +63,25 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
  * incompatibility would otherwise stay invisible until a live send had already paid for and
  * landed the earlier setup steps.
  *
- * The fee mode is not a plain field — on-chain it is Borsh-packed into `baseFeeInfo.data`, so
- * it is decoded with the SDK's own `getBaseFeeHandlerFromBorshData` and identified by handler
- * class rather than by reading a byte at a hardcoded offset.
+ * The fee mode is not a plain field — on an on-chain-fetched pool it is POD/bytemuck-packed
+ * into `baseFeeInfo.data` (verified against the installed cp-amm-sdk's own IDL, which tags
+ * that field `serialization: "bytemuck"` — NOT Borsh; the 27-byte `getBaseFeeHandlerFromBorshData`
+ * variant is for client-constructed pool-creation params, e.g. `validatePoolFees`'s
+ * `poolFees.baseFee.data`, a different, shorter encoding). This decodes with the SDK's own
+ * `getBaseFeeHandlerFromPodAlignedData` — the same function the SDK's own
+ * `getTotalTradingFeeFromIncludedFeeAmount`/`getTotalTradingFeeFromExcludedFeeAmount` call on
+ * this exact `poolFees.baseFee.baseFeeInfo.data` field for a fetched `PoolState` — and
+ * identified by handler class rather than by reading a byte at a hardcoded offset. (An earlier
+ * revision of this guard called the Borsh variant on this same POD field path instead: both
+ * functions accept an untyped `number[]` and never validate its length or encoding, but they
+ * read the mode discriminator from DIFFERENT offsets — Borsh from the last byte, POD-aligned
+ * from a fixed byte 8 — so calling the Borsh reader on 32-byte POD data silently decoded an
+ * unrelated byte as the mode instead of throwing, and the guard never fired for a real
+ * rate-limiter pool. Caught empirically by studio/src/tests/e2e-review-fixes-zap.sh: it sent a
+ * real transaction and only failed on-chain at "zap in", instead of refusing pre-flight.)
  */
 function assertPoolIsZapInCompatible(poolState: PoolState, poolAddress: PublicKey): void {
-  const baseFeeHandler = getBaseFeeHandlerFromBorshData(
+  const baseFeeHandler = getBaseFeeHandlerFromPodAlignedData(
     poolState.poolFees.baseFee.baseFeeInfo.data
   );
   if (baseFeeHandler instanceof FeeRateLimiter) {
