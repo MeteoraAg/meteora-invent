@@ -12,6 +12,8 @@ import {
   getTokenDecimals as getDammV2TokenDecimals,
   getCurrentPoint,
   derivePositionAddress,
+  getBaseFeeHandlerFromBorshData,
+  FeeRateLimiter,
   type PoolState,
 } from '@meteora-ag/cp-amm-sdk';
 import DLMM, { getTokenProgramId, StrategyType } from '@meteora-ag/dlmm';
@@ -42,6 +44,42 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
   if (balance === 0) {
     throw new Error(
       `Wallet ${payer.toString()} has 0 SOL — fund it first; even dry-run simulation requires an existing fee payer account`
+    );
+  }
+}
+
+/**
+ * Refuse a DAMM v2 zap-in against a Rate-Limiter-fee-mode pool.
+ *
+ * `zapInDammV2` CPIs into cp-amm's swap to perform its rebalance, and the rate-limiter fee
+ * mode's on-chain validation rejects that: the real send fails with cp-amm error 6049
+ * `FailToValidateSingleSwapInstruction`. Verified empirically on localnet against a pool
+ * created from `damm_v2_config.jsonc`'s own default `baseFeeMode: 2`, and it fails regardless
+ * of how the bundle is structured — including with the zap-in instruction completely alone in
+ * its transaction (see studio/src/tests/e2e-review-fixes-zap.sh).
+ *
+ * This has to be a pre-flight check rather than something a dry run would surface: the zap-in
+ * step legitimately carries `dependsOnPriorStep`, so dry-run DEFERS simulating it, and the
+ * incompatibility would otherwise stay invisible until a live send had already paid for and
+ * landed the earlier setup steps.
+ *
+ * The fee mode is not a plain field — on-chain it is Borsh-packed into `baseFeeInfo.data`, so
+ * it is decoded with the SDK's own `getBaseFeeHandlerFromBorshData` and identified by handler
+ * class rather than by reading a byte at a hardcoded offset.
+ */
+function assertPoolIsZapInCompatible(poolState: PoolState, poolAddress: PublicKey): void {
+  const baseFeeHandler = getBaseFeeHandlerFromBorshData(
+    poolState.poolFees.baseFee.baseFeeInfo.data
+  );
+  if (baseFeeHandler instanceof FeeRateLimiter) {
+    throw new Error(
+      `DAMM v2 pool ${poolAddress.toString()} uses the Rate Limiter base-fee mode, which is not ` +
+        'compatible with zap-in: the zap program swaps by CPI into cp-amm, and the rate limiter ' +
+        'rejects that with error 6049 (FailToValidateSingleSwapInstruction) no matter how the ' +
+        'transactions are arranged. Stopping now, before any transaction is sent.\n' +
+        'To zap into a pool you are creating, give it a fee-scheduler base-fee mode instead ' +
+        '(damm_v2_config.jsonc baseFeeMode 0 or 1). For a pool that already exists with the rate ' +
+        'limiter, add liquidity directly with damm-v2-add-liquidity instead of zapping.'
     );
   }
 }
@@ -167,6 +205,8 @@ export async function zapInDammV2(
         'covered by this action.'
     );
   }
+
+  assertPoolIsZapInCompatible(poolState, poolAddress);
 
   const tokenAProgram = getDammV2TokenProgram(poolState.tokenAFlag);
   const tokenBProgram = getDammV2TokenProgram(poolState.tokenBFlag);

@@ -114,6 +114,18 @@ calls Jupiter's quote API to price its rebalancing swap — DAMM v2's direct rou
 Jupiter (see `studio-actions.md`'s Zap section for how each is verified). Build results are
 **multi-transaction bundles** (`setupTransaction`, `swapTransactions[]`, `zapInTransaction`,
 `cleanUpTransaction`) — send in order.
+
+Two gotchas found by testing zap-in on localnet, both worth knowing before you build on this
+SDK. First, keep `zapInTransaction` **alone in its own transaction** — that separate response
+field is a requirement, not a size convenience. The zap program swaps by CPI into cp-amm, and
+merging that instruction with others trips cp-amm's single-swap validation. Second, **a
+Rate-Limiter-fee-mode DAMM v2 pool cannot be zapped into at all**: it fails on-chain with
+cp-amm error 6049 (`FailToValidateSingleSwapInstruction`) even when the zap-in instruction is
+completely alone. Since a fresh pool created from `damm_v2_config.jsonc`'s defaults uses that
+fee mode, check the pool's base-fee mode before you attempt a zap — decode it from the pool
+state with cp-amm's `getBaseFeeHandlerFromBorshData` (the mode is Borsh-packed inside
+`poolFees.baseFee.baseFeeInfo.data`, not a plain field) and compare against `FeeRateLimiter`.
+
 Studio actions: `zap-in-damm-v2` (direct), `zap-in-dlmm` (Jupiter-quoted), `zap-out` (direct) —
 see `studio-actions.md`.
 

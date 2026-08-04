@@ -277,7 +277,10 @@ Flags: `--poolAddress` (required). Reads `splitPosition`: `newPositionOwner` plu
 percentage fields `unlockedLiquidityPercentage`, `permanentLockedLiquidityPercentage`,
 `innerVestingLiquidityPercentage`, `feeAPercentage`, `feeBPercentage`, `reward0Percentage`,
 `reward1Percentage` — the share of each dimension transferred to the new owner's position
-(there is no `splitLpAmount`; DAMM v2 has position NFTs, not LP tokens).
+(there is no `splitLpAmount`; DAMM v2 has position NFTs, not LP tokens). Creating the second
+position and splitting into it happen in one transaction, so `dryRun: true` is genuinely
+side-effect-free here (it used to create the second position for real, and pay its rent, even
+under `dryRun`).
 
 ### `damm-v2-close-position`
 ```bash
@@ -873,13 +876,32 @@ a clear "fund it first" error, before any pool fetch, quote, or per-step simulat
 happens even under `dryRun`, since simulating still needs an existing fee-payer account).
 Past that gate, all three build/send an ORDERED bundle of transactions through the shared
 `sendOrderedTransactions` helper (`studio/src/helpers/transaction.ts`, generic — any future
-multi-tx flow can reuse it). Under `dryRun` it simulates **every** step in order even after an
-earlier one fails, so a single dry run surfaces every problem it can find at once, then throws a
-combined report naming each failed step if any did. For a real send it goes step-by-step with a
-fresh blockhash fetched right before each one and **aborts immediately on the first failure**,
-naming the failed step and every step that was NOT sent — steps before the failure already landed
-on-chain, so the right recovery is re-running the same command (it rebuilds a fresh bundle from
-current on-chain state), not assuming a clean slate.
+multi-tx flow can reuse it).
+
+**What a zap dry run does and does not verify.** It simulates every step it can, in order, even
+after an earlier one fails, so one dry run surfaces every problem it can find at once and then
+throws a combined report naming each failed step. Steps that genuinely need an earlier step to
+have *landed* on-chain are **deferred, not verified** — they print an explicit "deferring
+simulation" line and are counted separately in the summary (`N/M step(s) simulated
+successfully; K step(s) deferred`). A deferred step is unverified, not verified-safe: simulating
+it in isolation would fail against chain state where the prerequisite never actually landed, so
+reporting that as a failure would be a lie in the other direction. Read a clean dry run as "no
+problem found in the steps that could be checked", not "the whole bundle is guaranteed to work".
+
+**If a real send aborts partway through.** It goes step-by-step with a fresh blockhash before
+each one and aborts immediately on the first failure, naming the failed step, every step that
+was NOT sent, and a public recovery address (the position involved). Whether re-running is safe
+depends on the action, and the abort message says which case you are in:
+
+- **`zap-out` is safe to re-run.** It re-reads the position's remaining liquidity from chain on
+  every invocation, so re-running converges instead of repeating a completed withdrawal.
+- **`zap-in-damm-v2` and `zap-in-dlmm` are NOT safe to re-run.** Each run mints a *fresh*
+  position keypair, so re-running does not resume — it builds a brand-new bundle and will
+  deposit a second time (a duplicate orphaned position, or a doubled deposit with
+  `positionMode: "existing"`). Before doing anything else, inspect chain state with a read-only
+  action (`damm-v2-get-positions` / `dlmm-get-positions`) and check whether the deposit already
+  landed. If it did, do not re-run; for DAMM v2, continue with `positionMode: "existing"`
+  against the position from the abort message instead of creating another one.
 
 ### `zap-in-damm-v2`
 ```bash
@@ -899,6 +921,19 @@ docs: "used for price calculation, not the actual amountIn"); `jupiterQuote` is 
 which provably rules out the SDK's Jupiter branch (it requires `jupiterQuote !== null` first, so
 the code path that would call Jupiter is unreachable). ~0.01-0.02 SOL (more with
 `positionMode: "new"`).
+
+**Rate-Limiter pools cannot be zapped into — including pools made with the DAMM v2 template's
+own defaults.** The zap program performs its rebalancing swap by CPI into cp-amm, and the
+Rate Limiter base-fee mode rejects that on-chain with cp-amm error 6049
+(`FailToValidateSingleSwapInstruction`). Verified on localnet, and it fails no matter how the
+bundle is arranged — even with the zap-in instruction alone in its own transaction. This action
+therefore decodes the pool's base-fee mode and **refuses up front**, before sending anything.
+The catch worth knowing: `damm_v2_config.jsonc` ships `baseFeeMode: 2` (Rate Limiter) as its
+default, so a pool you just created from the template defaults is *not* zap-in compatible. Give
+pools you intend to zap into a fee-scheduler mode (`baseFeeMode` 0 or 1); for a rate-limiter
+pool that already exists, use `damm-v2-add-liquidity` instead. Note this cannot be caught by a
+dry run — zap-in is one of the deferred steps described above — which is exactly why the check
+is a pre-flight refusal.
 
 ### `zap-in-dlmm`
 ```bash
