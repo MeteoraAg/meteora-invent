@@ -49,7 +49,7 @@
       "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds, e.g., Date.now() / 1000 + 86400 for 24 hours from now)
       "whitelistMode": 0, // Whitelist mode: 0 = permissionless (anyone can participate) | 1 = permissioned_with_merkle_proof | 2 = permissioned_with_authority
       "disableEarlierPresaleEndOnceCapReached": false, // if true, FCFS/fixed-price presales keep running until presaleEndTime even after the max cap is hit
-      "unsoldTokenAction": 1 // Action for unsold tokens: 0 = burn | 1 = refund to creator
+      "unsoldTokenAction": 1 // Action for unsold tokens: 0 = refund unsold tokens to creator | 1 = burn unsold tokens
     },
 
     /* Fixed Price Presale specific fields (only required for fixed_price presaleVaultType)
