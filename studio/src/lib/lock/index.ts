@@ -78,6 +78,22 @@ export async function createVestingEscrow(
       `lockCreateEscrow.numberOfPeriod must be a non-negative integer (got ${numberOfPeriod})`
     );
   }
+  // Verified against @meteora-ag/met-lock-sdk@1.0.1's IDL: error 6009 is exactly
+  // `InvalidVestingStartTime` ("Invalid vesting start time"), and this codebase's own
+  // studio-actions.md documents (from earlier QA) that the program rejects creation whenever
+  // vestingStartTime > cliffTime. Deliberately NOT checking cliffTime against "now" — an
+  // already-elapsed cliff is a legitimate immediately-unlockable vesting schedule; only the
+  // relative order matters here.
+  if (!(vestingStartTime <= cliffTime)) {
+    throw new Error(
+      `lockCreateEscrow.vestingStartTime (${vestingStartTime}, ` +
+        `${new Date(vestingStartTime * 1000).toISOString()}) must be <= cliffTime (${cliffTime}, ` +
+        `${new Date(cliffTime * 1000).toISOString()}) — met-lock-sdk's create-vesting-escrow instruction ` +
+        'rejects the reverse order on-chain with InvalidVestingStartTime (error 6009). Fix lock_config.jsonc ' +
+        'so vestingStartTime <= cliffTime (a cliffTime in the past is fine on its own, e.g. for an ' +
+        'immediately-unlockable vesting schedule, as long as it is not before vestingStartTime).'
+    );
+  }
 
   console.log('\n> Initializing Met Lock vesting escrow...');
   const payerBalance = await connection.getBalance(wallet.publicKey);
