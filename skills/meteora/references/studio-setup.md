@@ -65,16 +65,10 @@ pnpm studio start-test-validator
 pnpm studio airdrop-sol --network localnet   # fixed 5 SOL per call; no --amount flag
 ```
 
-The validator now preloads **all** Meteora programs — DLMM, DAMM v1, DAMM v2, DBC, Alpha
+The validator preloads **all** Meteora programs — DLMM, DAMM v1, DAMM v2, DBC, Alpha
 Vault, Dynamic Vault, Met Lock, and Dynamic Fee Sharing, plus **Presale**, **Stake2Earn
 (M3M3)**, **Zap**, and **Pool Farms** — so every product's golden path is testable on
 localnet without faucets.
-
-Maintainers: `studio/src/tests/e2e-helper-smoke.sh` runs an automated, idempotent smoke test
-of the Met Lock and Dynamic Fee Sharing golden paths end-to-end against this validator
-(throwaway wallet + mint, dry-run then real send, PASS/FAIL per step) without touching any
-existing `studio/.env` / `keypair.json` / config — see the script's header comment for exact
-scope and why the other families aren't included.
 
 ## Verify Setup
 

@@ -5,9 +5,7 @@ import BN from 'bn.js';
 import { getAmountInTokens } from '../../helpers';
 import { ALPHA_VAULT_PROGRAM_IDS } from '../../utils/constants';
 
-// getAvailableDepositQuota() (in the SDK) uses this exact sentinel to mean "no cap applies"
-// (FCFS-only caps default to it when the vault/mode doesn't constrain deposits) — recognized
-// here so status/participant output prints "unlimited" instead of a confusing huge number.
+// SDK sentinel from getAvailableDepositQuota() meaning "no cap applies"
 const UNLIMITED_QUOTA = new BN(Number.MAX_SAFE_INTEGER);
 
 export function getAlphaVaultWhitelistMode(mode: WhitelistModeConfig): WhitelistMode {
@@ -42,26 +40,22 @@ export function getClusterFromProgramId(alphaVaultProgramId: PublicKey): string 
 }
 
 /**
- * The alpha vault program id every action in this codebase resolves against unless told
- * otherwise (mainnet-beta and devnet share this id; only localhost differs — see
- * ALPHA_VAULT_PROGRAM_IDS). Matches the create-path precedent in lib/alpha_vault/index.ts.
+ * Default alpha vault program id (mainnet-beta and devnet share this id; only localhost differs).
+ * @returns The alpha vault program id
  */
 export function defaultAlphaVaultProgramId(): PublicKey {
   return new PublicKey(ALPHA_VAULT_PROGRAM_IDS['mainnet-beta']);
 }
 
 /**
- * Hydrate an AlphaVault instance (fetches .vault/.mode/.vaultState + base/quote mint info) for
- * a known vault address, using the same program-id -> cluster resolution as the create-path
- * actions (createMerkleProofMetadata, etc.) — reused here so participant/status ops stay
- * consistent with vault creation.
+ * Hydrate an AlphaVault instance for a known vault address.
  *
- * Wraps `AlphaVault.create` in a try/catch: a nonexistent vault address makes the SDK's
- * `getMultipleAccountsInfo(...)` return `null` for that account, and it reads `.data` off that
- * with no null guard (verified against the compiled source) — a raw `TypeError: Cannot read
- * properties of null (reading 'data')` instead of an actionable message. Every write action in
- * `participant.ts` plus `status.ts`'s `getStatus` route through this one function, so fixing it
- * here covers all of them (mirrors the `Presale.create` wrap in `presale_vault/status.ts`).
+ * `AlphaVault.create` returns null for a nonexistent vault but reads `.data` off it with no
+ * guard, throwing a raw `TypeError` — wrapped here into an actionable error.
+ * @param connection - The connection to the network
+ * @param vault - The alpha vault address
+ * @param alphaVaultProgramId - The alpha vault program id
+ * @returns The hydrated AlphaVault instance
  */
 export async function loadAlphaVault(
   connection: Connection,
@@ -80,9 +74,10 @@ export async function loadAlphaVault(
 }
 
 /**
- * Format a quota/cap BN as human token units, recognizing the SDK's "no cap" sentinel
- * (Number.MAX_SAFE_INTEGER, returned by getAvailableDepositQuota when nothing constrains the
- * deposit — e.g. prorata mode, or FCFS with no individual cap left to hit).
+ * Format a quota/cap BN as human token units, printing "unlimited" for the SDK's no-cap sentinel.
+ * @param amount - The quota/cap amount
+ * @param decimals - The token decimals
+ * @returns The formatted amount
  */
 export function formatAlphaVaultAmount(amount: BN, decimals: number): string {
   if (amount.gte(UNLIMITED_QUOTA)) {

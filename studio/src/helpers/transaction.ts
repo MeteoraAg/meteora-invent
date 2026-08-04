@@ -165,20 +165,13 @@ export async function handleSendTxs(
 
 /**
  * Merge several already-built Transactions' instructions into ONE Transaction, in order.
- * Solana executes a transaction's instructions sequentially against continuously-updated
- * account state, so an account CREATED by instruction N (e.g. `createPosition`, or the
- * ledger-account init inside a zap bundle) is already fully usable by instruction N+1 in the
- * SAME transaction — both for a real send AND for `simulateTransaction`. Combining dependent
- * steps this way is what lets `sendOrderedTransactions`' dry-run path (which simulates each
- * STEP independently against unchanged chain state) honestly verify a bundle whose later
- * steps reference accounts an earlier step creates, instead of the later step's simulation
- * always failing against an account that (in isolation) was never actually created — see
- * zapInDammV2/zapInDlmm in lib/zap for the concrete case this fixed (verified empirically on
- * localnet; see studio/src/tests/e2e-review-fixes-zap.sh).
- *
- * Does not set feePayer or sign anything — callers still do that on the returned Transaction
- * exactly as they would on any single step's `tx` before handing it to
- * `sendOrderedTransactions`.
+ * An account created by instruction N is already usable by instruction N+1 in the same
+ * transaction, so combining dependent steps this way lets a dry run of `sendOrderedTransactions`
+ * verify a step that reads an account an earlier step creates.
+ * Does not set feePayer or sign anything — callers do that on the returned Transaction the
+ * same way they would for any single step's `tx`.
+ * @param txs - The transactions to merge, in order
+ * @returns The combined transaction
  */
 export function combineTransactions(txs: Transaction[]): Transaction {
   const combined = new Transaction();
