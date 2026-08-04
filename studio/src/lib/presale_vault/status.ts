@@ -18,7 +18,7 @@ export interface PresaleSelector {
  * derived from [baseMint, quoteMint, base], where `base` is a one-off keypair generated at
  * creation time and is not recoverable from the mint alone). Matches are filtered by the
  * decoded account's `baseMint` field — the same field getStatus() below reads off
- * `presale.presaleAccount` (verified against the installed @meteora-ag/presale .d.ts).
+ * `presale.presaleAccount`.
  */
 export async function resolvePresaleAddress(
   connection: Connection,

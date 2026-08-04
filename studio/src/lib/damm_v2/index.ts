@@ -629,23 +629,9 @@ export async function splitPosition(
   console.log(`- Unclaimed Fee B: ${unclaimedLpFee.feeTokenB.toString()}`);
   console.log(`- TOTAL POSITION FEE B: ${totalPositionFeeB.toString()}`);
 
-  // F4-ADJACENT FIX (dry-run trap): this used to unconditionally REALLY SEND
-  // createSecondPositionTx via sendAndConfirmTransaction BEFORE the config.dryRun check below —
-  // meaning even a "dry run" of damm-v2-split-position created a real second position on-chain
-  // and paid real rent for it (confirmed by code inspection: the send call had no dryRun
-  // branch at all, unlike splitPositionTx just below it). It then re-fetched the second
-  // position over RPC just to read back `position`/`positionNftAccount`, which are pure,
-  // deterministic PDA derivations of the position-NFT mint (derivePositionAddress /
-  // derivePositionNftAccount, both exported by the installed cp-amm-sdk and already used this
-  // way by the zap-sdk itself) — no RPC round-trip is actually needed to know them.
-  //
-  // Fix: derive both directly (no send yet), build BOTH instructions, and combine them into
-  // ONE transaction via combineTransactions (same technique — and same empirical
-  // justification, see lib/zap/index.ts's buildDammV2ZapInSteps doc — used for the F4 zap
-  // fix: an account created by an earlier instruction is already usable by a later one in the
-  // SAME transaction, both for a real send and for simulateTransaction). That makes the
-  // combined tx safe to gate on config.dryRun exactly like every other action in this file:
-  // simulate-only in a dry run (nothing is created), send-for-real otherwise.
+  // The second position's addresses are deterministic PDAs of its NFT mint, so they need no
+  // RPC read, and creating it can share one transaction with the split — which keeps the whole
+  // action behind the config.dryRun gate instead of creating a real position during a dry run.
   const secondPositionKP = Keypair.generate();
   const secondPositionAddress = derivePositionAddress(secondPositionKP.publicKey);
   const secondPositionNftAccount = derivePositionNftAccount(secondPositionKP.publicKey);

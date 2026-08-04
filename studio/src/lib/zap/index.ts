@@ -137,22 +137,13 @@ async function assertHoldsAtLeast(
  * keypair; "existing" deposits into the wallet's own position on this pool, prompting when
  * there is more than one).
  *
- * Two-phase SDK call (verified against the installed @meteora-ag/zap-sdk@1.3.2 .d.ts, the
- * SDK's own examples/zapInDammV2DirectPool.ts, and tests/zapInDammV2.test.ts):
- * `getZapInDammV2DirectPoolParams` -> `buildZapInDammV2Transaction`. The response is an
- * ORDERED multi-transaction bundle — setupTransaction? -> swapTransactions[] ->
- * ledgerTransaction -> zapInTransaction -> cleanUpTransaction — sent in that exact order via
- * the shared `sendOrderedTransactions` helper.
+ * Two-phase SDK call: `getZapInDammV2DirectPoolParams` -> `buildZapInDammV2Transaction`. The
+ * response is an ordered bundle — setupTransaction? -> swapTransactions[] -> ledgerTransaction
+ * -> zapInTransaction -> cleanUpTransaction — sent in that order via `sendOrderedTransactions`.
  *
- * No-Jupiter guarantee (verified against the SDK source, not just its docs): passing
- * `jupiterQuote: null` makes the SDK's internal route picker take the
- * `else if (dammV2Quote !== null)` branch unconditionally — the Jupiter branch requires
- * `jupiterQuote !== null` first, so `buildJupiterSwapTransaction` (the only place that would
- * hit Jupiter's live API) is provably unreachable here. `dammV2Quote` itself is our own
- * REFERENCE quote for exactly 1 unit of inputMint priced through the pool's own liquidity
- * (per the SDK's own JSDoc: "used for price calculation, not the actual amountIn") — computed
- * with `cpAmm.getQuote`, the same public helper `damm-v2-swap` already uses elsewhere in this
- * codebase.
+ * Passing `jupiterQuote: null` keeps the SDK on its direct-pool branch, so nothing here
+ * reaches Jupiter's API. `dammV2Quote` is a reference quote for one unit of inputMint priced
+ * through the pool itself — per the SDK, used for price calculation rather than as the amount.
  */
 export async function zapInDammV2(
   config: ZapConfig,
@@ -339,8 +330,7 @@ export async function zapInDammV2(
     positionNftMint,
     maxSqrtPriceChangeBps,
     maxTransferAmountExtendPercentage,
-    // Unused on this code path: only read inside the Jupiter branch, which is unreachable
-    // because jupiterQuote is always null below (verified against the SDK source).
+    // Only read inside the Jupiter branch, which jupiterQuote: null below rules out
     maxAccounts: 20,
     slippageBps,
     dammV2Quote,
@@ -384,47 +374,17 @@ export async function zapInDammV2(
  * either `[]` (positionMode "existing") or a single "create position" step (positionMode
  * "new"); `bundle` is the SDK's response from `buildZapInDammV2Transaction`.
  *
- * EMPIRICAL F4 FIX (verified on localnet — see studio/src/tests/e2e-review-fixes-zap.sh, two
- * rounds of empirical evidence):
+ * Create-position, setup and ledger go into one transaction: a dry run simulates each step
+ * against unchanged chain state, so a later step reading an account an earlier step creates
+ * would otherwise fail simulation on an account that never landed.
  *
- * Round 1 finding: `sendOrderedTransactions`' dry-run simulates each step independently
- * against UNCHANGED chain state, so any step whose accounts are only created/initialized by
- * an EARLIER step fails simulation once that earlier step is only simulated too (never
- * actually landing on-chain). Confirmed empirically: dry-running the ORIGINAL 5-separate-step
- * bundle failed "zap in" simulation with Anchor error 3007 `AccountOwnedByWrongProgram` on the
- * `ledger` account (created by the immediately-preceding "ledger update" step) — and, for
- * positionMode "new", the same problem applies in principle to the `position` account created
- * by the separate preceding "create position" step (the reviewer's original hypothesis).
+ * The zap-in instruction must stay alone in its own transaction. It reaches cp-amm's swap by
+ * CPI, and the rate-limiter fee mode rejects a transaction carrying anything else alongside
+ * that swap (cp-amm 6049). Zap-in and clean-up therefore keep `dependsOnPriorStep`, which
+ * defers their simulation rather than reporting a false failure.
  *
- * Round 1 attempted fix (REVERTED): combining create-position + setup + ledger + zap-in +
- * clean-up into ONE transaction resolves the dry-run problem (confirmed — the account
- * -ownership error disappeared) but empirically BREAKS A REAL SEND for the template's default
- * pool config: `damm_v2_config.jsonc`'s default `baseFeeMode: 2` (Rate Limiter) rejects it
- * on-chain with `AnchorError ... FailToValidateSingleSwapInstruction` (error 6049) — the
- * rate-limiter fee mode requires the swap-performing instruction to be the ONLY thing in its
- * transaction (`zapInDammV2` CPIs into cp-amm's `Swap2` internally to do the rebalance swap,
- * confirmed in the simulation logs), which is almost certainly WHY the SDK's own response
- * shape keeps `zapInTransaction` as its own separate field in the first place — not merely a
- * transaction-size convenience. Combining zap-in with anything else is therefore NOT safe in
- * general, regardless of size headroom.
- *
- * Actual fix: combine ONLY create-position (if any) + setup + ledger into ONE transaction —
- * none of those three invoke the rate-limited swap path (confirmed: CreatePosition ran fine
- * alongside other instructions in the round-1 experiment; only the ZapInDammV2 instruction
- * itself tripped the check), so this is safe and resolves both dependency problems above
- * without touching zap-in's isolation. "zap in" and "clean up" stay in their OWN untouched
- * transactions exactly as the SDK built them, marked `dependsOnPriorStep: true` so dry-run
- * honestly DEFERS simulating them (they still depend on the combined step having actually
- * landed, which a simulation never does) instead of either misreporting a failure (the
- * original bug) or falsely claiming full verification. A live send is unaffected either way —
- * all steps still send for real, in order.
- *
- * Whenever `bundle.swapTransactions` is non-empty — believed unreachable for this action today
- * (studio always calls `getZapInDammV2DirectPoolParams` with `jupiterQuote: null`, and the
- * installed zap-sdk's `dammV2Quote` branch, the only one reachable with a null jupiterQuote,
- * never populates `swapTransactions` — verified by reading the compiled SDK source) — this
- * falls back to the fully-separate, fully-deferred step list instead of assuming it is safe to
- * combine a not-yet-landed swap's output into the same transaction as anything reading it.
+ * A non-empty `bundle.swapTransactions` falls back to fully separate, deferred steps; the
+ * direct route never populates it, since `jupiterQuote` is always null.
  */
 function buildDammV2ZapInSteps(
   preambleSteps: OrderedTransactionStep[],
@@ -561,13 +521,10 @@ function wrapJupiterQuoteFailure(error: unknown): Error {
  * it's set — mirrors the SDK's own `zapInDlmmDirectSingleSided.ts` example), maxActiveBinSlippage,
  * maxAccounts, maxTransferAmountExtendPercentage.
  *
- * ALWAYS creates a new position (a throwaway keypair co-signs once, and the resulting position
- * address is logged prominently) — verified against the SDK source: `buildZapInDlmmTransaction`
- * unconditionally calls the private `zapInDlmmForUninitializedPosition` (whose embedded IDL
- * marks `position` as a fresh `signer` account, matching `Keypair.generate()` in the SDK's own
- * examples). The companion instruction for an already-initialized position
- * (`zapInDlmmForInitializedPosition`) is only reachable through the separate, much heavier
- * `rebalanceDlmmPosition` flow (remove ALL liquidity -> swap -> re-add) — a different operation,
+ * Always creates a new position, co-signed once by a throwaway keypair whose address is
+ * logged: `buildZapInDlmmTransaction` only builds the uninitialized-position instruction. The
+ * initialized-position variant is reachable only through the heavier `rebalanceDlmmPosition`
+ * flow (remove all liquidity -> swap -> re-add) — a different operation,
  * out of scope here; depositing into an existing DLMM position stays a BUILD-path task (see
  * `studio-actions.md` / `SKILL.md`'s "DLMM add-to-existing-position / rebalance" note).
  *
@@ -764,34 +721,14 @@ export async function zapInDlmm(
 }
 
 /**
- * Builds the ordered step list for a DLMM zap-in bundle. Same empirically-verified F4 bug as
- * `buildDammV2ZapInSteps` (see its doc, including the ROUND 1 finding/revert): the "zap in"
- * instruction's `ledger` account is created by the immediately-preceding "ledger update" step,
- * so `sendOrderedTransactions`' per-step-independent dry-run simulation fails it with an
- * uninitialized-account error unless that dependency is removed.
+ * Builds the ordered step list for a DLMM zap-in bundle. Setup and ledger are combined for the
+ * same reason as `buildDammV2ZapInSteps`: the zap-in instruction reads a ledger account the
+ * preceding step creates, which a per-step dry run cannot simulate in isolation.
  *
- * This function deliberately never combines "zap in" itself with anything else, for two
- * independent reasons, either of which is sufficient on its own:
- * 1. DAMM v2's `zapInDammV2` instruction was empirically found to internally CPI into a
- *    rate-limited swap that on-chain REJECTS being combined with any other instruction in the
- *    same transaction (`FailToValidateSingleSwapInstruction`, cp-amm error 6049 — see
- *    `buildDammV2ZapInSteps`'s doc for the full empirical trail). DLMM is a different program
- *    with a different fee model and has not been observed to have the identical restriction,
- *    but this has NOT been verified empirically for DLMM (Jupiter-dependent, cannot run on
- *    localnet — see this file's zap-in-dlmm doc), so the same conservative isolation is kept
- *    here rather than assumed safe.
- * 2. DLMM zap-in's rebalancing swap is genuinely common (per this file's `zapInDlmm` doc:
- *    needed whenever the deposit isn't already balanced for the target range) and can be
- *    Jupiter-routed — Jupiter routes can already sit close to the transaction size ceiling on
- *    their own, so combining a real swap transaction into the same transaction as anything
- *    else is not safe to assume fits.
- *
- * So: combine ONLY setup + ledger into one transaction when there is no swap to worry about
- * (neither invokes anything swap-related); "zap in" and "clean up" always stay in their OWN
- * untouched transactions exactly as the SDK built them, marked `dependsOnPriorStep: true` so
- * dry-run honestly DEFERS simulating them (they still depend on the combined step's real
- * effect) instead of misreporting a failure. A live send always runs every step for real, in
- * order, regardless of this flag.
+ * Zap-in stays alone in its transaction here too. The DLMM program has a different fee model
+ * and has not been shown to carry cp-amm's single-swap restriction, but its rebalancing swap
+ * is common and can be Jupiter-routed, and Jupiter routes already sit close to the transaction
+ * size ceiling.
  */
 function buildDlmmZapInSteps(
   bundle: {
@@ -876,9 +813,8 @@ function buildDlmmZapInSteps(
  * `outputMint`, atomically. Reads config.zapOut: protocol ("damm-v2" | "dlmm"), outputMint,
  * slippageBps.
  *
- * The remove-liquidity instruction(s) and the zap-out swap MUST land in the SAME on-chain
- * transaction (verified against the SDK's own examples/removeDammV2LiquidityAndZapOut.ts,
- * examples/removeDlmmLiquidityAndZapOut.ts, and tests/zapOutDammV2.test.ts): the swap reads a
+ * The remove-liquidity instruction(s) and the zap-out swap must land in the same on-chain
+ * transaction: the swap reads a
  * balance DELTA (current on-chain balance minus a `preUserTokenBalance` snapshot taken when the
  * zap-out instruction was built) to know how much the preceding removal actually freed up.
  * Building the removal and the swap as two separate, sequentially-CONFIRMED transactions would

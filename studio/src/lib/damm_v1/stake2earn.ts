@@ -299,9 +299,8 @@ async function loadStakeForFee(
 /**
  * Confirm `owner` holds at least `amountLamports` of the stake mint in its associated token
  * account. Stake2Earn's `stake()` derives the staker's source ATA with no tokenProgram override
- * and hardcodes `tokenProgram: TOKEN_PROGRAM_ID` on the instruction itself (verified against the
- * compiled SDK) — the same classic-Token-Program assumption `farming/index.ts`'s own
- * `assertHoldsAtLeast` makes for its (also DAMM v1 LP) staking mint.
+ * and hardcodes `tokenProgram: TOKEN_PROGRAM_ID` on the instruction itself — the same
+ * classic-Token-Program assumption `farming/index.ts`'s `assertHoldsAtLeast` makes.
  */
 async function assertHoldsAtLeast(
   connection: Connection,
@@ -337,8 +336,8 @@ async function assertHoldsAtLeast(
 
 /**
  * StakeForFee.getUnstakeByUser destructures the first result of an internal
- * stakeEscrow.all(owner, feeVault) memcmp scan with no length check (verified against the
- * compiled SDK) — a wallet with no stake escrow at all on this farm makes it throw a raw
+ * stakeEscrow.all(owner, feeVault) memcmp scan with no length check — a wallet with no stake
+ * escrow on this farm makes it throw a raw
  * TypeError instead of returning an empty list (observed on the installed SDK/Node as "Cannot
  * read properties of undefined (reading 'publicKey')"; older V8 phrasing for the same
  * destructure-of-undefined shape reads "Cannot destructure property 'publicKey' of
@@ -420,8 +419,7 @@ async function resolveUnstakeKey(
  * human units, converted via the mint's own decimals from accountStates.stakeMint). The SDK's
  * own stake() method already creates the caller's stake escrow inline (a prepended
  * initializeStakeEscrow instruction via getOrCreateStakeEscrowInstruction) when one doesn't
- * exist yet — verified against the compiled SDK and the SDK repo's own examples/index.ts — so
- * no separate escrow-check/create step or extra transaction is needed here.
+ * exist yet, so no separate escrow-check step or extra transaction is needed here.
  */
 export async function stake(
   config: DammV1Config,

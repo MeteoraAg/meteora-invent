@@ -10,8 +10,7 @@ import BN from 'bn.js';
 import { getAmountInTokens } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 
-// vestingEscrow account layout (verified against the installed .d.ts and the SDK repo's
-// scripts/sumCreatorLockVaultTotals.s.ts, which hardcodes CREATOR_OFFSET = 8 + 32 + 32):
+// vestingEscrow account layout:
 // 8 discriminator | 32 recipient (offset 8) | 32 tokenMint (offset 40) | 32 creator (offset 72)
 const RECIPIENT_MEMCMP_OFFSET = 8;
 const CREATOR_MEMCMP_OFFSET = 8 + 32 + 32;
@@ -123,8 +122,7 @@ export async function getEscrow(connection: Connection, escrow: PublicKey) {
 /**
  * List vesting escrows where `wallet` is the recipient or the creator (needs the wallet's
  * public key to filter by, but no signature — read-only).
- * `program.account.vestingEscrow.all` with a memcmp filter — offsets verified against the
- * SDK repo's scripts/sumCreatorLockVaultTotals.s.ts (CREATOR_OFFSET = 8 + 32 + 32).
+ * Filters `program.account.vestingEscrow.all` by the memcmp offsets above.
  */
 export async function listEscrows(
   connection: Connection,

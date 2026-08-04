@@ -488,16 +488,14 @@ export async function createPermissionedFixedPricePresaleVaultWithMerkleProof() 
  * rejects a deposit against an already-ended presale on-chain with `PresaleEnded` (error 6016).
  * A `presaleEndTime` at or before the current time is therefore `Completed`/`Failed` from the
  * instant the vault is created: nobody can ever deposit into it. `presaleStartTime: 0` is the
- * SDK/program's own "start immediately" sentinel (documented in presale_vault_config.jsonc and
- * relied on elsewhere in this codebase, e.g. e2e-review-fixes-minors.sh) — it is intentionally
- * NOT flagged as "past" here, only `presaleEndTime` is checked against on-chain time.
+ * SDK/program's own "start immediately" sentinel, so it is not flagged as past here; only
+ * `presaleEndTime` is checked against on-chain time.
  *
  * Also guards the two fields' relationship: if `presaleStartTime` is a real (nonzero) future
  * timestamp, `presaleEndTime` must be after it, or the state machine above jumps straight from
- * `NotStarted` to `Completed`/`Failed` and the presale is never `Ongoing` either — note the
- * program additionally enforces its own minimum presale duration between the effective start
- * and end (see e2e-review-fixes-minors.sh's Section A setup), so clearing this ordering check
- * alone does not guarantee on-chain acceptance; leave a comfortable margin.
+ * `NotStarted` to `Completed`/`Failed` and the presale is never `Ongoing`. The program also
+ * enforces a minimum duration between the effective start and end, so passing this check alone
+ * does not guarantee on-chain acceptance; leave a comfortable margin.
  *
  * Uses the on-chain clock (`getOnChainTimestamp`), not the local wall clock — this program's
  * state machine is defined in terms of the validator's Clock sysvar, not the caller's machine.

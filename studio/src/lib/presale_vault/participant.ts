@@ -65,8 +65,7 @@ export async function simulateOrSend(
  * Deposit into a presale. Reads config.presaleDeposit (amount in quote human units,
  * registryIndex). `Presale.deposit()` itself creates a missing buyer escrow as a bundled
  * pre-instruction in the SAME transaction for Permissionless/PermissionWithMerkleProof modes
- * (verified against the installed `@meteora-ag/presale@0.1.1` compiled SDK's `Presale.deposit()`
- * — no separate create-escrow transaction is built or sent here):
+ * — no separate create-escrow transaction is built or sent here:
  *  - permissionless: `deposit()` calls `getOrCreatePermissionlessEscrowIx` internally. That
  *    helper — and the on-chain `create_permissionless_escrow` instruction itself (IDL-verified:
  *    the escrow PDA's seeds hardcode registry index 0, not an instruction arg) — can only ever
