@@ -51,34 +51,14 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
 /**
  * Refuse a DAMM v2 zap-in against a Rate-Limiter-fee-mode pool.
  *
- * `zapInDammV2` CPIs into cp-amm's swap to perform its rebalance, and the rate-limiter fee
- * mode's on-chain validation rejects that: the real send fails with cp-amm error 6049
- * `FailToValidateSingleSwapInstruction`. Verified empirically on localnet against a pool
- * created from `damm_v2_config.jsonc`'s own default `baseFeeMode: 2`, and it fails regardless
- * of how the bundle is structured — including with the zap-in instruction completely alone in
- * its transaction (see studio/src/tests/e2e-review-fixes-zap.sh).
+ * The zap program CPIs into cp-amm's swap to rebalance, and the rate limiter rejects that
+ * with error 6049 (FailToValidateSingleSwapInstruction) regardless of how the transaction is
+ * arranged, so this must run pre-flight — the zap-in step depends on a prior step, and a dry
+ * run cannot simulate it.
  *
- * This has to be a pre-flight check rather than something a dry run would surface: the zap-in
- * step legitimately carries `dependsOnPriorStep`, so dry-run DEFERS simulating it, and the
- * incompatibility would otherwise stay invisible until a live send had already paid for and
- * landed the earlier setup steps.
- *
- * The fee mode is not a plain field — on an on-chain-fetched pool it is POD/bytemuck-packed
- * into `baseFeeInfo.data` (verified against the installed cp-amm-sdk's own IDL, which tags
- * that field `serialization: "bytemuck"` — NOT Borsh; the 27-byte `getBaseFeeHandlerFromBorshData`
- * variant is for client-constructed pool-creation params, e.g. `validatePoolFees`'s
- * `poolFees.baseFee.data`, a different, shorter encoding). This decodes with the SDK's own
- * `getBaseFeeHandlerFromPodAlignedData` — the same function the SDK's own
- * `getTotalTradingFeeFromIncludedFeeAmount`/`getTotalTradingFeeFromExcludedFeeAmount` call on
- * this exact `poolFees.baseFee.baseFeeInfo.data` field for a fetched `PoolState` — and
- * identified by handler class rather than by reading a byte at a hardcoded offset. (An earlier
- * revision of this guard called the Borsh variant on this same POD field path instead: both
- * functions accept an untyped `number[]` and never validate its length or encoding, but they
- * read the mode discriminator from DIFFERENT offsets — Borsh from the last byte, POD-aligned
- * from a fixed byte 8 — so calling the Borsh reader on 32-byte POD data silently decoded an
- * unrelated byte as the mode instead of throwing, and the guard never fired for a real
- * rate-limiter pool. Caught empirically by studio/src/tests/e2e-review-fixes-zap.sh: it sent a
- * real transaction and only failed on-chain at "zap in", instead of refusing pre-flight.)
+ * The fee mode is POD/bytemuck-packed into `baseFeeInfo.data` on a fetched pool, not the
+ * Borsh layout used by client-constructed pool-creation params, so it must decode with
+ * `getBaseFeeHandlerFromPodAlignedData` rather than the Borsh variant.
  */
 function assertPoolIsZapInCompatible(poolState: PoolState, poolAddress: PublicKey): void {
   const baseFeeHandler = getBaseFeeHandlerFromPodAlignedData(

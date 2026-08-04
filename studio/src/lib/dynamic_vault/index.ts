@@ -19,10 +19,7 @@ import {
 import { DEFAULT_SEND_TX_MAX_RETRIES, SOL_TOKEN_MINT } from '../../utils/constants';
 import { loadDynamicVault } from './status';
 
-/**
- * 0-SOL fee-payer guard, shared by deposit/withdraw. Returns the balance (lamports) so
- * deposit() can reuse it for the native-SOL wrap sufficiency check below.
- */
+/** 0-SOL fee-payer guard, shared by deposit/withdraw; returns the balance so deposit() can reuse it for the wrap sufficiency check. */
 async function assertFunded(connection: Connection, payer: PublicKey): Promise<number> {
   const balance = await connection.getBalance(payer);
   if (balance === 0) {
@@ -34,15 +31,13 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<n
 }
 
 /**
- * Deposit into the dynamic vault for `baseMint`. Reads config.dynamicVaultDeposit.amount
- * (baseMint human units, converted via the mint's own decimals). `VaultImpl.create()` keys off
- * the TOKEN MINT, not a vault address — there is one permissionless dynamic vault per mint.
- *
- * wSOL note (verified against the installed package's compiled `dist/cjs/src/vault/index.js`):
- * when `baseMint` is native SOL's wrapped mint, `deposit()` WRAPS the requested amount of SOL
- * for you internally (a `SystemProgram.transfer` + sync-native pre-instruction ahead of the
- * deposit instruction) — no pre-funded wSOL account is needed, only enough actual SOL lamports
- * in the wallet to cover the wrap amount plus rent/fees (checked below).
+ * Deposit into the dynamic vault for `baseMint`. Reads config.dynamicVaultDeposit.amount (baseMint human units).
+ * `VaultImpl.create()` keys off the token mint, not a vault address — there is one permissionless vault per mint.
+ * When `baseMint` is native SOL, `deposit()` wraps the requested amount internally; no pre-funded wSOL account is needed.
+ * @param config - The dynamic vault config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet that owns and pays for the deposit
+ * @param baseMint - The vault's base token mint
  */
 export async function deposit(
   config: DynamicVaultConfig,
@@ -74,8 +69,7 @@ export async function deposit(
       '- Base mint is native SOL (wSOL) — deposit() wraps the requested amount of SOL for you ' +
         'internally; no pre-funded wSOL account is needed.'
     );
-    // The wrap pre-instruction moves `amountLamports` lamports straight out of the wallet, on
-    // top of the rent + fees the fee-payer guard above already confirmed the wallet can cover.
+    // The wrap moves `amountLamports` out of the wallet, on top of what assertFunded already confirmed covers rent/fees.
     if (payerBalance < Number(amountLamports.toString())) {
       throw new Error(
         `Wallet ${wallet.publicKey.toString()} has ${payerBalance} lamports of SOL but depositing ` +
@@ -84,9 +78,7 @@ export async function deposit(
       );
     }
   } else {
-    // allowOwnerOffCurve=true + TOKEN_PROGRAM_ID mirrors the SDK's own internal
-    // getAssociatedTokenAccount helper exactly (dynamic vault has no Token-2022 support — every
-    // account it builds hardcodes TOKEN_PROGRAM_ID, verified against the compiled source).
+    // Dynamic vault has no Token-2022 support; every account it builds hardcodes TOKEN_PROGRAM_ID.
     const ownerATA = getAssociatedTokenAddressSync(
       baseMint,
       wallet.publicKey,
@@ -134,22 +126,11 @@ export async function deposit(
 
 /**
  * Withdraw from the dynamic vault for `baseMint`. Reads config.dynamicVaultWithdraw.amount.
- *
- * UNIT WARNING (verified against the installed package's compiled `dist/cjs/src/vault/index.js`
- * and the vault program's IDL — NOT the shipped `.d.ts`, whose parameter name is misleading):
- * despite the SDK naming the parameter `baseTokenAmount`, `withdraw()` actually burns VAULT LP
- * TOKENS, not base-mint tokens. Internally it computes
- * `amountToWithdraw = baseTokenAmount.mul(withdrawableAmount).div(lpSupply)` — exactly the
- * `getAmountByShare(share, withdrawableAmount, totalSupply)` formula exported by this same
- * package — before choosing a withdrawal path, and the on-chain instruction's real argument
- * names (from the vault program IDL) are `unmintAmount` + `minOutAmount`, confirming
- * `baseTokenAmount` here IS the LP/share amount to burn. `config.dynamicVaultWithdraw.amount` is
- * therefore in **vault LP token human units** — the LP mint's own decimals, which always equal
- * the base mint's decimals on-chain (`mint::decimals = token_mint.decimals` in the vault
- * program's account-init constraints), so the human-unit scale looks the same even though 1 LP
- * token generally does NOT equal 1 base-mint token once the vault has earned yield. The
- * equivalent underlying-token amount this will actually redeem is computed and printed below
- * before every send.
+ * Despite the SDK naming the parameter `baseTokenAmount`, `config.dynamicVaultWithdraw.amount` is in vault LP-share units, not base-mint tokens; the underlying equivalent is computed via `getAmountByShare` and printed before every send.
+ * @param config - The dynamic vault config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet that owns the LP tokens
+ * @param baseMint - The vault's base token mint
  */
 export async function withdraw(
   config: DynamicVaultConfig,

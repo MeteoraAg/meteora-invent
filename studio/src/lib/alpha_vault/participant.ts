@@ -27,10 +27,8 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
 }
 
 /**
- * Deposit into an alpha vault. Reads config.alphaVaultDeposit.amount (quote human units).
- * Auto-fetches a merkle proof when the vault is permissioned_with_merkle_proof, and pre-checks
- * interactionState().canDeposit + availableQuota so a blocked deposit fails with a clear
- * "why" (vault phase / whitelist / cap) instead of an on-chain revert.
+ * Deposit into an alpha vault. Auto-fetches a merkle proof for permissioned_with_merkle_proof
+ * vaults, and pre-checks canDeposit + availableQuota so a blocked deposit fails with a clear reason.
  */
 export async function deposit(
   config: AlphaVaultConfig,
@@ -140,9 +138,8 @@ export async function deposit(
 }
 
 /**
- * Withdraw from an alpha vault during the deposit phase. Reads config.alphaVaultWithdraw.amount
- * (quote human units). Only valid for prorata-mode vaults while still DEPOSITING — guarded on
- * interactionState().canWithdraw.
+ * Withdraw from an alpha vault during the deposit phase. Only valid for prorata-mode vaults
+ * while still DEPOSITING — guarded on canWithdraw.
  */
 export async function withdraw(
   config: AlphaVaultConfig,
@@ -226,10 +223,9 @@ export async function withdraw(
 }
 
 /**
- * Claim vested/bought tokens from an alpha vault. Guarded on claimInfo.totalClaimable > 0
- * (surfaced via interactionState().canClaim). When config.alphaVaultClaim.closeEscrowWhenDone
- * is set and a real (non-dry-run) claim lands, refreshes state and closes the escrow afterwards
- * if — and only if — vesting has ended and everything has now been claimed.
+ * Claim vested/bought tokens from an alpha vault, guarded on claimInfo.totalClaimable > 0. When
+ * alphaVaultClaim.closeEscrowWhenDone is set, closes the escrow after a real claim once vesting
+ * has ended and everything is claimed.
  */
 export async function claim(
   config: AlphaVaultConfig,
@@ -326,7 +322,7 @@ export async function claim(
 
 /**
  * Withdraw an escrow's unused ("remaining") deposit after the vault has finished buying —
- * prorata overflow refunds. Guarded on interactionState().canWithdrawRemainingQuote.
+ * prorata overflow refunds. Guarded on canWithdrawRemainingQuote.
  */
 export async function withdrawRemainingQuote(
   config: AlphaVaultConfig,
@@ -400,11 +396,9 @@ export async function withdrawRemainingQuote(
 }
 
 /**
- * Crank the vault to buy tokens from the pool with deposited quote — permissionless; anyone can
- * call it. Loops fillVault(payer) until it returns null/undefined (fully filled, or the pool ran
- * out of the liquidity the vault needed). Under dryRun this can only simulate the FIRST
- * transaction (each subsequent fill depends on the previous one having actually landed), so it
- * simulates once and stops with a note instead of looping.
+ * Crank the vault to buy tokens from the pool with deposited quote — permissionless. Loops
+ * fillVault(payer) until it returns null (fully filled, or the pool ran out of liquidity). A dry
+ * run only simulates the first transaction, since later fills depend on earlier ones landing.
  */
 export async function crankFill(
   config: AlphaVaultConfig,
@@ -453,9 +447,7 @@ export async function crankFill(
     });
     console.log(`>>> Fill vault iteration ${iteration} landed: ${txHash}`);
 
-    // fillVault() reads off the cached this.vault snapshot — without refreshing, every
-    // iteration would rebuild the exact same (now stale) transaction. Matches the SDK's own
-    // fillVaultDlmm.ts example.
+    // fillVault() reads the cached vault snapshot; refresh between iterations or it rebuilds a stale transaction
     await alphaVault.refreshState();
   }
 }

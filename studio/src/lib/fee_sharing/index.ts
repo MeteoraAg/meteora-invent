@@ -50,14 +50,13 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<n
 }
 
 /**
- * Create a Dynamic Fee Sharing vault for `baseMint` (the token whose fees will be shared).
- * Reads config.feeSharingCreate: `userShares` (2-5 recipients, `share` a relative integer
- * weight — NOT required to sum to 100, docs.md-verified min/max enforced here pre-flight) and
- * `useKeypairVault` (true = createFeeVault, a fresh `feeVault` KEYPAIR co-signs once and IS the
- * vault address; false = createFeeVaultPda, a fresh `base` keypair co-signs once and the vault
- * address is a PDA derived from base + tokenMint). Either way a brand-new keypair is generated
- * in-memory purely to co-sign this one transaction — only the resulting vault ADDRESS matters
- * afterward (logged prominently below), the keypair's secret is never needed again.
+ * Create a Dynamic Fee Sharing vault for `baseMint`, the token whose fees will be shared.
+ * userShares needs 2-5 recipients; share is a relative integer weight and is not required to
+ * sum to 100.
+ * @param config - Fee sharing config; feeSharingCreate.userShares and useKeypairVault
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet that pays for and owns the vault
+ * @param baseMint - The mint whose fees will be shared
  */
 export async function createVault(
   config: FeeSharingConfig,
@@ -174,11 +173,13 @@ export async function createVault(
 }
 
 /**
- * Directly fund a fee vault from the wallet's own token account. Reads config.feeSharingFund.
- * amount (the vault's tokenMint human units, converted via the mint's own decimals). wSOL
- * note (verified against the SDK's compiled `fundFeeVault`): when the vault's tokenMint is
- * native SOL's wrapped mint, the SDK wraps the requested amount of SOL for you internally — no
- * pre-funded wSOL account is needed, only enough actual SOL lamports in the wallet.
+ * Directly fund a fee vault from the wallet's own token account. If the vault's tokenMint is
+ * native SOL's wrapped mint, fundFeeVault wraps the requested SOL internally — no pre-funded
+ * wSOL account is needed.
+ * @param config - Fee sharing config; feeSharingFund.amount in the vault's tokenMint units
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet funding the vault
+ * @param vault - The fee vault address
  */
 export async function fund(
   config: FeeSharingConfig,
@@ -279,29 +280,9 @@ export async function fund(
 
 /**
  * Resolve the DAMM v2 position(s) on `poolAddress` whose position-NFT account is owned by
- * `vault` — the shared discovery used by both `fundFromDammV2` and `fundFromDammV2Reward`.
- *
- * Queried via `cpAmm.getUserPositionByPool(poolAddress, vault)`: despite the SDK naming that
- * second param "user", it resolves to a plain `connection.getTokenAccountsByOwner(vault,
- * {programId: TOKEN_2022_PROGRAM_ID})` scan under the hood (verified in the installed SDK's
- * compiled `getAllPositionNftAccountByOwner`) — a read-only RPC filter that works for ANY owner
- * pubkey, including a PDA such as a `createFeeVaultPda` vault, no signature required. Pointed at
- * the vault instead of the wallet, this returns ONLY vault-held position NFTs, without ever
- * touching a wallet-owned one.
- *
- * F1 fix note: the old code queried `getUserPositionByPool(poolAddress, wallet.publicKey)` (the
- * WALLET) and then filtered those results for a position whose NFT account was owned by the
- * VAULT. Since an SPL token account has exactly one owner, those two conditions can never both
- * hold — every input hit one of the two guard errors and `fundByClaimDammV2Fee` was never
- * reached. Fixed by querying the vault directly instead of the wallet.
- *
- * Ownership must already have been transferred to the vault — via
- * `transferDammV2PositionToVault` (action: `fee-sharing-transfer-damm-v2-position`, wraps the
- * SDK's `setTokenAccountOwnerTx`) — before this finds anything. Both `fundByClaimDammV2Fee` and
- * `fundByClaimDammV2Reward` re-verify ownership internally via their own `checkPositionOwnership`
- * call and throw a raw `InvalidPositionOwnership` error if it was never transferred (verified in
- * the SDK's compiled `dfs.ts`); the check below exists only to fail fast with an actionable,
- * vault-naming message instead of that opaque SDK error.
+ * `vault` — shared by `fundFromDammV2` and `fundFromDammV2Reward`. Positions are discovered by
+ * querying the vault's ownership, not the wallet's. Ownership must already have been
+ * transferred to the vault via `transferDammV2PositionToVault` before this finds anything.
  */
 async function findVaultOwnedDammV2Position(
   connection: Connection,
@@ -338,9 +319,7 @@ async function findVaultOwnedDammV2Position(
     }
   }
 
-  // Defense-in-depth only: getUserPositionByPool(vault) already filters by vault ownership via
-  // getTokenAccountsByOwner, so every candidate above is expected to pass. Reaching here would
-  // mean ownership changed between the query and this re-check (e.g. a concurrent transfer out).
+  // Defense-in-depth: vault ownership was already filtered above; reaching here means it changed since the query.
   throw new Error(
     `None of the DAMM v2 position NFTs found for fee vault ${vault.toString()} on pool ` +
       `${poolAddress.toString()} passed re-verification — ownership may have changed since the ` +
@@ -349,22 +328,10 @@ async function findVaultOwnedDammV2Position(
 }
 
 /**
- * `fundByClaimDammV2Fee` and `fundByClaimDammV2Reward` both route through the DFS program's
- * shared `fund_by_claiming_fee` instruction, which enforces two on-chain constraints — verified
- * directly against the program's own Rust source (`ix_fund_by_claiming_fee.rs`), reached via
- * empirical localnet testing after F1's query fix and a real position transfer still hit an
- * on-chain `InvalidSigner` (0x1778) error:
- *   1. `require!(fee_vault.fee_vault_type == 1, FeeVaultError::InvalidFeeVault)` — only
- *      PDA-variant vaults are supported (`feeSharingCreate.useKeypairVault: false` /
- *      `createFeeVaultPda`); a keypair-variant vault (`useKeypairVault: true` / `createFeeVault`)
- *      is rejected outright, regardless of who signs.
- *   2. `require!(fee_vault.is_share_holder(signer), FeeVaultError::InvalidSigner)` — the
- *      transaction's `signer` must be one of the vault's registered `userShare` recipients. The
- *      vault's `owner` field (whoever ran `fee-sharing-create-vault`) is a SEPARATE concept the
- *      program never checks here — being the vault's creator/owner is not sufficient on its own
- *      unless that same wallet is also a recipient.
- * Both are checked here so a mismatched vault fails fast with an actionable message instead of
- * the program's opaque `InvalidFeeVault` / `InvalidSigner` errors.
+ * `fundByClaimDammV2Fee` and `fundByClaimDammV2Reward` both require a PDA-variant vault
+ * (`feeSharingCreate.useKeypairVault: false`) and a signer registered as one of the vault's
+ * `userShare` recipients — the program rejects otherwise with `InvalidFeeVault` /
+ * `InvalidSigner`. Checked here so a mismatched vault fails fast with an actionable message.
  */
 async function assertVaultSupportsClaimingFeeBridge(
   client: DynamicFeeSharingClient,
@@ -400,25 +367,17 @@ async function assertVaultSupportsClaimingFeeBridge(
 
 /**
  * Transfer a DAMM v2 position NFT's token-account ownership from this wallet to a fee vault —
- * the on-chain prerequisite `fee-sharing-fund-from-damm-v2` / `-reward` document but that no
- * studio action actually performed (F1: without it, those two actions were unreachable — every
- * input hit a guard error). Wraps the DFS SDK's own `setTokenAccountOwnerTx(tokenAccount, from,
- * to, tokenProgramId)` (verified in the SDK's own `docs.md` — "Can be used to transfer DAMM v2
- * position NFT to the fee vault" — and its `scripts/fundByClaimDammV2Fee.s.ts` fixture, which
- * performs exactly this transfer before its own fund-from-damm-v2 example runs): a plain SPL
- * Token-2022 `SetAuthority(AccountOwner)` instruction re-pointing the position NFT account's
- * owner. Only the CURRENT owner (this wallet) signs — the new owner (the vault, whether a PDA
- * from `createFeeVaultPda` or a plain keypair address from `createFeeVault`) never needs to sign
- * a SetAuthority instruction that merely names it as the new authority.
+ * the on-chain prerequisite for `fundFromDammV2` / `fundFromDammV2Reward`. Wraps the DFS SDK's
+ * `setTokenAccountOwnerTx` as a plain SPL Token-2022 `SetAuthority(AccountOwner)` instruction;
+ * only the current owner (this wallet) signs, the vault never needs to sign.
  *
- * Resolves the wallet's position(s) on `poolAddress` via `cpAmm.getUserPositionByPool` (same
- * lookup `damm-v2-get-positions` uses) and mirrors `damm_v2`'s `closePosition` disambiguation
- * convention: auto-select when there's exactly one position, otherwise prompt interactively.
- *
- * ONE-WAY DOOR for this CLI: once transferred, only the vault (via the DFS program's own
- * instructions) can move this position again — the wallet can no longer manage it with
- * `damm-v2-*` actions (close, remove liquidity, etc.). Refuses to run if the position's NFT
- * account is already owned by anyone other than this wallet or the target vault.
+ * Once transferred, only the vault can move this position again — the wallet can no longer
+ * manage it with `damm-v2-*` actions.
+ * @param config - Fee sharing config
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet that currently owns the position
+ * @param vault - The fee vault to transfer ownership to
+ * @param poolAddress - The DAMM v2 pool the position belongs to
  */
 export async function transferDammV2PositionToVault(
   config: FeeSharingConfig,
@@ -534,12 +493,13 @@ export async function transferDammV2PositionToVault(
 
 /**
  * Fund a fee vault by sweeping fees straight out of a DAMM v2 position (`fundByClaimDammV2Fee`).
- * Resolves the vault's position via `findVaultOwnedDammV2Position` (queries
- * `cpAmm.getUserPositionByPool` targeted at the VAULT, not the wallet — see that function's
- * comment for the F1 fix this replaced). Ownership must already have been transferred to the
- * vault first with `fee-sharing-transfer-damm-v2-position` — if no candidate position qualifies,
- * this throws a clear, actionable error naming the vault instead of attempting a doomed
- * transaction.
+ * The position must already be owned by the vault — transfer it first with
+ * `transferDammV2PositionToVault`.
+ * @param config - Fee sharing config
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet paying for and signing the transaction
+ * @param vault - The fee vault address
+ * @param poolAddress - The DAMM v2 pool to sweep fees from
  */
 export async function fundFromDammV2(
   config: FeeSharingConfig,
@@ -591,16 +551,14 @@ export async function fundFromDammV2(
 }
 
 /**
- * Fund a fee vault by sweeping a DAMM v2 position's REWARD emissions (`fundByClaimDammV2Reward`)
- * — distinct from `fundFromDammV2`'s trading fees. M4: direct analog of `fundFromDammV2`, reusing
- * the same vault-owned-position discovery (`findVaultOwnedDammV2Position`); the only extra input
- * is `feeSharingFundDammV2Reward.rewardIndex` (DAMM v2 pools have 2 reward slots, so 0 or 1).
- *
- * Validated pre-flight two ways before the SDK call: `validateRewardIndex` (bounds check,
- * cp-amm-sdk) and an `initialized` check on the pool's own reward-slot state — the SDK itself
- * indexes `poolState.rewardInfos[rewardIndex]` with no bounds/initialized check of its own
- * (verified in its compiled `dfs.ts`), so an uninitialized or out-of-range index would otherwise
- * fail deep inside the SDK with an opaque error instead of a clear one here.
+ * Fund a fee vault by sweeping a DAMM v2 position's reward emissions (`fundByClaimDammV2Reward`)
+ * — distinct from `fundFromDammV2`'s trading fees. rewardIndex is 0 or 1 (DAMM v2 pools have 2
+ * reward slots) and must already be initialized on the pool.
+ * @param config - Fee sharing config; feeSharingFundDammV2Reward.rewardIndex
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet paying for and signing the transaction
+ * @param vault - The fee vault address
+ * @param poolAddress - The DAMM v2 pool to sweep reward emissions from
  */
 export async function fundFromDammV2Reward(
   config: FeeSharingConfig,
@@ -668,15 +626,15 @@ export async function fundFromDammV2Reward(
 }
 
 /**
- * Fund a fee vault by sweeping fees out of a DBC pool. Reads config.feeSharingFundDbc: `role`
- * ("creator" | "partner") x `source` ("tradingFee" | "surplus" | "migrationFee") routes to the
- * matching bridge — ALWAYS the `2`-suffixed trading-fee variants
- * (`fundByClaimDbcCreatorTradingFee2` / `fundByClaimDbcPartnerTradingFee2`), never the
- * unsuffixed ones. The DBC pool is resolved from `baseMint` via
- * `DynamicBondingCurveClient.state.getPoolByBaseMint`, mirroring `lib/dbc`. The fee vault must
- * already be set as the pool config's creator (role "creator") or feeClaimer (role "partner")
- * — the SDK itself validates this and throws a clear `InvalidCreator` / `InvalidFeeClaimer`
- * error otherwise.
+ * Fund a fee vault by sweeping fees out of a DBC pool. `role` ("creator" | "partner") x
+ * `source` ("tradingFee" | "surplus" | "migrationFee") selects the bridge; tradingFee always
+ * uses the `2`-suffixed variants, not the unsuffixed ones. The fee vault must already be set as
+ * the pool config's creator or feeClaimer for the given role.
+ * @param config - Fee sharing config; feeSharingFundDbc.role and .source
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet paying for and signing the transaction
+ * @param vault - The fee vault address
+ * @param baseMint - The DBC pool's base mint
  */
 export async function fundFromDbc(
   config: FeeSharingConfig,
@@ -776,10 +734,13 @@ export async function fundFromDbc(
 }
 
 /**
- * Claim the wallet's own share of a fee vault via `claimUserFee2` (receiver = the wallet; the
- * `2`-variant's receiver does not need to sign, unlike `claimUserFee`). Prints the wallet's
- * allocated/claimed/claimable amounts first and refuses to send a pointless transaction when
- * nothing is claimable yet.
+ * Claim the wallet's own share of a fee vault via `claimUserFee2` — the `2`-variant's receiver
+ * does not need to sign, unlike `claimUserFee`. Refuses to send a transaction when nothing is
+ * claimable yet.
+ * @param config - Fee sharing config
+ * @param connection - The connection to the cluster
+ * @param wallet - The wallet claiming its share
+ * @param vault - The fee vault address
  */
 export async function claim(
   config: FeeSharingConfig,

@@ -49,9 +49,6 @@ export function defaultAlphaVaultProgramId(): PublicKey {
 
 /**
  * Hydrate an AlphaVault instance for a known vault address.
- *
- * `AlphaVault.create` returns null for a nonexistent vault but reads `.data` off it with no
- * guard, throwing a raw `TypeError` — wrapped here into an actionable error.
  * @param connection - The connection to the network
  * @param vault - The alpha vault address
  * @param alphaVaultProgramId - The alpha vault program id
@@ -64,6 +61,7 @@ export async function loadAlphaVault(
 ): Promise<AlphaVault> {
   const cluster = getClusterFromProgramId(alphaVaultProgramId);
   try {
+    // AlphaVault.create reads .data off a null result for a nonexistent address; wrap into a clear error
     return await AlphaVault.create(connection, vault, { cluster: cluster as Cluster });
   } catch {
     throw new Error(

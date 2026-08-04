@@ -20,11 +20,7 @@ import {
 import { DEFAULT_SEND_TX_MAX_RETRIES } from '../../utils/constants';
 import { guessFarmingCluster, loadFarm, getSafeFarmUserState } from './status';
 
-/**
- * 0-SOL fee-payer guard, shared by every write action below — matches the
- * dynamic_vault/fee_sharing/stake2earn precedent (even a dry-run simulation needs an
- * existing fee payer account).
- */
+/** 0-SOL fee-payer guard, shared by every write action below; a dry-run still needs an existing fee payer account. */
 async function assertFunded(connection: Connection, payer: PublicKey): Promise<void> {
   const balance = await connection.getBalance(payer);
   if (balance === 0) {
@@ -34,15 +30,7 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
   }
 }
 
-/**
- * `PoolFarmImpl.deposit`/`withdraw`/`claim` all return a single `Transaction` with
- * `feePayer` and a blockhash ALREADY set (verified against the compiled SDK: each one calls
- * `connection.getLatestBlockhash("finalized")` internally while building the tx — a slower,
- * more-already-aged commitment than the "confirmed" this codebase sends with elsewhere). By
- * the time our own pre-checks/prompts above run, that blockhash may already be a meaningful
- * fraction of the way through its validity window, so it is unconditionally refreshed here
- * right before simulate-or-send rather than trusted as-is.
- */
+/** `deposit`/`withdraw`/`claim` already set a blockhash (via a "finalized" commitment) when building the tx; refreshed here since it may be stale by send time. */
 async function refreshBlockhash(
   connection: Connection,
   tx: Transaction,
@@ -80,10 +68,7 @@ async function simulateOrSend(
 
 /**
  * Confirm `owner` holds at least `amountLamports` of `mint` in its associated token account.
- * DAMM v1 LP mints (what every Pool Farm stakes) are always classic Token Program mints — the
- * farming program's IDL hardcodes `tokenProgram` on every instruction (never parameterized for
- * Token-2022, verified against the installed IDL) — so unlike zap/fee_sharing there is no
- * owner-program detection or native-SOL wrap branch to handle here.
+ * The farming program's IDL hardcodes the classic Token Program (never Token-2022), so there is no owner-program detection or native-SOL wrap branch here.
  */
 async function assertHoldsAtLeast(
   connection: Connection,
@@ -117,14 +102,12 @@ async function assertHoldsAtLeast(
 }
 
 /**
- * Stake DAMM v1 LP tokens into `farm`. Reads config.farmStake.amount (staking-mint human
- * units, converted via the mint's own decimals — `farm.poolState.stakingMint` -> `getMint`).
- * `PoolFarmImpl.deposit()` already creates the caller's `user` account inline on first use
- * (verified against the compiled SDK's `createUserInstruction` — despite calling the SDK's own
- * buggy `getUserState` internally, its call chain happens to resolve the correct address in
- * THIS one call path, so first-time stakers are safe going through `deposit()` itself; see
- * `getSafeFarmUserState` in `status.ts` for why nothing here relies on that bug-for-bug
- * accident directly), so no separate account-init step or extra transaction is needed.
+ * Stake DAMM v1 LP tokens into `farm`. Reads config.farmStake.amount (staking-mint human units).
+ * `PoolFarmImpl.deposit()` creates the caller's `user` account inline on first use, so no separate account-init step is needed.
+ * @param config - The farming config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet that owns and pays for the stake
+ * @param farm - The Pool Farm address
  */
 export async function stake(
   config: FarmingConfig,
@@ -151,8 +134,6 @@ export async function stake(
   console.log(`- Farm ${farm.toString()}`);
   console.log(`- Staking mint (DAMM v1 LP) ${pool.stakingMint.toString()} (${decimals} decimals)`);
 
-  // Never-staked-safe: uses the safe fetch (getUserPda + direct program.account.user read),
-  // NOT the SDK's own getUserBalance/getUserState (both buggy — see status.ts).
   const existing = await getSafeFarmUserState(farmImpl, wallet.publicKey);
   if (existing) {
     console.log(`- Existing staked amount: ${getAmountInTokens(existing.balanceStaked, decimals)}`);
@@ -184,11 +165,12 @@ export async function stake(
 }
 
 /**
- * Unstake DAMM v1 LP tokens from `farm`. Reads config.farmUnstake.amount (staking-mint human
- * units; `null` = unstake everything currently staked). Unlike `deposit()`, the SDK's
- * `withdraw()` does NOT create a `user` account if one is missing — it would fail on-chain
- * against an uninitialized account — so this pre-checks the caller actually has a stake at all
- * via the SAME safe fetch `stake()` uses, refusing clearly instead of sending a doomed tx.
+ * Unstake DAMM v1 LP tokens from `farm`. Reads config.farmUnstake.amount (staking-mint human units; `null` unstakes everything currently staked).
+ * Unlike `deposit()`, the SDK's `withdraw()` does not create a `user` account if one is missing, so this pre-checks the caller has a stake before sending.
+ * @param config - The farming config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet that owns the stake
+ * @param farm - The Pool Farm address
  */
 export async function unstake(
   config: FarmingConfig,
@@ -248,11 +230,11 @@ export async function unstake(
 }
 
 /**
- * Claim accrued rewards from `farm`. No config block — claims everything currently claimable,
- * computed the same way `farm-get-status` displays it (`PoolFarmImpl.getClaimableRewards`,
- * null-safe for a never-staked wallet on its own) and printed before sending; refuses with a
- * clear message instead of a no-op transaction when both reward sides are zero, or when the
- * wallet has never staked in this farm at all (safe fetch, same as stake/unstake).
+ * Claim accrued rewards from `farm`. No config block — claims everything currently claimable, and refuses instead of sending a no-op transaction when nothing is pending.
+ * @param config - The farming config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet claiming rewards
+ * @param farm - The Pool Farm address
  */
 export async function claim(
   config: FarmingConfig,
@@ -311,14 +293,12 @@ export async function claim(
 }
 
 /**
- * Batch-claim rewards across every farm listed in config.farmClaimAll.farms (farm ADDRESSES,
- * not staking-mint/LP addresses — see the config type's own note).
- * `PoolFarmImpl.claimAll` batches up to MAX_CLAIM_ALL_ALLOWED (2) farms per transaction and
- * returns one `Transaction` per chunk; each chunk claims a disjoint set of farms, so — unlike
- * alpha-vault's crank loop — chunks do NOT depend on one another landing first and can each be
- * simulated (dry run) or sent independently. Reward amounts are printed in RAW base units (not
- * converted to human units) to avoid an extra getMint round trip per farm per reward side; run
- * farm-get-status on an individual farm for its human-readable reward decimals.
+ * Batch-claim rewards across every farm in config.farmClaimAll.farms (farm addresses, not staking-mint/LP addresses).
+ * Each chunk of up to MAX_CLAIM_ALL_ALLOWED (2) farms is an independent transaction, so chunks can be simulated or sent without depending on one another.
+ * Reward amounts here are printed in raw base units, not human units.
+ * @param config - The farming config
+ * @param connection - The connection to the network
+ * @param wallet - The wallet claiming rewards
  */
 export async function claimAll(config: FarmingConfig, connection: Connection, wallet: Wallet) {
   if (!config.farmClaimAll || config.farmClaimAll.farms.length === 0) {

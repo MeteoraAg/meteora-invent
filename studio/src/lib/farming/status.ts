@@ -4,9 +4,7 @@ import { getMint } from '@solana/spl-token';
 import BN from 'bn.js';
 import { getAmountInTokens } from '../../helpers';
 
-/** The only two clusters `FARMING_API_ENDPOINT` has entries for (verified against the
- * installed `.d.ts`) — there is no `localhost`/`testnet` key, so `--poolAddress` REST
- * resolution is never available on a local validator regardless of this guess. */
+/** The only clusters `FARMING_API_ENDPOINT` covers; `--poolAddress` REST resolution has no localnet/testnet fallback. */
 export type FarmingRestCluster = 'devnet' | 'mainnet-beta';
 
 export interface FarmSelector {
@@ -14,12 +12,7 @@ export interface FarmSelector {
   poolAddress?: PublicKey;
 }
 
-/**
- * Shape of the farming program's `user` account (IDL account name `user`), typed here because
- * the installed SDK never safely exposes a fetch for it — see `getSafeFarmUserState` below.
- * Field names/types verified against the installed `@meteora-ag/farming-sdk@1.0.18` `.d.ts`
- * (this is also, word for word, the SDK's own — unreliable — `getUserState` return type).
- */
+/** Shape of the farming program's `user` IDL account; the SDK exposes no safe fetch for it, see `getSafeFarmUserState`. */
 export interface FarmUserAccount {
   pool: PublicKey;
   owner: PublicKey;
@@ -31,22 +24,12 @@ export interface FarmUserAccount {
   nonce: number;
 }
 
-/**
- * Best-effort guess of which farming REST endpoint (devnet vs mainnet-beta) matches
- * `rpcUrl`, for the `--poolAddress` -> `getFarmAddressesByPoolAddress` resolution path only.
- * `--farm` bypasses this entirely. Custom RPC providers (Helius/QuickNode/etc.) and localnet
- * URLs aren't detectable this way and fall back to `mainnet-beta` — the SDK's own default.
- */
+/** Guess devnet vs mainnet-beta for `rpcUrl`, for `--poolAddress` REST resolution only (`--farm` bypasses this). */
 export function guessFarmingCluster(rpcUrl: string): FarmingRestCluster {
   return rpcUrl.includes('devnet') ? 'devnet' : 'mainnet-beta';
 }
 
-/**
- * Load a `PoolFarmImpl` for `farm`, with a clearer error than the SDK's own bare
- * `"No pool state found"` (verified against the compiled `PoolFarmImpl.create` — it throws
- * that exact message with no address context when `program.account.pool.fetchNullable(farm)`
- * comes back null).
- */
+/** Load a `PoolFarmImpl` for `farm`, with a clearer error than the SDK's bare `"No pool state found"`. */
 export async function loadFarm(
   connection: Connection,
   farm: PublicKey,
@@ -64,16 +47,13 @@ export async function loadFarm(
 }
 
 /**
- * Resolve a farm address from either an explicit `--farm`, or a `--poolAddress` looked up via
- * the SDK's `getFarmAddressesByPoolAddress` (a REST call to `amm.meteora.ag` / the devnet
- * mirror — there is no on-chain PDA derivation from just the DAMM v1 pool address). That call
- * THROWS both on a genuine network/offline failure and when the REST API is reachable but has
- * no farms for this pool (verified against the compiled source: `if (!farms.length) throw ...`)
- * — both cases are caught here and turned into one clear message pointing at `--farm`, since a
- * user can't tell those two failure modes apart from the SDK's raw error anyway and the fix is
- * identical either way. A pool with more than one farm is listed rather than guessed at (unlike
- * alpha-vault's pool->vault resolution) because different farms on the same pool can pay out
- * different reward tokens — silently picking one could stake into the wrong reward program.
+ * Resolve a farm address from `--farm`, or from `--poolAddress` via the REST API — there is no
+ * on-chain PDA derivation from just the DAMM v1 pool address. A pool with more than one farm is
+ * listed rather than picked automatically, since farms on the same pool can pay different reward
+ * tokens.
+ * @param selector - The `--farm`/`--poolAddress` selector
+ * @param cluster - Farming REST cluster override
+ * @returns The resolved farm address
  */
 export async function resolveFarmAddress(
   selector: FarmSelector,
@@ -101,8 +81,7 @@ export async function resolveFarmAddress(
 
   const [first] = farms;
   if (!first) {
-    // Not expected (the SDK throws instead of returning empty — see the doc comment above),
-    // but guarded in case a future SDK version changes that.
+    // Defensive: the SDK throws rather than returning empty; guards a future SDK change.
     throw new Error(
       `No farms found for pool ${selector.poolAddress.toString()} — pass --farm <pubkey> ` +
         'directly if you already know the farm address.'
@@ -128,40 +107,31 @@ export async function resolveFarmAddress(
 }
 
 /**
- * Safely fetch the caller's `user` account on `farm`, working around TWO verified SDK bugs
- * rather than using either of the SDK's own accessors:
- *  - `PoolFarmImpl.getUserBalance(owner)` does `fetchNullable(...).balanceStaked` with no null
- *    guard — throws a raw `TypeError: Cannot read properties of null` for anyone who has never
- *    staked in this farm.
- *  - `PoolFarmImpl.getUserState(owner)` computes the correct PDA via `getUserPda(owner)` and
- *    then ignores it, calling `fetchNullable(owner)` — i.e. it fetches the WALLET address
- *    itself, not the user PDA, so it returns null (or garbage) even for an active staker.
- * Both verified by reading the installed package's compiled `dist/index.js`.
- *
- * The fix (also this function's implementation): derive the PDA ourselves via the SDK's own
- * (correct, public) `getUserPda(owner)`, then fetch it directly through the farm's Anchor
- * `program` — which the `.d.ts` marks `private` (an `as any` boundary cast, same policy as
- * `lib/damm_v1`, is needed to reach it; its own compiled type is untyped, hence the manual
- * `FarmUserAccount` cast).
+ * Safely fetch the caller's `user` account on `farm`. `PoolFarmImpl.getUserBalance` throws for a
+ * wallet that has never staked, and `getUserState` fetches the wallet address instead of the
+ * user PDA it computes — so this derives the PDA via `getUserPda` and fetches it directly.
+ * @param farm - The loaded Pool Farm
+ * @param owner - The staker's wallet
+ * @returns The user account, or null if `owner` has never staked
  */
 export async function getSafeFarmUserState(
   farm: PoolFarmImpl,
   owner: PublicKey
 ): Promise<FarmUserAccount | null> {
   const userPda = farm.getUserPda(owner);
+  // `program` is typed private in the SDK's `.d.ts` but is populated and accessible at runtime.
   const program = (farm as any).program;
   const userState = (await program.account.user.fetchNullable(userPda)) as FarmUserAccount | null;
   return userState;
 }
 
 /**
- * Print the status of a Pool Farm (read-only, DAMM v1 LP staking farms only): resolves the
- * farm (direct `--farm`, or `--poolAddress` via the REST lookup above), prints the farm's
- * `pool` account summary (IDL account name is `pool` — this is the farming program's OWN
- * account for the farm, distinct from the DAMM v1 AMM pool it stakes LP from), and — with a
- * wallet — that wallet's staked balance (via the safe fetch above) and claimable rewards (via
- * the SDK's static `getClaimableRewards`, which is itself null-safe for a never-staked wallet:
- * it just omits the farm from the returned map instead of throwing).
+ * Print the status of a Pool Farm (read-only, DAMM v1 LP staking farms only), including staked
+ * balance and claimable rewards for an optional wallet.
+ * @param connection - The connection to the network
+ * @param selector - The `--farm`/`--poolAddress` selector
+ * @param walletPubkey - Optional wallet to show staked balance/rewards for
+ * @param cluster - Farming REST cluster override
  */
 export async function getStatus(
   connection: Connection,
@@ -174,6 +144,7 @@ export async function getStatus(
   console.log(`> Program: ${FARM_PROGRAM_ID.toString()}`);
 
   const farm = await loadFarm(connection, farmAddress, cluster);
+  // `pool` is the farming program's own IDL account, distinct from the DAMM v1 AMM pool it stakes LP from.
   const pool = farm.poolState;
 
   const stakingMintInfo = await getMint(connection, pool.stakingMint, connection.commitment);

@@ -15,11 +15,11 @@ export interface AlphaVaultSelector {
 }
 
 /**
- * Resolve a vault address from either an explicit --vault, or a --poolAddress looked up via
- * getProgramAccounts memcmp (Vault.pool is the first field after the 8-byte discriminator, so
- * offset 8 — verified against the installed .d.ts). There is no pure PDA derivation from just
- * the pool: the vault's seed is `[base, pool]` where `base` is the creator/config keypair, not
- * recoverable from the pool alone.
+ * Resolve a vault address from either an explicit --vault, or a --poolAddress.
+ * @param connection - The connection to the network
+ * @param selector - Explicit vault address, or a pool address to resolve it from
+ * @param alphaVaultProgramId - The alpha vault program id
+ * @returns The resolved vault address
  */
 export async function resolveAlphaVaultAddress(
   connection: Connection,
@@ -33,6 +33,8 @@ export async function resolveAlphaVaultAddress(
     throw new Error('Please provide --vault or --poolAddress flag to do this action');
   }
 
+  // Vault.pool is the first field after the 8-byte discriminator, hence offset 8. The vault's
+  // seed is `[base, pool]` (base = creator/config keypair), so it isn't derivable from the pool alone.
   const accounts = await connection.getProgramAccounts(alphaVaultProgramId, {
     filters: [{ memcmp: { offset: 8, bytes: selector.poolAddress.toBase58() } }],
   });
@@ -52,10 +54,10 @@ export async function resolveAlphaVaultAddress(
 }
 
 /**
- * Print the status of an alpha vault (read-only, no keypair required): resolves the vault
- * (direct or via pool memcmp), prints mode/state/caps/totals from the on-chain `.vault`
- * fields, and — when a wallet is supplied — the wallet's interactionState() booleans plus
- * deposit/claim numbers.
+ * Print an alpha vault's status (read-only), plus interaction state and deposit/claim numbers when a wallet is given.
+ * @param connection - The connection to the network
+ * @param selector - Explicit vault address, or a pool address to resolve it from
+ * @param walletPubkey - Optional wallet to also print the per-wallet view for
  */
 export async function getStatus(
   connection: Connection,
@@ -120,9 +122,7 @@ export async function getStatus(
     console.log('> No escrow found for this wallet on this vault (it has not deposited yet).');
   }
 
-  // Merkle-gated vaults need the proof to correctly report isWhitelisted/canDeposit/
-  // availableQuota below — fetch it the same way alpha-vault-deposit does. getMerkleProofForDeposit
-  // never throws (it swallows fetch errors internally and resolves to null), so no try/catch needed.
+  // getMerkleProofForDeposit never throws — it resolves to null on failure, so no try/catch needed
   const merkleProof =
     v.whitelistMode === WhitelistMode.PermissionWithMerkleProof
       ? await alphaVault.getMerkleProofForDeposit(walletPubkey)

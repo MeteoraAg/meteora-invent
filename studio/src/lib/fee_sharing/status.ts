@@ -9,11 +9,11 @@ import { getAmountInTokens } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 
 /**
- * Fetch a fee vault's on-chain state. `getFeeVault` is typed as returning `FeeVault` (never
- * null), but is actually built on Anchor's `fetchNullable` under the hood (verified against
- * the installed package's compiled `getAccountData` helper) — it resolves to `null` for a
- * missing account despite the `.d.ts`. Caught here and re-thrown with a clear message instead
- * of a bare TypeError bubbling up from the first downstream `.tokenMint` access.
+ * Fetch a fee vault's on-chain state. `getFeeVault` is typed non-null but returns null for a
+ * missing account; this throws a clear error instead.
+ * @param client - The Dynamic Fee Sharing client
+ * @param feeVault - The fee vault address
+ * @returns The fee vault's on-chain state
  */
 export async function loadFeeVault(
   client: DynamicFeeSharingClient,
@@ -30,12 +30,11 @@ export async function loadFeeVault(
 }
 
 /**
- * Print the status of a Dynamic Fee Sharing vault (read-only, no keypair required to inspect a
- * known --vault; a wallet is only used to also highlight its own row / do the reverse lookup):
- * - with `vault`: vault header + getFeeBreakdown totals + a per-user shares/claimed/unclaimed
- *   table.
- * - without `vault` but with `wallet`: reverse-lookup every vault the wallet holds a share in
- *   via getRecipientDfsVault and list them (re-run with --vault for the full breakdown).
+ * Print the status of a Dynamic Fee Sharing vault (read-only). With `vault`, prints vault
+ * details and a breakdown; without it, reverse-looks-up vaults `wallet` holds a share in.
+ * @param connection - The connection to the cluster
+ * @param vault - The fee vault to inspect
+ * @param wallet - Used to highlight the wallet's row, or reverse-lookup vaults when vault is omitted
  */
 export async function getStatus(
   connection: Connection,
