@@ -340,7 +340,14 @@ restate the amounts before executing.**
 pnpm studio damm-v1-create-stake2earn-farm --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `stake2EarnFarm` (top-list size, unlock duration,
-start time). Creates an M3M3 fee farm on the pool. The staker lifecycle (stake, claim,
+start time). **Pre-checks `startFeeDistributeTimestamp` against the on-chain clock before
+building any transaction**: a value behind the current on-chain time always fails on-chain
+with AnchorError `MathOverflow` (6015) — the program computes
+`start_fee_distribute_timestamp.checked_sub(current_timestamp)` with no clamping — so this is
+rejected client-side first with an explanatory error naming the field, its decoded date, how
+far behind it is, and how to compute a valid one. `secondsToFullUnlock` cannot compensate for
+a stale `startFeeDistributeTimestamp` — it only governs the post-distribution fee-release decay
+rate. Creates an M3M3 fee farm on the pool. The staker lifecycle (stake, claim,
 unstake, cancel/withdraw) and a status read live in the `stake2earn-*` actions below.
 
 ### `damm-v1-lock-liquidity-stake2earn`
@@ -515,7 +522,16 @@ Flags: `--baseMint` (required). Reads `presaleVault`: `presaleRegistries[]` tier
 (`presaleSupply` in **raw base-token units — passed straight to BN, no decimal
 conversion** (verified); buyer min/max deposit caps **in quote lamports**;
 `depositFeeBps`), timing points, and mode (fcfs/prorata/fixed-price per template comments).
-Creator options (SDK 0.1.1): `presaleArgs.disableEarlierPresaleEndOnceCapReached`
+**Pre-checks `presaleArgs.presaleEndTime` against the ON-CHAIN clock (`getOnChainTimestamp`,
+not the local wall clock) before building any transaction**: an end time at or before the
+current on-chain time means the presale is Completed/Failed from the instant it is created (per
+the SDK's own `getPresaleProgressState` state machine) and any deposit is rejected on-chain with
+`PresaleEnded` (error 6016) — rejected client-side first instead, with the decoded date and how
+far behind it is. `presaleStartTime: 0` (this program's "start immediately" sentinel) is never
+itself flagged as stale; but if `presaleStartTime` is a real future timestamp,
+`presaleEndTime` must be after it too, or the presale jumps straight from NotStarted to
+Completed/Failed without ever being Ongoing. Creator options (SDK 0.1.1):
+`presaleArgs.disableEarlierPresaleEndOnceCapReached`
 (default false), `lockedVestingArgs.immediateReleaseTimestamp` (0/omitted = at
 `presaleEndTime`), and fixed-price `fixedPricePresaleConfig.disableWithdraw` (default false).
 
@@ -635,8 +651,11 @@ known errors (see `other-products.md`), so these actions mirror the SDK repo's o
 pnpm studio lock-create-vesting-escrow --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `lockCreateEscrow`: `recipient`, `vestingStartTime` /
-`cliffTime` (unix **seconds** — **`vestingStartTime` must be ≤ `cliffTime`; the program
-rejects creation otherwise**), `frequency` (seconds between unlock periods),
+`cliffTime` (unix **seconds** — **`vestingStartTime` must be ≤ `cliffTime`; pre-checked before
+building any transaction, naming both decoded dates — the program itself would otherwise
+reject creation on-chain with `InvalidVestingStartTime` (error 6009). A `cliffTime` in the past
+is fine on its own (e.g. an immediately-unlockable vesting schedule) and is NOT flagged — only
+the relative order is checked**), `frequency` (seconds between unlock periods),
 `cliffUnlockAmount` + `amountPerPeriod` (human token units, converted via the mint's
 decimals), `numberOfPeriod`, `updateRecipientMode` / `cancelMode` (0-3: NONE / CREATOR_ONLY /
 RECIPIENT_ONLY / CREATOR_RECIPIENT), `isSenderMultiSig`. Pre-checks the wallet's token
