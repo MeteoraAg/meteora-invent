@@ -100,7 +100,7 @@
     "topListLength": 100, // Maximum number of top stakers eligible for fee rewards (minimum 50, maximum 1000)
     "unstakeLockDurationSecs": 25200, // 7-hour cooldown period before unstaked tokens can be withdrawn
     "secondsToFullUnlock": 86400, // 24-hour period for locked fees to fully drip/release to stakers
-    "startFeeDistributeTimestamp": 1753441790 // Start date for fee distribution (Jan 24, 2025 17:49:50 UTC)
+    "startFeeDistributeTimestamp": 1753441790 // Start date for fee distribution, unix seconds (this value = 2025-07-25 11:09:50 UTC). STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now — a past value overflows the on-chain fee-drip math
   },
 
   /* stake2EarnStake is only used in the following action:
@@ -152,9 +152,9 @@
      */
     // "maxBuyingCap": 10000, // Maximum total amount (in quote token) that can be bought across all users in the vault
 
-    "depositingPoint": 1733626299, // When users can start depositing depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
-    "startVestingPoint": 1746808201, // When token vesting begins and users can start claiming their vested tokens depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
-    "endVestingPoint": 1746808201, // When token vesting ends and all tokens become fully claimable depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+    "depositingPoint": 1733626299, // When users can start depositing depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
+    "startVestingPoint": 1746808201, // When token vesting begins and users can start claiming their vested tokens depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
+    "endVestingPoint": 1746808201, // When token vesting ends and all tokens become fully claimable depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
     "escrowFee": 0, // Fee amount (in quote token) charged when creating a stake escrow account
     "whitelistMode": "permissionless" // Whitelist mode: permissionless | permissioned_with_merkle_proof | permissioned_with_authority
 

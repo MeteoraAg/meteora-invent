@@ -19,8 +19,8 @@
    */
   "lockCreateEscrow": {
     "recipient": "YOUR_RECIPIENT_ADDRESS", // wallet that will receive the vested tokens
-    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from; MUST be <= cliffTime (program rejects creation otherwise)
-    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time; must be >= vestingStartTime
+    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from; MUST be <= cliffTime (program rejects creation otherwise). STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now
+    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time; must be >= vestingStartTime. STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now
     "frequency": 2592000, // seconds between unlock periods after the cliff (e.g. 2592000 = 30 days)
     "cliffUnlockAmount": 2500, // human token units unlocked exactly at cliffTime; total locked = cliffUnlockAmount + amountPerPeriod * numberOfPeriod — set to 0 unless an upfront cliff unlock is wanted
     "amountPerPeriod": 2500, // human token units unlocked every `frequency` seconds after the cliff — put the full amount here for pure linear vesting
