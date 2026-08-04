@@ -125,7 +125,7 @@ pnpm studio generate-keypair --network devnet --airdrop
 pnpm studio <action> [--baseMint <MINT> | --poolAddress <POOL>]
 ```
 
-All 79 actions with their real flags, config blocks, and outputs:
+All 81 actions with their real flags, config blocks, and outputs:
 `references/studio-actions.md`. Environment details and wallet import:
 `references/studio-setup.md`.
 

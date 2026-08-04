@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-79 studio actions (plus the start-test-validator helper), verified against
+81 studio actions (plus the start-test-validator helper), verified against
 `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
@@ -497,7 +497,9 @@ whitelist mode, caps, and running totals (deposited, swapped, bought, refunded, 
 the vault account. If a usable keypair exists at `keypairFilePath` it also prints that
 wallet's `interactionState()` booleans (`canDeposit`/`canWithdraw`/`canClaim`/...) plus
 deposit/claim numbers — no keypair is required otherwise (a missing/invalid keypair file
-degrades to vault-only output instead of erroring).
+degrades to vault-only output instead of erroring). A nonexistent `--vault` address gets a
+clean "No alpha vault at ..." error instead of the raw `TypeError` the underlying SDK call
+throws for one — every other `alpha-vault-*` action shares this same wrap.
 
 ## Presale Vault actions — config file: `studio/config/presale_vault_config.jsonc`
 
@@ -522,23 +524,30 @@ Creator options (SDK 0.1.1): `presaleArgs.disableEarlierPresaleEndOnceCapReached
 pnpm studio presale-vault-deposit --vault <PRESALE>
 ```
 Flags: `--vault` (required — the presale account pubkey, printed by `presale-vault-create`).
-Reads `presaleDeposit`: `amount` (quote human units), `registryIndex` (default `0`;
-**serialized as a u8 on-chain — must be an integer 0-255**). Ensures a buyer escrow exists
-first: permissionless presales get one built and sent automatically; a
-`permissioned_with_merkle_proof` presale auto-fetches the proof from the creator's
-permissioned-server metadata (best-effort — fails with a clear "ask the creator" error if no
-server/proof is published yet); `permissioned_with_authority` presales require the creator's
-operator to create the escrow server-side, so this action errors clearly instead of guessing.
-Guarded on the wrapper's `canDeposit()` plus the registry's min/max deposit caps.
+Reads `presaleDeposit`: `amount` (quote human units, must be > 0), `registryIndex` (default
+`0`; **serialized as a u8 on-chain — must be an integer 0-255**). A missing buyer escrow is
+created as a bundled pre-instruction in the SAME deposit transaction by the SDK's own
+`Presale.deposit()` — permissionless and `permissioned_with_merkle_proof` presales both get
+this for free, in ONE transaction, not two (verified against the installed SDK; no separate
+create-escrow transaction is built or sent). `permissioned_with_merkle_proof` auto-fetches the
+proof from the creator's permissioned-server metadata as part of that same call (best-effort —
+fails with a clear "ask the creator" error if no server/proof is published yet);
+`permissioned_with_authority` presales require the creator's operator to create the escrow
+server-side, so this action errors clearly instead of guessing. Guarded on the wrapper's
+`canDeposit()` plus the registry's min/max deposit caps. **Permissionless gotcha:** a wallet's
+FIRST-EVER escrow on a permissionless presale can only be created at registry 0 — the on-chain
+`create_permissionless_escrow` instruction's PDA seeds hardcode that byte, not an instruction
+arg — so depositing into a nonzero `registryIndex` before that wallet already has an escrow
+there fails fast with a clear pre-flight error instead of a raw on-chain revert.
 
 ### `presale-vault-withdraw`
 ```bash
 pnpm studio presale-vault-withdraw --vault <PRESALE>
 ```
-Flags: `--vault` (required). Reads `presaleWithdraw`: `amount`, `registryIndex`. Only while the
-presale is still ongoing — **blocked entirely on FCFS presales, and on fixed-price presales
-created with `disableWithdraw: true`** (surfaced by name in the refusal message); prorata
-presales always allow it during the deposit window.
+Flags: `--vault` (required). Reads `presaleWithdraw`: `amount` (must be > 0), `registryIndex`.
+Only while the presale is still ongoing — **blocked entirely on FCFS presales, and on
+fixed-price presales created with `disableWithdraw: true`** (surfaced by name in the refusal
+message); prorata presales always allow it during the deposit window.
 
 ### `presale-vault-claim`
 ```bash
@@ -556,6 +565,19 @@ pnpm studio presale-vault-withdraw-remaining-quote --vault <PRESALE>
 Flags: `--vault` (required). No config block — sweeps every registry the wallet has an escrow
 on and refunds whichever ones are eligible (prorata overflow once the presale is `Completed`, or
 the full deposit back once it's `Failed`), skipping and reporting the rest.
+
+### `presale-vault-close-escrow`
+```bash
+pnpm studio presale-vault-close-escrow --vault <PRESALE>
+```
+Flags: `--vault` (required). No config block — mirrors
+`presale-vault-withdraw-remaining-quote`'s sweep: closes every registry escrow the wallet has
+on this presale that the SDK's own `EscrowWrapper.canClose()` says is eligible, reclaiming its
+rent, and reports the rest with why they aren't closable yet (still ongoing with a nonzero
+deposit; failed with quote not yet withdrawn; completed with something still unclaimed, or —
+prorata — remaining quote not yet withdrawn). Mirrors alpha-vault's
+`alphaVaultClaim.closeEscrowWhenDone`, but as its own action since a presale wallet can hold one
+escrow per registry rather than a single vault-wide escrow.
 
 ### `presale-vault-creator-withdraw`
 ```bash
@@ -587,9 +609,9 @@ base mint: exactly one match prints its status directly; more than one prints a
 clean "No presale found for base mint ..." error. A nonexistent `--vault` address also gets a
 clean "No presale vault at ..." error instead of the raw Anchor "account does not exist"
 exception. **Read-only** — keypair is optional (a missing/invalid keypair file degrades to
-presale-only output — this part matches every other `*-get-status` action, but the clean
-not-found error handling above is presale's own: `alpha-vault-get-status`, for one, does not
-yet wrap a bad `--vault` this cleanly). Prints progress
+presale-only output — this part matches every other `*-get-status` action). Every `alpha-vault-*`
+write/status action gets the same clean-error treatment for a bad `--vault`, via that family's
+own `loadAlphaVault` wrap (see `alpha-vault-get-status` below). Prints progress
 state/%, mode, whitelist mode, totals, average token price, timings, every gate boolean, and a
 per-registry table (supply, deposits, caps, fee, price); with a usable wallet, also each of its
 escrows (deposited, claimable, pending, withdrawable-remaining-quote). **After the raise** —
@@ -1037,6 +1059,17 @@ pending reward A / reward B first (`PoolFarmImpl.getClaimableRewards`, itself sa
 never-staked wallet) and refuses with a clear message instead of a no-op transaction when both
 are zero, or when the wallet has never staked in this farm at all. ~0.001 SOL.
 
+### `farm-claim-all`
+```bash
+pnpm studio farm-claim-all
+```
+No flag — reads `farmClaimAll.farms` (a list of **farm addresses**, not staking-mint/LP
+addresses) and batch-claims all of them via `PoolFarmImpl.claimAll`, which chunks up to 2 farms
+per transaction (`MAX_CLAIM_ALL_ALLOWED`). Prints pending reward A/B (raw base units) per farm
+first and refuses clearly if every farm is at zero; each chunk claims a disjoint set of farms,
+so — unlike a crank loop — every chunk is independently simulated (dry run) or sent, not just
+the first. ~0.001 SOL per transaction (may send/simulate several).
+
 ### `farm-get-status`
 ```bash
 pnpm studio farm-get-status --farm <FARM>
@@ -1111,6 +1144,7 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `presale-vault-withdraw-remaining-quote` | `--vault` | — | 0.001 |
 | `presale-vault-creator-withdraw` | `--vault` | — (`presaleCreatorWithdraw` opt.) | 0.001 |
 | `presale-vault-handle-unsold` | `--vault` | — | 0.001 |
+| `presale-vault-close-escrow` | `--vault` | — | 0.001 |
 | `presale-vault-get-status` | `--vault` or `--baseMint` | — (read-only) | 0 |
 | `lock-create-vesting-escrow` | `--baseMint` | `lockCreateEscrow` | 0.01 |
 | `lock-create-escrow-metadata` | `--escrow` | `lockEscrowMetadata` | 0.002 |
@@ -1134,6 +1168,7 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `farm-stake` | `--farm` or `--poolAddress` | `farmStake` | 0.002 |
 | `farm-unstake` | `--farm` | `farmUnstake` | 0.001 |
 | `farm-claim` | `--farm` | — | 0.001 |
+| `farm-claim-all` | — | `farmClaimAll` | 0.001 (per tx; may send several) |
 | `farm-get-status` | `--farm` or `--poolAddress` | — (read-only) | 0 |
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.

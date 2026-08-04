@@ -22,6 +22,11 @@ const accounts = await connection.getProgramAccounts(new PublicKey(ALPHA_VAULT_P
   filters: [{ memcmp: { offset: 8, bytes: poolAddress.toBase58() } }],  // Vault.pool is the first field
 })
 const av = await AlphaVault.create(connection, accounts[0].pubkey)
+// Gotcha: a nonexistent vault address makes AlphaVault.create read `.data` off a null
+// getMultipleAccountsInfo result with no guard — a raw TypeError, not an actionable message
+// (verified against the compiled source). The studio's own loadAlphaVault wraps this into a
+// clean "No alpha vault at ..." error — see alpha_vault/utils.ts if calling AlphaVault.create
+// directly.
 // av.vault (state), av.mode (VaultMode), av.vaultState (lifecycle phase)
 const escrow = await av.getEscrow(userPubkey)
 const state = await av.interactionState(escrow)   // { depositInfo, claimInfo, availableQuota,
@@ -61,10 +66,23 @@ const w = presale.getParsedPresale()          // PresaleWrapper:
 // w.canDeposit()/canWithdraw()/canClaim()/canCreatorWithdraw()
 const escrows = await presale.getPresaleEscrowByOwner(buyer)  // per-buyer state
 ```
-Buyer lifecycle (instance methods → `Transaction`): `createPermissionlessEscrow` →
-`deposit({ owner, amount, registryIndex? })` → (after end) `claim({ owner, registryIndex })`
-/ `withdrawRemainingQuote`. Creator: `creatorWithdraw`, `creatorCollectFee`,
-`performUnsoldBaseTokenAction`. Gotcha: `registryIndex` is a BN serialized as **u8**.
+Buyer lifecycle (instance methods → `Transaction`): `deposit({ owner, amount, registryIndex? })`
+→ (after end) `claim({ owner, registryIndex })` / `withdrawRemainingQuote` / `closeEscrow({
+owner, registryIndex })` (reclaims escrow rent once eligible). `deposit()` itself creates a
+missing buyer escrow as a bundled pre-instruction in the SAME transaction for permissionless
+(`getOrCreatePermissionlessEscrowIx`) and permissioned_with_merkle_proof
+(`getOrCreatePermissionedEscrowWithMerkleProofIx`) whitelist modes — calling
+`createPermissionlessEscrow`/`createPermissionedEscrowWithMerkleProof` yourself first is
+unnecessary and would just cost an extra transaction (verified against the compiled 0.1.1 SDK).
+`EscrowWrapper.canClose(presaleWrapper)` gates whether `closeEscrow` will succeed: Ongoing/Failed
+escrows need their deposit (and any fee) already at zero; Completed escrows need everything
+allocated to them already claimed (and, for prorata, any remaining quote already withdrawn).
+Creator: `creatorWithdraw`, `creatorCollectFee`, `performUnsoldBaseTokenAction`. Gotchas:
+`registryIndex` is a BN serialized as **u8**; a permissionless presale's escrow-creation
+instruction can only ever create a wallet's FIRST escrow at registry 0 — its on-chain PDA seeds
+hardcode that byte rather than taking it as an instruction arg (IDL-verified) — so a first-time
+deposit into a nonzero registry on a permissionless presale has no automatic escrow-creation
+path.
 
 Studio actions: `presale-vault-*` (create + full buyer/creator lifecycle + status) — see
 `studio-actions.md`.
@@ -192,6 +210,18 @@ creating an escrow. Owner→escrow listing has no SDK helper: use
 offset 72 = creator — both verified against the SDK repo's
 `sumCreatorLockVaultTotals.s.ts` script).
 
+**Not exposed: cancel / update-recipient.** The 5 methods listed above are `LockClient`'s
+entire surface (verified) — there is no `cancelVestingEscrow` or update-recipient wrapper.
+Exposing either would mean hand-rolling a raw `program.methods.cancelVestingEscrow(...)` /
+`program.methods.updateVestingEscrowRecipient(...)` write call directly off the exported IDL,
+the same class of gap as Pool Farms' `farm-create` below — deliberately out of scope here, so
+no `lock-*` action can cancel a vesting escrow or change its recipient. This doesn't mean the
+settings are inert: `cancelMode` / `updateRecipientMode` (`lock_config.jsonc`'s
+`lockCreateEscrow.cancelMode` / `updateRecipientMode`) ARE recorded on-chain at
+`createVestingEscrowV2` time either way, for OTHER clients (the SDK repo's own scripts, a
+future studio addition, or any other `program.methods` caller) to act on later — this CLI just
+has no action that reads them back out.
+
 Studio actions: `lock-*` — see `studio-actions.md`.
 
 ## Pool Farms — `@meteora-ag/farming-sdk@1.0.18`
@@ -219,7 +249,10 @@ blockhash already set by the SDK — refresh both right before sending anyway):
 `deposit(owner, amount: BN)` (auto-creates the `user` account inline on first stake),
 `withdraw(owner, amount: BN)`, `claim(owner)`. Static
 `claimAll(connection, owner, farmAddresses, opt?)` → `Transaction[]`, chunked 2 farms per tx
-(`MAX_CLAIM_ALL_ALLOWED`). Despite the parameter being named `farmMints` throughout this SDK
+(`MAX_CLAIM_ALL_ALLOWED`) — wrapped by the studio's `farm-claim-all` action (config-driven farm
+list; each chunk claims a disjoint set of farms, so unlike a crank loop the chunks don't depend
+on one another and can each be simulated/sent independently). Despite the parameter being named
+`farmMints` throughout this SDK
 (`getUserBalances`, `getClaimableRewards`, `claimAll`), it is actually an array of **farm
 addresses** (verified against the compiled source — it feeds straight into
 `program.account.pool.fetchMultiple`), never staking-mint/LP addresses.
