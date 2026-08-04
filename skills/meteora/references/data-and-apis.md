@@ -6,7 +6,7 @@ For documentation (not chain state): every docs.meteora.ag page serves raw markd
 (`https://docs.meteora.ag/llms.txt` is the index), and `https://docs.meteora.ag/mcp` is a
 live docs MCP server (search + read tools) — connect it when the runtime supports MCP.
 
-## REST data APIs (verified 2026-08-01, docs.meteora.ag)
+## REST data APIs (as of 2026-08-01, docs.meteora.ag)
 
 | Protocol | Base URL | Rate limit |
 |---|---|---|
@@ -18,7 +18,7 @@ Key endpoints (see the per-protocol API reference under
 `https://docs.meteora.ag/developer-guides/<protocol>/api-reference/overview.md` for full
 schemas / Swagger):
 
-**DLMM** (`dlmm.datapi.meteora.ag`) — params below verified live 2026-08-02:
+**DLMM** (`dlmm.datapi.meteora.ag`) — params below as of 2026-08-02:
 - `GET /pools?page_size=<n>&sort_by=<field>:desc` — paginated pool list; sort fields include
   `tvl`, `volume_24h` (also `_30m/_1h/_2h/_4h/_12h`), `fee_pct`, `bin_step`, `pool_created_at`.
   Response: `{ total, pages, current_page, page_size, data: [{ address, name, token_x, token_y, ... }] }`
@@ -33,7 +33,7 @@ schemas / Swagger):
 - `GET /pools`, `GET /pools/{address}`, `GET /pools/groups`, `GET /pools/{address}/ohlcv`,
   `GET /pools/{address}/volume/history`, `GET /stats/protocol_metrics`
 
-**DAMM v1** (`damm-api.meteora.ag`) — verified live 2026-08-04:
+**DAMM v1** (`damm-api.meteora.ag`) — as of 2026-08-04:
 - `GET /pools/search?q=<term>&page=0&size=<n>` — pool discovery; response includes
   `pool_address`, `is_meme`, `pool_tvl`, `trading_volume` (+ more TVL/volume fields)
 - `GET /farms` — every farm across every pool; each entry carries a `farming_pool` field that
@@ -42,13 +42,13 @@ schemas / Swagger):
 - also: pool configs, alpha vault data, fee configs (not yet spot-checked here)
 
 ```bash
-# verified: most active DLMM pools right now — note the volume field is NESTED
+# most active DLMM pools right now — note the volume field is NESTED
 # (.volume["24h"]), unlike the flat sort key volume_24h
 curl -s "https://dlmm.datapi.meteora.ag/pools?page_size=10&sort_by=volume_24h:desc" \
   | jq -r '.data[] | [.address, .name, (.volume["24h"]|tostring)] | @tsv'
-# verified: a wallet's open DLMM positions
+# a wallet's open DLMM positions
 curl -s "https://dlmm.datapi.meteora.ag/portfolio/open?user=<WALLET>" | jq '.'
-# verified: DAMM v1 pool discovery — is_meme flags memecoin pools (useful for the M3M3/
+# DAMM v1 pool discovery — is_meme flags memecoin pools (useful for the M3M3/
 # Stake2Earn farm heuristic in other-products.md)
 curl -s "https://damm-api.meteora.ag/pools/search?q=USDC&page=0&size=5" \
   | jq -r '.data[] | [.pool_address, .pool_name, .is_meme] | @tsv'

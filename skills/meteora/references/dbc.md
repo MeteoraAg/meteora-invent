@@ -1,7 +1,7 @@
 # DBC — Dynamic Bonding Curve
 
 > **Source of truth:** `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11`
-> (github.com/MeteoraAg/dynamic-bonding-curve-sdk) — verified against SDK source 2026-08-01.
+> (github.com/MeteoraAg/dynamic-bonding-curve-sdk) — as of 2026-08-01.
 > Program ID (mainnet **and** devnet): `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`
 > Deps: web3.js v1 (^1.98), Anchor 0.31, `bn.js`. Full per-function reference:
 > `packages/dynamic-bonding-curve/docs.md` in the SDK repo (~5,000 lines) and
@@ -116,8 +116,7 @@ partner and creator per the config's `liquidityDistribution` (permanent-locked s
 locked); check with `cpAmm.getUserPositionByPool(pool, owner)`. A trading UI must handle
 this switch or it breaks at graduation.
 
-## Core flow: build curve → create config (verified from SDK scripts)
-
+## Core flow: build curve → create config
 ```ts
 import { Connection, Keypair, PublicKey, sendAndConfirmTransaction } from '@solana/web3.js'
 import {
@@ -179,8 +178,7 @@ Other builders (same nested base params, different shape inputs): `buildCurve`
 `buildCurveWithMidPrice`, `buildCurveWithLiquidityWeights` (16 weights),
 `buildCurveWithCustomSqrtPrices` (ascending `prices[]` + optional weights).
 
-## Core flow: quote + swap on a live pool (verified)
-
+## Core flow: quote + swap on a live pool
 ```ts
 import BN from 'bn.js'
 

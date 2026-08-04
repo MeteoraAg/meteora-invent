@@ -1,7 +1,7 @@
 # Other Products — Alpha Vault, Presale, Stake2Earn, Zap, Dynamic Vault, Fee Sharing, Met Lock, Pool Farms
 
-> Compact SDK surfaces verified against the packages installed with the studio
-> (read from each package's shipped `.d.ts`, 2026-08-02 → 03). Creation flows for alpha/presale
+> Compact SDK surfaces, read from the shipped `.d.ts` of each package installed with the
+> studio (as of 2026-08-03). Creation flows for alpha/presale
 > vaults are ACT-path (`studio-actions.md`); this file covers the SDK surface — above all
 > the **read/verify calls** the studio doesn't expose. All are web3.js v1.
 > ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · the rest 0.31) —
@@ -24,7 +24,7 @@ const accounts = await connection.getProgramAccounts(new PublicKey(ALPHA_VAULT_P
 const av = await AlphaVault.create(connection, accounts[0].pubkey)
 // Gotcha: a nonexistent vault address makes AlphaVault.create read `.data` off a null
 // getMultipleAccountsInfo result with no guard — a raw TypeError, not an actionable message
-// (verified against the compiled source). The studio's own loadAlphaVault wraps this into a
+// The studio's own loadAlphaVault wraps this into a
 // clean "No alpha vault at ..." error — see alpha_vault/utils.ts if calling AlphaVault.create
 // directly.
 // av.vault (state), av.mode (VaultMode), av.vaultState (lifecycle phase)
@@ -47,7 +47,7 @@ BUILD-side code needed just to check a vault's state).
 Program `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` (the src IDL in the repo shows a
 different, non-deployed address — trust PRESALE_PROGRAM_ID from the package). **Pre-1.0 —
 expect churn.**
-Since 0.0.5 (changelog + source, verified): `presaleArgs` gained required
+Since 0.0.5: `presaleArgs` gained required
 `disableEarlierPresaleEndOnceCapReached` (keep FCFS/fixed-price running until end time even
 after the cap is hit) and `lockedVestingArgs` gained required `immediateReleaseTimestamp`
 (when the immediate-release portion unlocks — the SDK's examples default it to
@@ -73,14 +73,14 @@ missing buyer escrow as a bundled pre-instruction in the SAME transaction for pe
 (`getOrCreatePermissionlessEscrowIx`) and permissioned_with_merkle_proof
 (`getOrCreatePermissionedEscrowWithMerkleProofIx`) whitelist modes — calling
 `createPermissionlessEscrow`/`createPermissionedEscrowWithMerkleProof` yourself first is
-unnecessary and would just cost an extra transaction (verified against the compiled 0.1.1 SDK).
+unnecessary and would just cost an extra transaction.
 `EscrowWrapper.canClose(presaleWrapper)` gates whether `closeEscrow` will succeed: Ongoing/Failed
 escrows need their deposit (and any fee) already at zero; Completed escrows need everything
 allocated to them already claimed (and, for prorata, any remaining quote already withdrawn).
 Creator: `creatorWithdraw`, `creatorCollectFee`, `performUnsoldBaseTokenAction`. Gotchas:
 `registryIndex` is a BN serialized as **u8**; a permissionless presale's escrow-creation
 instruction can only ever create a wallet's FIRST escrow at registry 0 — its on-chain PDA seeds
-hardcode that byte rather than taking it as an instruction arg (IDL-verified) — so a first-time
+hardcode that byte rather than taking it as an instruction arg — so a first-time
 deposit into a nonzero registry on a permissionless presale has no automatic escrow-creation
 path.
 
@@ -112,7 +112,7 @@ Admin: `StakeForFee.createFeeVault(...)` (what the studio's stake2earn actions w
 Studio actions: `stake2earn-*` (farm create + lock via `damm-v1-*`, full staker lifecycle +
 status) — see `studio-actions.md`.
 
-**Finding a farm:** SDK static `StakeForFee.getAllFeeVault(connection)` (verified) returns
+**Finding a farm:** SDK static `StakeForFee.getAllFeeVault(connection)` returns
 every fee vault on the program as `{ publicKey, account }[]`, with `account.pool` and
 `account.stakeMint` among the decoded fields — filter by either to find a farm, then run
 `stake2earn-get-status --poolAddress <pool>`. Heuristic for which pools have one at all: M3M3
@@ -129,7 +129,7 @@ keyless endpoint (`https://api.jup.ag`) at a shared, low rate limit, an API key
 → `buildZapInDammV2Transaction(...)`; same for DLMM (`...Dlmm...`); `zapOut*` variants; also
 `rebalanceDlmmPosition(params)`. DLMM zap-in's own `estimateDlmmDirectSwap` unconditionally
 calls Jupiter's quote API to price its rebalancing swap — DAMM v2's direct route never touches
-Jupiter (see `studio-actions.md`'s Zap section for how each is verified). Build results are
+Jupiter (see `studio-actions.md`'s Zap section). Build results are
 **multi-transaction bundles** (`setupTransaction`, `swapTransactions[]`, `zapInTransaction`,
 `cleanUpTransaction`) — send in order.
 
@@ -207,11 +207,10 @@ it with `==` (object identity, not `.equals()`). Helper `calculateTotalLockedVes
 cliffUnlockAmount, amountPerPeriod, numberOfPeriod)` pre-checks a sender's balance before
 creating an escrow. Owner→escrow listing has no SDK helper: use
 `client.program.account.vestingEscrow.all()` with a memcmp filter (offset 8 = recipient,
-offset 72 = creator — both verified against the SDK repo's
-`sumCreatorLockVaultTotals.s.ts` script).
+offset 72 = creator).
 
 **Not exposed: cancel / update-recipient.** The 5 methods listed above are `LockClient`'s
-entire surface (verified) — there is no `cancelVestingEscrow` or update-recipient wrapper.
+entire surface — there is no `cancelVestingEscrow` or update-recipient wrapper.
 Exposing either would mean hand-rolling a raw `program.methods.cancelVestingEscrow(...)` /
 `program.methods.updateVestingEscrowRecipient(...)` write call directly off the exported IDL,
 the same class of gap as Pool Farms' `farm-create` below — deliberately out of scope here, so
@@ -229,7 +228,7 @@ Studio actions: `lock-*` — see `studio-actions.md`.
 Program `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`. DAMM v1 LP staking/reward farms —
 every farm's `stakingMint` is a DAMM v1 pool's LP mint; no DAMM v2/DLMM equivalent exists.
 **Anchor 0.28 pinned**, and `@solana/web3.js` pinned to `~1.78.3` — the narrowest version pin
-of any Meteora SDK in this studio (verified against the installed `package.json`). Left as-is,
+of any Meteora SDK in this studio. Left as-is,
 that pin forces an isolated, non-deduped `@solana/web3.js` install whose own `rpc-websockets`
 dependency collides with the newer one the rest of the workspace hoists, crashing on the
 package's very first `import` with `ERR_PACKAGE_PATH_NOT_EXPORTED` (reproduced on both Node 22
@@ -237,7 +236,7 @@ and 24) — this repo works around it with a root `pnpm.overrides` entry,
 `"@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4"` (`package.json`), deduping the SDK onto
 the same `@solana/web3.js` install every other SDK here already uses safely. A side effect:
 `PublicKey`/`Transaction`/`BN` values now round-trip through this SDK's public API without
-needing `as any` boundary casts (verified — `studio/src/lib/farming` has none).
+needing `as any` boundary casts — `studio/src/lib/farming` has none.
 
 ```ts
 import { PoolFarmImpl } from '@meteora-ag/farming-sdk'
@@ -254,10 +253,10 @@ list; each chunk claims a disjoint set of farms, so unlike a crank loop the chun
 on one another and can each be simulated/sent independently). Despite the parameter being named
 `farmMints` throughout this SDK
 (`getUserBalances`, `getClaimableRewards`, `claimAll`), it is actually an array of **farm
-addresses** (verified against the compiled source — it feeds straight into
+addresses** (it feeds straight into
 `program.account.pool.fetchMultiple`), never staking-mint/LP addresses.
 
-**Two verified read bugs — do not call either directly:**
+**Two read bugs — do not call either directly:**
 - `getUserBalance(owner)` does `fetchNullable(pda).balanceStaked` with no null guard — throws a
   raw `TypeError` for any wallet that has never staked in the farm.
 - `getUserState(owner)` derives the correct `user` PDA via its own (correct, public)
@@ -273,12 +272,12 @@ rewardB}>` is itself null-safe for a never-staked wallet (it just omits that far
 returned map) and is the right way to compute claimable rewards. It deep-imports
 `chunkedGetMultipleAccountInfos` from `@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils` at
 runtime — an undeclared peer dependency this package never lists in its own `package.json` —
-but studio already depends on `@meteora-ag/dynamic-amm-sdk` directly, so it resolves (verified:
-the whole package imports cleanly end to end, including this deep path).
+but studio already depends on `@meteora-ag/dynamic-amm-sdk` directly, so it resolves and the
+package imports cleanly, including this deep path.
 
 **Caution — the REST `farming_pool` field can be stale:** `damm-api.meteora.ag/farms`'s
 `farming_pool` value for a pool can point to a DIFFERENT (older) farm account than what the CLI
-resolves — verified live with pool `7TY9HFLwy8BpS1sGNzYt281YY9WP4V1TzKcYbYft5SD1` (two distinct
+resolves. Pool `7TY9HFLwy8BpS1sGNzYt281YY9WP4V1TzKcYbYft5SD1` returns two distinct
 farm accounts with different reward-end timestamps). Trust the CLI's resolution
 (`farm-get-status --poolAddress ...`); treat the REST field as advisory, not authoritative.
 

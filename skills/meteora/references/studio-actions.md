@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-81 studio actions (plus the start-test-validator helper), verified against
+81 studio actions (plus the start-test-validator helper), read from
 `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
@@ -88,7 +88,7 @@ There is **no `--baseMint` flag**: the mint keypair is generated, or loaded from
 `symbol`, `metadata` (either an existing `uri`, or `image` — URL or file path resolved from
 `studio/` (e.g. `./data/image/x.jpg`) — + `description`/socials, uploaded to Irys).
 When `uri` is set it takes precedence — the `image`/`description`/social fields may remain
-in the file and are ignored (verified).
+in the file and are ignored.
 For transfer-hook configs set `dbcPool.transferHookProgram` to the same hook program.
 Output: base mint, config pubkey, and tx hashes are logged — **the pool address is NOT
 logged**; derive it with `dbc-get-status --baseMint <MINT>`. Note: in the combined
@@ -424,7 +424,7 @@ open unstake request (address, amount, release time) via `getUnstakeByUser`.
 ## Alpha Vault actions — config file: `studio/config/alpha_vault_config.jsonc`
 
 Creation (4 variants + merkle infra) plus the full depositor lifecycle — deposit, withdraw,
-claim, refund, and the permissionless crank that buys from the pool — verified against
+claim, refund, and the permissionless crank that buys from the pool — read from
 `@meteora-ag/alpha-vault@1.1.16`'s installed `.d.ts` + source.
 
 ### `alpha-vault-create`
@@ -511,7 +511,7 @@ throws for one — every other `alpha-vault-*` action shares this same wrap.
 ## Presale Vault actions — config file: `studio/config/presale_vault_config.jsonc`
 
 Creation (3 modes) plus the full buyer + creator lifecycle — deposit, withdraw, claim,
-overflow/failed-raise refunds, raise withdrawal, and unsold-token handling — verified against
+overflow/failed-raise refunds, raise withdrawal, and unsold-token handling — read from
 `@meteora-ag/presale@0.1.1`'s installed `.d.ts` + source.
 
 ### `presale-vault-create`
@@ -520,7 +520,7 @@ pnpm studio presale-vault-create --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `presaleVault`: `presaleRegistries[]` tiers
 (`presaleSupply` in **raw base-token units — passed straight to BN, no decimal
-conversion** (verified); buyer min/max deposit caps **in quote lamports**;
+conversion**; buyer min/max deposit caps **in quote lamports**;
 `depositFeeBps`), timing points, and mode (fcfs/prorata/fixed-price per template comments).
 **Pre-checks `presaleArgs.presaleEndTime` against the ON-CHAIN clock (`getOnChainTimestamp`,
 not the local wall clock) before building any transaction**: an end time at or before the
@@ -544,8 +544,8 @@ Reads `presaleDeposit`: `amount` (quote human units, must be > 0), `registryInde
 `0`; **serialized as a u8 on-chain — must be an integer 0-255**). A missing buyer escrow is
 created as a bundled pre-instruction in the SAME deposit transaction by the SDK's own
 `Presale.deposit()` — permissionless and `permissioned_with_merkle_proof` presales both get
-this for free, in ONE transaction, not two (verified against the installed SDK; no separate
-create-escrow transaction is built or sent). `permissioned_with_merkle_proof` auto-fetches the
+this for free, in one transaction, not two — no separate create-escrow transaction is built
+or sent. `permissioned_with_merkle_proof` auto-fetches the
 proof from the creator's permissioned-server metadata as part of that same call (best-effort —
 fails with a clear "ask the creator" error if no server/proof is published yet);
 `permissioned_with_authority` presales require the creator's operator to create the escrow
@@ -641,9 +641,9 @@ design); buyers run `presale-vault-claim`.
 
 Standalone vesting/locking for any SPL or Token-2022 mint — program
 `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn`, not coupled to any pool; a natural follow-up
-after any token launch ("lock the team allocation"). Verified against
-`@meteora-ag/met-lock-sdk@1.0.1`'s source + installed `.d.ts` — its shipped `docs.md` has
-known errors (see `other-products.md`), so these actions mirror the SDK repo's own
+after any token launch ("lock the team allocation"). Built on
+`@meteora-ag/met-lock-sdk@1.0.1`, whose shipped `docs.md` has known errors (see
+`other-products.md`), so these actions mirror the SDK repo's own
 `createVestingEscrowV2.s.ts` / `claimV2.s.ts` scripts instead.
 
 ### `lock-create-vesting-escrow`
@@ -706,7 +706,7 @@ pnpm studio lock-list-escrows
 Flags: none. Reads `lockList.role` (`"recipient"` | `"creator"`). Loads the wallet (needed to
 know whose escrows to list) but does **not** check its SOL balance — nothing is signed.
 `program.account.vestingEscrow.all` with a memcmp filter: offset 8 for recipient, offset 72
-for creator (both verified against the SDK repo's `sumCreatorLockVaultTotals.s.ts` script).
+for creator.
 Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow --escrow
 <ADDR>` for the decimal-formatted single view.
 
@@ -714,8 +714,7 @@ Lists raw base-unit total/claimed/claimable per escrow — run `lock-get-escrow 
 
 The yield layer under DAMM v1 pool reserves — program
 `24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi` (**Anchor 0.28, the oldest stack in the
-studio**). Verified against `@meteora-ag/vault-sdk@2.3.1`'s installed `.d.ts` + compiled
-source. All three actions key off **the token mint being deposited/withdrawn (`--baseMint`),
+studio**), built on `@meteora-ag/vault-sdk@2.3.1`. All three actions key off **the token mint being deposited/withdrawn (`--baseMint`),
 not a vault address** — there is one permissionless dynamic vault per mint, PDA-derived from
 it; DAMM v1 pools already reference these same vaults internally as `pool.vaultA` /
 `pool.vaultB`.
@@ -726,7 +725,7 @@ pnpm studio vault-deposit --baseMint <MINT>
 ```
 Flags: `--baseMint` (required — the mint being deposited, e.g. wSOL or USDC; fails clearly if
 no permissionless vault exists yet for this mint). Reads `dynamicVaultDeposit.amount` (baseMint
-human units, converted via the mint's own decimals). wSOL note (verified against the installed
+human units, converted via the mint's own decimals). wSOL note (from the installed
 package's compiled `deposit()`): **when `baseMint` is native SOL's wrapped mint, the SDK wraps
 the requested amount of SOL for you internally** — unlike `lock-create-vesting-escrow`, there
 is no pre-funded-wSOL requirement, just enough actual SOL in the wallet to cover the wrap
@@ -738,9 +737,9 @@ pnpm studio vault-withdraw --baseMint <MINT>
 ```
 Flags: `--baseMint` (required). Reads `dynamicVaultWithdraw.amount` — **in VAULT LP TOKEN
 human units, NOT baseMint units.** The SDK's `withdraw(owner, baseTokenAmount)` is misleadingly
-named: verified against the compiled source (it computes `amountToWithdraw = baseTokenAmount *
-withdrawableAmount / totalSupply` — exactly the `getAmountByShare` formula) and the vault
-program's IDL (the on-chain instruction's real args are `unmintAmount` + `minOutAmount`), the
+named: it computes `amountToWithdraw = baseTokenAmount * withdrawableAmount / totalSupply` —
+exactly the `getAmountByShare` formula — and the on-chain instruction's real args are
+`unmintAmount` + `minOutAmount`, so the
 amount burns **LP/vault shares**, not the underlying token. The LP mint always has the same
 decimals as `baseMint` on-chain, so the human-unit scale looks identical, but 1 LP token does
 not equal 1 baseMint token once the vault has earned yield. Guarded against withdrawing more LP
@@ -762,9 +761,8 @@ wallet, also that wallet's LP balance and its current underlying redemption valu
 ## Dynamic Fee Sharing actions — config file: `studio/config/fee_sharing_config.jsonc`
 
 Splits a fee stream among up to 5 fixed recipients — program
-`dfsdo2UqvwfN8DuUVrMRNfQe11VaiNoKcMqLHVvDPzh`. Verified against
-`@meteora-ag/dynamic-fee-sharing-sdk@1.1.0`'s installed `.d.ts` + source (has a `docs.md`,
-cross-checked against the shipped scripts). Vault creation co-signs with a fresh, ephemeral
+`dfsdo2UqvwfN8DuUVrMRNfQe11VaiNoKcMqLHVvDPzh`, built on
+`@meteora-ag/dynamic-fee-sharing-sdk@1.1.0`. Vault creation co-signs with a fresh, ephemeral
 keypair (the vault's own `feeVault` keypair, or a `base` keypair for the PDA variant) — used
 once, and the resulting vault address is logged prominently (save it: every other
 `fee-sharing-*` action needs it via `--vault`). The `fund-from-damm-v2*` / `fund-from-dbc` bridge
@@ -782,9 +780,8 @@ any pubkey owner, including a vault PDA — and the SDK's own `fundByClaimDammV2
 `fundByClaimDammV2Reward` re-verify ownership internally too). Get there with
 `fee-sharing-transfer-damm-v2-position`, which wraps the SDK's `setTokenAccountOwnerTx` helper.
 
-**The vault itself must qualify too — verified directly against the on-chain program's own
-source** (`ix_fund_by_claiming_fee.rs`, the shared instruction both DAMM v2 bridges route
-through), not just its `.d.ts`: (1) it must be a **PDA-variant vault**
+**The vault itself must qualify too**, per the on-chain program's `ix_fund_by_claiming_fee.rs`
+(the shared instruction both DAMM v2 bridges route through) rather than anything in its `.d.ts`: (1) it must be a **PDA-variant vault**
 (`feeSharingCreate.useKeypairVault: false` at creation — the program rejects a keypair-variant
 vault outright, `fee_vault_type` must be `1`); and (2) the **CLI's wallet must be one of the
 vault's registered `userShares` recipients** (the program checks `fee_vault.is_share_holder
@@ -903,9 +900,8 @@ share in.
 ## Zap actions — config file: `studio/config/zap_config.jsonc`
 
 Single-token enter/exit for DAMM v2 and DLMM positions — program
-`zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Verified against `@meteora-ag/zap-sdk@1.3.2`'s
-installed `.d.ts` plus its own `examples/*.ts` and `tests/*.test.ts` (its `docs.md` only covers
-`zapOut*`/Jupiter helper functions, not zap-in — cross-checked against source instead).
+`zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`, built on `@meteora-ag/zap-sdk@1.3.2`. That
+SDK's `docs.md` covers only `zapOut*` and the Jupiter helpers, not zap-in.
 `zap-in-damm-v2` and `zap-out` are **direct-pool routes only — no Jupiter, ever** (each
 action's own note below says exactly how that's guaranteed); `zap-in-dlmm` is
 **Jupiter-quoted** — its rebalancing swap always compares a live Jupiter quote against the
@@ -966,7 +962,7 @@ the code path that would call Jupiter is unreachable). ~0.01-0.02 SOL (more with
 **Rate-Limiter pools cannot be zapped into — including pools made with the DAMM v2 template's
 own defaults.** The zap program performs its rebalancing swap by CPI into cp-amm, and the
 Rate Limiter base-fee mode rejects that on-chain with cp-amm error 6049
-(`FailToValidateSingleSwapInstruction`). Verified on localnet, and it fails no matter how the
+(`FailToValidateSingleSwapInstruction`). It fails no matter how the
 bundle is arranged — even with the zap-in instruction alone in its own transaction. This action
 therefore decodes the pool's base-fee mode and **refuses up front**, before sending anything.
 The catch worth knowing: `damm_v2_config.jsonc` ships `baseFeeMode: 2` (Rate Limiter) as its
@@ -990,7 +986,7 @@ active bin's own X/Y split; forced to match `singleSided` whenever it isn't `nul
 `maxActiveBinSlippage`, `maxAccounts`, `maxTransferAmountExtendPercentage`. **ALWAYS creates a
 brand-new position** — a throwaway keypair co-signs once and the resulting position address is
 logged prominently; depositing into an *existing* DLMM position stays BUILD-path (see
-`dlmm.md`) — verified against the SDK source: `buildZapInDlmmTransaction` unconditionally calls
+`dlmm.md`) — `buildZapInDlmmTransaction` unconditionally calls
 the private `zapInDlmmForUninitializedPosition`, and the "already-initialized position"
 instruction is only reachable through the separate, much heavier `rebalanceDlmmPosition` flow
 (remove all liquidity → swap → re-add), a different operation.
@@ -1024,9 +1020,7 @@ tokens), `slippageBps`. Removes ALL of the wallet's unlocked liquidity from its 
 pool (prompting when there is more than one), then converts whichever side is not `outputMint`
 into `outputMint` so the position exits into a single token. The removal and the swap MUST share
 one on-chain transaction — the swap reads a pre/post token-account balance delta to know how much
-the removal actually freed up, verified against the SDK's own
-`examples/removeDammV2LiquidityAndZapOut.ts` / `removeDlmmLiquidityAndZapOut.ts` and
-`tests/zapOutDammV2.test.ts` — so they are combined into a single step rather than sent as
+the removal actually freed up — so they are combined into a single step rather than sent as
 separate ordered steps. DLMM's `removeLiquidity` can still return several transactions for wide
 positions; only the last one is combined with the swap, and any earlier ones are sent first as
 their own ordered steps. Vested/permanent-locked liquidity is out of scope — only unlocked
@@ -1035,10 +1029,9 @@ skipped automatically. ~0.001-0.002 SOL.
 
 ## Pool Farm actions — config file: `studio/config/farming_config.jsonc`
 
-DAMM v1 LP staking/reward farms — program `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`.
-Verified against the installed `@meteora-ag/farming-sdk@1.0.18`'s `.d.ts` + compiled source
-(the local reward-pool checkout is an older, feature-branch 1.0.17 whose dist ships no
-types — the npm package is the source of truth here). **DAMM v1 farms only** — every farm's
+DAMM v1 LP staking/reward farms — program `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`,
+built on `@meteora-ag/farming-sdk@1.0.18` (the local reward-pool checkout is an older,
+feature-branch 1.0.17 whose dist ships no types — use the npm package). **DAMM v1 farms only** — every farm's
 `stakingMint` is a DAMM v1 pool's LP mint; there is no DAMM v2/DLMM equivalent.
 `--poolAddress` resolution on any of the actions below calls `getFarmAddressesByPoolAddress`,
 a **REST call to `amm.meteora.ag`** (or its devnet mirror) with no localnet/offline fallback —

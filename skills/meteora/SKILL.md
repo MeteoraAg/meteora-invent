@@ -14,7 +14,7 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 
 ## Product Map
 
-| Protocol | What it is | Choose when | SDK (verified version) | Program ID (mainnet + devnet) |
+| Protocol | What it is | Choose when | SDK (pinned version) | Program ID (mainnet + devnet) |
 |---|---|---|---|---|
 | **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
 | **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.4.5` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
@@ -25,7 +25,7 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
 | **Pool Farms** | DAMM v1 LP staking/reward farms | Stake DAMM v1 LP tokens to earn a separate reward token | `@meteora-ag/farming-sdk@1.0.18` | `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1` |
 
-Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
+Compact SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
 (M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock, Pool Farms — live in
 `references/other-products.md` (deep docs: https://docs.meteora.ag/llms.txt).
 
@@ -168,8 +168,8 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 2. **Key hygiene.** Never ask the owner to paste a raw private key or seed phrase into
    chat; never print secret values; refer to wallets by public address and to keys by file
    path or env-var name only.
-3. **Fresh context policy.** The reference packs are verified against the pinned SDK
-   versions in the Product Map. If the installed version is newer, read the SDK's
+3. **Fresh context policy.** The reference packs track the pinned SDK versions in the
+   Product Map. If the installed version is newer, read the SDK's
    CHANGELOG/`docs.md` before trusting a snippet; fetched source beats this skill — follow
    it and note the mismatch. Deep, always-current reference: every docs.meteora.ag page
    serves raw markdown (index: https://docs.meteora.ag/llms.txt), and the docs are also
