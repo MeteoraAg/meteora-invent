@@ -1,0 +1,72 @@
+{
+  /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": true, // Set to false only after you understand what will happen
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* zapInDammV2 is only used in the following actions:
+   * 1. zap-in-damm-v2 (requires --poolAddress flag)
+   * DIRECT ROUTE ONLY: inputMint must already be tokenA or tokenB of the pool — the SDK
+   * sources the other side from the pool's own liquidity, never Jupiter. If inputMint is not
+   * one of the pool's two mints, the action throws instead of routing indirectly.
+   * positionMode "new" creates a fresh, empty position first (a throwaway keypair co-signs
+   * once — only the resulting position address matters afterward); "existing" deposits into
+   * the wallet's own position on this pool (prompts if there is more than one).
+   */
+  "zapInDammV2": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are zapping in with; must be one of the pool's two mints
+    "amountIn": 0.1, // amount of inputMint to zap in, in human token units (converted via the mint's own decimals)
+    "slippageBps": 100, // swap slippage tolerance in basis points (100 = 1%), applied to the internal rebalance swap
+    "maxSqrtPriceChangeBps": 100, // max allowed pool sqrt-price impact from the internal rebalance swap, in basis points
+    "maxTransferAmountExtendPercentage": 20, // % buffer added on top of the swap estimate's max-transfer ceiling
+    "positionMode": "new" // "new" | "existing"
+  },
+
+  /* zapInDlmm is only used in the following actions:
+   * 1. zap-in-dlmm (requires --poolAddress flag; this is the lbPair address)
+   * JUPITER-QUOTED: unlike zapInDammV2, the DLMM zap-in estimator (estimateDlmmDirectSwap)
+   * always calls Jupiter's live quote API to price the rebalancing swap between the position's
+   * two sides, comparing it against the pool's own bin quote and using whichever pays out more —
+   * there is no Jupiter-free escape hatch for DLMM zap-in. Needs network access to Jupiter; see
+   * studio/.env.example for the optional JUPITER_API_KEY / JUPITER_API_URL — the SDK's own
+   * keyless default endpoint already works, just at a lower shared rate limit.
+   * DIRECT ROUTE ONLY: inputMint must already be tokenX or tokenY of the lbPair.
+   * ALWAYS creates a brand-new position (a throwaway keypair co-signs once and the resulting
+   * position address is logged prominently) — depositing into an existing DLMM position is a
+   * BUILD-path task (see the meteora skill's dlmm.md), not covered by this action.
+   */
+  "zapInDlmm": {
+    "inputMint": "So11111111111111111111111111111111111111112", // mint you are zapping in with; must be tokenX or tokenY of the lbPair
+    "amountIn": 0.1, // amount of inputMint to zap in, in human token units (converted via the mint's own decimals)
+    "swapSlippageBps": 150, // slippage tolerance in basis points (150 = 1.5%) for the Jupiter/pool rebalancing-swap quote
+    "minDeltaId": -34, // lower edge of the position's bin range, as an offset from the CURRENT active bin (negative = below active)
+    "maxDeltaId": 34, // upper edge of the position's bin range, as an offset from the current active bin (positive = above active)
+    "strategyType": 0, // liquidity distribution across the range: 0 Spot | 1 Curve | 2 BidAsk
+    "singleSided": null, // "x" | "y" | null — deposit only tokenX or only tokenY (skips the swap entirely); null = balanced two-sided deposit
+    "favorXInActiveId": false, // tie-break for the active bin's own X/Y split; ignored (forced to match singleSided) whenever singleSided isn't null
+    "maxActiveBinSlippage": 50, // bins the active bin id may drift between quoting and landing on-chain
+    "maxAccounts": 50, // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+    "maxTransferAmountExtendPercentage": 0 // % buffer added on top of the swap estimate's max-transfer ceiling
+  },
+
+  /* zapOut is only used in the following actions:
+   * 1. zap-out (requires --poolAddress flag; for "dlmm" this is the lbPair address)
+   * Removes ALL of the wallet's unlocked liquidity from its position on the pool, then
+   * converts whichever side is NOT outputMint into outputMint — the position exits into a
+   * single token. outputMint must be one of the pool's two mints. Direct-pool routes only
+   * (no Jupiter). Vested/permanent-locked liquidity is out of scope; only unlocked liquidity
+   * is removed.
+   */
+  "zapOut": {
+    "protocol": "damm-v2", // "damm-v2" | "dlmm"
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // token the position gets fully converted into
+    "slippageBps": 100 // swap slippage tolerance in basis points (100 = 1%), applied to the non-output side being converted
+  }
+}

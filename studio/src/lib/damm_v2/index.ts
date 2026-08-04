@@ -5,6 +5,8 @@ import {
   BIN_STEP_BPS_U128_DEFAULT,
   calculateTransferFeeIncludedAmount,
   CpAmm,
+  derivePositionAddress,
+  derivePositionNftAccount,
   getBaseFeeParams,
   getDynamicFeeParams,
   getLiquidityDeltaFromAmountA,
@@ -27,6 +29,7 @@ import {
   modifyComputeUnitPriceIx,
   runSimulateTransaction,
   getCurrentPoint,
+  combineTransactions,
 } from '../../helpers';
 import { promptForSelection } from '../../helpers/cli';
 import { DEFAULT_SEND_TX_MAX_RETRIES } from '../../utils/constants';
@@ -626,8 +629,14 @@ export async function splitPosition(
   console.log(`- Unclaimed Fee B: ${unclaimedLpFee.feeTokenB.toString()}`);
   console.log(`- TOTAL POSITION FEE B: ${totalPositionFeeB.toString()}`);
 
-  // CREATE THE SECOND POSITION FIRST
+  // The second position's addresses are deterministic PDAs of its NFT mint, so they need no
+  // RPC read, and creating it can share one transaction with the split — which keeps the whole
+  // action behind the config.dryRun gate instead of creating a real position during a dry run.
   const secondPositionKP = Keypair.generate();
+  const secondPositionAddress = derivePositionAddress(secondPositionKP.publicKey);
+  const secondPositionNftAccount = derivePositionNftAccount(secondPositionKP.publicKey);
+
+  console.log(`\n> Second (new) position will be: ${secondPositionAddress.toString()}`);
 
   const createSecondPositionTx = await cpAmmInstance.createPosition({
     owner: new PublicKey(config.splitPosition.newPositionOwner),
@@ -636,39 +645,14 @@ export async function splitPosition(
     positionNft: secondPositionKP.publicKey,
   });
 
-  const createSignature = await sendAndConfirmTransaction(
-    connection,
-    createSecondPositionTx,
-    [wallet.payer, secondPositionKP],
-    {
-      commitment: 'confirmed',
-      skipPreflight: true,
-    }
-  );
-  console.log('Second position created:', createSignature);
-
-  // Now get the newly created second position
-  const secondPositions = await cpAmmInstance.getUserPositionByPool(
-    poolAddress,
-    new PublicKey(config.splitPosition.newPositionOwner)
-  );
-
-  const secondPosition = secondPositions.find((pos) =>
-    pos.positionState.nftMint.equals(secondPositionKP.publicKey)
-  );
-
-  if (!secondPosition) {
-    throw new Error('Could not find the newly created second position');
-  }
-
   const splitPositionTx = await cpAmmInstance.splitPosition({
     firstPositionOwner: wallet.publicKey,
     secondPositionOwner: new PublicKey(config.splitPosition.newPositionOwner),
     pool: poolAddress,
     firstPosition: userPosition.position,
     firstPositionNftAccount: userPosition.positionNftAccount,
-    secondPosition: secondPosition.position,
-    secondPositionNftAccount: secondPosition.positionNftAccount,
+    secondPosition: secondPositionAddress,
+    secondPositionNftAccount,
     unlockedLiquidityPercentage: config.splitPosition.unlockedLiquidityPercentage,
     permanentLockedLiquidityPercentage: config.splitPosition.permanentLockedLiquidityPercentage,
     innerVestingLiquidityPercentage: config.splitPosition.innerVestingLiquidityPercentage,
@@ -678,29 +662,34 @@ export async function splitPosition(
     reward1Percentage: config.splitPosition.reward1Percentage,
   });
 
-  modifyComputeUnitPriceIx(splitPositionTx, config.computeUnitPriceMicroLamports ?? 0);
+  const combinedTx = combineTransactions([createSecondPositionTx, splitPositionTx]);
+  modifyComputeUnitPriceIx(combinedTx, config.computeUnitPriceMicroLamports ?? 0);
 
   if (config.dryRun) {
-    console.log(`\n> Simulating split position transaction...`);
-    await runSimulateTransaction(connection, [wallet.payer], wallet.publicKey, [splitPositionTx]);
-    console.log('> Split position simulation successful');
+    console.log(`\n> Simulating create-second-position + split-position transaction...`);
+    await runSimulateTransaction(connection, [wallet.payer, secondPositionKP], wallet.publicKey, [
+      combinedTx,
+    ]);
+    console.log(
+      '> Split position simulation successful (this was a dry run — nothing was created or split on-chain)'
+    );
   } else {
-    console.log(`\n>> Sending split position transaction...`);
+    console.log(`\n>> Sending create-second-position + split-position transaction...`);
 
-    const claimFeeTxHash = await sendAndConfirmTransaction(
+    const splitTxHash = await sendAndConfirmTransaction(
       connection,
-      splitPositionTx,
-      [wallet.payer],
+      combinedTx,
+      [wallet.payer, secondPositionKP],
       {
         commitment: connection.commitment,
         maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
       }
     ).catch((err) => {
-      console.error(`Failed to claim fee for position:`, err);
+      console.error(`Failed to split position:`, err);
       throw err;
     });
 
-    console.log(`>>> Position split successfully with tx hash: ${claimFeeTxHash}`);
+    console.log(`>>> Position split successfully with tx hash: ${splitTxHash}`);
   }
 }
 

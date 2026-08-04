@@ -1,6 +1,6 @@
 ---
 name: meteora
-description: "Do anything on Meteora, Solana's liquidity layer: launch tokens on Dynamic Bonding Curves (DBC), create and manage DAMM v1/v2 and DLMM pools, add or remove liquidity, swap, place DLMM limit orders, claim fees, migrate DBC pools to DAMM, run alpha/presale vaults, and write TypeScript against Meteora SDKs. Use for any Meteora, meteora-invent, DBC, DLMM, DAMM, Solana token launch, bonding curve, or Solana liquidity/LP task — including building launchpads, trading bots, and integrations."
+description: "Do anything on Meteora, Solana's liquidity layer: launch tokens on Dynamic Bonding Curves (DBC), create and manage DAMM v1/v2 and DLMM pools, add or remove liquidity, swap, place DLMM limit orders, claim fees, migrate DBC pools to DAMM, run alpha and presale vaults, lock tokens on vesting schedules, stake for fees (M3M3) or into LP farms, zap single tokens into and out of positions, split fees across wallets, and write TypeScript against Meteora SDKs. Use for any Meteora, meteora-invent, DBC, DLMM, DAMM, alpha vault, presale, token vesting, fee sharing, staking, farming, zap, or Solana liquidity/LP task — including building launchpads, trading bots, and integrations."
 license: MIT
 compatibility: "Requires Node.js 22.12+ and pnpm 10+ for the studio CLI path (repo enforces engine-strict), or Node.js 18+ with npm for standalone SDK code; network access to a Solana RPC; a funded keypair for on-chain writes."
 metadata: {"version": "2.0.0", "author": "MeteoraAg", "openclaw": {"emoji": "🌊", "homepage": "https://github.com/MeteoraAg/meteora-invent", "requires": {"anyBins": ["pnpm", "npm"]}}, "hermes": {"category": "defi", "tags": ["solana", "meteora", "defi", "liquidity", "token-launch"]}}
@@ -14,18 +14,20 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 
 ## Product Map
 
-| Protocol | What it is | Choose when | SDK (verified version) | Program ID (mainnet + devnet) |
+| Protocol | What it is | Choose when | SDK (pinned version) | Program ID (mainnet + devnet) |
 |---|---|---|---|---|
 | **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
 | **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.4.5` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
 | **DLMM** | Bin-based concentrated liquidity, dynamic fees, limit orders | Active LP strategies, capital efficiency, limit orders | `@meteora-ag/dlmm@1.9.14` | `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo` |
 | **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@1.4.1` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
-| **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | via studio CLI | — |
-| **Presale Vault** | Generic presale with vesting | Presale before pool creation | via studio CLI | — |
+| **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | `@meteora-ag/alpha-vault@1.1.16` | `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` |
+| **Presale Vault** | Generic presale with vesting | Presale before pool creation | `@meteora-ag/presale@0.1.1` | `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` |
+| **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
+| **Pool Farms** | DAMM v1 LP staking/reward farms | Stake DAMM v1 LP tokens to earn a separate reward token | `@meteora-ag/farming-sdk@1.0.18` | `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1` |
 
-Compact verified SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
-(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing — live in `references/other-products.md`
-(deep docs: https://docs.meteora.ag/llms.txt).
+Compact SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2Earn
+(M3M3), Zap, Dynamic Vault, Dynamic Fee Sharing, Met Lock, Pool Farms — live in
+`references/other-products.md` (deep docs: https://docs.meteora.ag/llms.txt).
 
 ## Decide the Path: ACT vs BUILD
 
@@ -35,16 +37,25 @@ pool creation, seeding, vaults, locks — and swaps, position/status reads, and 
 claims on every protocol.
 
 **BUILD — the user wants code, or a flow the studio doesn't have** → use the **SDKs
-directly** with the pinned versions above. Required for: bots, backends, UIs, and position
-management beyond the studio (DLMM add/remove/rebalance on existing positions, CP-AMM
-position ops on arbitrary pools, vault/presale user flows).
+directly** with the pinned versions above. Required for: bots, backends, UIs, DLMM
+add/remove/rebalance on existing positions, CP-AMM position ops on arbitrary pools, and
+anything else not exposed as a studio action.
 
 | Intent | Path | First action → then read |
 |---|---|---|
+| Wallet setup / get devnet SOL | ACT | `generate-keypair` → `airdrop-sol` (`references/studio-actions.md`) |
 | Launch token on bonding curve | ACT | Run intake in `references/dbc.md` → `dbc-create-config` → `dbc-create-pool` (`references/studio-actions.md`) |
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
-| Alpha/presale vault, locks, farms | ACT | `alpha-vault-create` / lock actions (`references/studio-actions.md`) |
+| Create an alpha/presale vault, a DAMM v1 lock escrow, or a Stake2Earn farm | ACT | `alpha-vault-create` / `presale-vault-create` / `damm-v1-lock-liquidity` / `damm-v1-create-stake2earn-farm` (`references/studio-actions.md`) |
+| Participate in a launch vault (deposit / claim / refund) | ACT | `alpha-vault-deposit` → `alpha-vault-claim` (`references/studio-actions.md`) |
+| Join / claim a presale (deposit, claim, refunds) | ACT | `presale-vault-deposit` → `presale-vault-claim` (`references/studio-actions.md`) |
+| Lock/vest tokens for a recipient (cliff + vesting) | ACT | `lock-create-vesting-escrow` (`references/studio-actions.md`) |
+| Stake for fees on a DAMM v1 memecoin pool (M3M3) | ACT | `stake2earn-stake` → `stake2earn-claim-fee` (`references/studio-actions.md`) |
+| Stake DAMM v1 LP into a reward farm | ACT | `farm-stake` (`references/studio-actions.md`) |
+| Earn lending yield on idle tokens (Dynamic Vault) | ACT | `vault-deposit` (`references/studio-actions.md`) |
+| Split a fee stream between wallets (create/fund/claim fee vault) | ACT | `fee-sharing-create-vault` (`references/studio-actions.md`) |
+| Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-in-dlmm` / `zap-out` (`references/studio-actions.md` — DAMM v2 zap-in is direct-route only; DLMM zap-in is Jupiter-quoted, needs `JUPITER_API_KEY`/`JUPITER_API_URL` setup) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
 | Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |
@@ -84,7 +95,10 @@ do before doing it:
 
 **Gates (non-negotiable):**
 1. First execution of any state-changing flow runs with `"dryRun": true` (ACT) or a
-   simulation/quote (BUILD); show the owner the result.
+   simulation/quote (BUILD); show the owner the result. For actions that generate a fresh
+   keypair (lock escrow, fee-sharing vault, stake2earn unstake account, zap position), the
+   address a dry run prints is a throwaway placeholder — only save the address the real
+   (`dryRun: false`) run prints.
 2. Mainnet + real execution only after the owner explicitly confirms in this conversation.
 3. After executing, verify on-chain (see Verification) and report addresses, costs, and
    next steps. Never claim success without verifying.
@@ -111,7 +125,7 @@ pnpm studio generate-keypair --network devnet --airdrop
 pnpm studio <action> [--baseMint <MINT> | --poolAddress <POOL>]
 ```
 
-All 31 actions with their real flags, config blocks, and outputs:
+All 81 actions with their real flags, config blocks, and outputs:
 `references/studio-actions.md`. Environment details and wallet import:
 `references/studio-setup.md`.
 
@@ -154,8 +168,8 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 2. **Key hygiene.** Never ask the owner to paste a raw private key or seed phrase into
    chat; never print secret values; refer to wallets by public address and to keys by file
    path or env-var name only.
-3. **Fresh context policy.** The reference packs are verified against the pinned SDK
-   versions in the Product Map. If the installed version is newer, read the SDK's
+3. **Fresh context policy.** The reference packs track the pinned SDK versions in the
+   Product Map. If the installed version is newer, read the SDK's
    CHANGELOG/`docs.md` before trusting a snippet; fetched source beats this skill — follow
    it and note the mismatch. Deep, always-current reference: every docs.meteora.ag page
    serves raw markdown (index: https://docs.meteora.ag/llms.txt), and the docs are also
@@ -180,7 +194,7 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 | Errors → causes → fixes (all protocols) | `references/troubleshooting.md` |
 | Launchpad UI / frontend templates | `references/scaffolds.md` |
 | Ready-to-fill config templates | `references/configs/*.jsonc` |
-| Alpha Vault / Presale / M3M3 / Zap / Dynamic Vault / Fee Sharing SDK surfaces | `references/other-products.md` |
+| Alpha Vault / Presale / Stake2Earn / Zap / Dynamic Vault / Fee Sharing / Met Lock / Pool Farms SDK surfaces | `references/other-products.md` |
 
 ## Verification
 

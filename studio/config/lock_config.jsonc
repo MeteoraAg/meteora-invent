@@ -1,0 +1,56 @@
+{
+  /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": true, // Set to false only after you understand what will happen
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* lockCreateEscrow is only used in the following actions:
+   * 1. lock-create-vesting-escrow (requires --baseMint flag)
+   * Locks `cliffUnlockAmount + amountPerPeriod * numberOfPeriod` of baseMint from the wallet
+   * into a new vesting escrow for `recipient`. A fresh "base" keypair is generated for you —
+   * the escrow address it derives is logged prominently; save it for every other lock-* action.
+   */
+  "lockCreateEscrow": {
+    "recipient": "YOUR_RECIPIENT_ADDRESS", // wallet that will receive the vested tokens
+    "vestingStartTime": 1755421200, // unix seconds — reference point vesting periods are counted from; MUST be <= cliffTime (program rejects creation otherwise). STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now
+    "cliffTime": 1763197200, // unix seconds — no tokens unlock before this time; must be >= vestingStartTime. STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now
+    "frequency": 2592000, // seconds between unlock periods after the cliff (e.g. 2592000 = 30 days)
+    "cliffUnlockAmount": 2500, // human token units unlocked exactly at cliffTime; total locked = cliffUnlockAmount + amountPerPeriod * numberOfPeriod — set to 0 unless an upfront cliff unlock is wanted
+    "amountPerPeriod": 2500, // human token units unlocked every `frequency` seconds after the cliff — put the full amount here for pure linear vesting
+    "numberOfPeriod": 4, // total number of periods after the cliff
+    "updateRecipientMode": 0, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can change the recipient address later)
+    "cancelMode": 1, // 0 = NONE | 1 = CREATOR_ONLY | 2 = RECIPIENT_ONLY | 3 = CREATOR_RECIPIENT (who can cancel the escrow)
+    "isSenderMultiSig": false // set true only if the sender's token account is owned by an off-curve authority (e.g. a multisig/PDA)
+  },
+
+  /* lockEscrowMetadata is only used in the following actions:
+   * 1. lock-create-escrow-metadata (requires --escrow flag)
+   */
+  "lockEscrowMetadata": {
+    "name": "YOUR_ESCROW_NAME", // display name for the vesting escrow
+    "description": "YOUR_ESCROW_DESCRIPTION", // human-readable description
+    "creatorEmail": "creator@example.com", // contact email for the escrow creator
+    "recipientEmail": "recipient@example.com" // contact email for the escrow recipient
+  },
+
+  /* lockClaim is only used in the following actions:
+   * 1. lock-claim (requires --escrow flag)
+   */
+  "lockClaim": {
+    "maxAmount": null // human token units to claim; null = claim everything currently vested
+  },
+
+  /* lockList is only used in the following actions:
+   * 1. lock-list-escrows
+   */
+  "lockList": {
+    "role": "recipient" // "recipient" = escrows where the wallet is the recipient | "creator" = escrows the wallet created
+  }
+}

@@ -8,6 +8,9 @@
   /* keypairFilePath is required and will be the payer + signer for all transactions */
   "keypairFilePath": "./keypair.json",
 
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
   /* quoteMint is required for the presale
    * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
    */
@@ -43,10 +46,10 @@
       "presaleMaximumCap": 100000000000, // Maximum total amount that can be raised (in quote token lamports, e.g., 100 SOL = 100000000000 lamports)
       "presaleMinimumCap": 1000000000, // Minimum total amount to reach for presale success (in quote token lamports, e.g., 1 SOL = 1000000000 lamports)
       "presaleStartTime": 0, // Presale start time (unix timestamp in seconds, 0 = start immediately)
-      "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds, e.g., Date.now() / 1000 + 86400 for 24 hours from now)
+      "presaleEndTime": 1760954400, // Presale end time (unix timestamp in seconds). STALE PLACEHOLDER (a date in the past) — replace with a future unix timestamp before running, e.g. Math.floor(Date.now() / 1000) + 86400 for 24h from now
       "whitelistMode": 0, // Whitelist mode: 0 = permissionless (anyone can participate) | 1 = permissioned_with_merkle_proof | 2 = permissioned_with_authority
       "disableEarlierPresaleEndOnceCapReached": false, // if true, FCFS/fixed-price presales keep running until presaleEndTime even after the max cap is hit
-      "unsoldTokenAction": 1 // Action for unsold tokens: 0 = burn | 1 = refund to creator
+      "unsoldTokenAction": 1 // Action for unsold tokens: 0 = refund unsold tokens to creator | 1 = burn unsold tokens
     },
 
     /* Fixed Price Presale specific fields (only required for fixed_price presaleVaultType)
@@ -68,5 +71,42 @@
       "immediateReleaseBps": 0, // Percentage of tokens released immediately in basis points (1000 = 10%, 0 = no immediate release)
       "immediateReleaseTimestamp": 0 // unix seconds when the immediate-release portion unlocks; 0/omitted = at presaleEndTime (SDK default)
     }
+  },
+
+  /* presaleDeposit is only used in the following actions:
+   * 1. presale-vault-deposit (requires --vault flag)
+   */
+  "presaleDeposit": {
+    "amount": 1, // amount to deposit, in quote token human units
+    // presale tier index (u8 on-chain: 0-255; single-tier presales use 0).
+    // NOTE (permissionless whitelistMode only): a wallet's FIRST-EVER escrow can only be
+    // created at registry 0 — create_permissionless_escrow hardcodes that seed on-chain, so
+    // depositing into a nonzero registryIndex before an escrow already exists there fails fast
+    // with a clear pre-flight error rather than a raw on-chain revert. Not a concern once an
+    // escrow already exists, or for merkle-proof/authority-whitelisted presales.
+    "registryIndex": 0
+  },
+
+  /* presaleWithdraw is only used in the following actions:
+   * 1. presale-vault-withdraw (requires --vault flag; blocked on FCFS presales, and on
+   *    fixed-price presales created with disableWithdraw: true)
+   */
+  "presaleWithdraw": {
+    "amount": 1, // amount to withdraw, in quote token human units
+    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255)
+  },
+
+  /* presaleClaim is only used in the following actions:
+   * 1. presale-vault-claim (requires --vault flag)
+   */
+  "presaleClaim": {
+    "registryIndex": 0 // presale tier index (u8 on-chain: 0-255)
+  },
+
+  /* presaleCreatorWithdraw is only used in the following actions:
+   * 1. presale-vault-creator-withdraw (requires --vault flag; creator wallet only)
+   */
+  "presaleCreatorWithdraw": {
+    "collectFee": true // also call creatorCollectFee() after creatorWithdraw, when eligible (no-op if not yet eligible)
   }
 }

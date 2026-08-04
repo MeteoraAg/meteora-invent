@@ -160,9 +160,9 @@
      */
     // "maxBuyingCap": 10000, // Maximum total amount (in quote token) that can be bought across all users in the vault
 
-    "depositingPoint": 1755421200, // When users can start depositing depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
-    "startVestingPoint": 1755507600, // When token vesting begins and users can start claiming their vested tokens depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
-    "endVestingPoint": 1755507600, // When token vesting ends and all tokens become fully claimable depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+    "depositingPoint": 1755421200, // When users can start depositing depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
+    "startVestingPoint": 1755507600, // When token vesting begins and users can start claiming their vested tokens depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
+    "endVestingPoint": 1755507600, // When token vesting ends and all tokens become fully claimable depending on pool's activationType (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp)) — the shipped value is a STALE PLACEHOLDER in the past — replace it before running
     "escrowFee": 0, // Fee amount (in quote token) charged when creating a stake escrow account
     "whitelistMode": "permissionless" // Whitelist mode: permissionless | permissioned_with_merkle_proof | permissioned_with_authority
 

@@ -29,7 +29,7 @@ Required `.env`:
 launch flow creates pools on that config; a launchpad operator is the **partner**
 (fee claimer) for every token launched through it.
 
-Working on the scaffold — layout (verified against `src/`):
+Working on the scaffold — layout:
 - Pages: `index.tsx` (explore), `token/` (token detail: chart, txs, holders),
   `create-pool.tsx` (launch flow), `_app.tsx`; API routes: `api/upload.ts` (R2
   image/metadata upload), `api/send-transaction.ts`.

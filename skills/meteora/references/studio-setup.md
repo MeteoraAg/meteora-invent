@@ -36,6 +36,8 @@ RPC endpoint, keypair path, and dry-run mode all live in the protocol config fil
 - Public devnet: `https://api.devnet.solana.com`
 - Premium (recommended): [Helius](https://www.helius.dev/), QuickNode, Triton
 
+**Optional:** `JUPITER_API_KEY` (and `JUPITER_API_URL`) in `studio/.env` — only needed to raise the rate limit on `zap-in-dlmm`'s live Jupiter quotes; every other action ignores them.
+
 ## Get a Wallet
 
 The studio signs with `studio/keypair.json`, produced by `generate-keypair` from a
@@ -47,7 +49,7 @@ converts keys, it does not create them.**
 cp -n studio/.env.example studio/.env    # then set PRIVATE_KEY=... in it
 
 # New wallet: create one without echoing the secret, appended straight into .env
-cd studio && node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();fs.appendFileSync('.env','\nPRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())" && cd ..
+cd studio && node -e "const {Keypair}=require('@solana/web3.js');const _b=require('bs58');const bs58=_b.default??_b;const fs=require('fs');const k=Keypair.generate();const env=fs.existsSync('.env')?fs.readFileSync('.env','utf8').split('\n').filter(l=>!l.startsWith('PRIVATE_KEY=')).join('\n').replace(/\n*$/,'\n'):'';fs.writeFileSync('.env',env+'PRIVATE_KEY='+bs58.encode(k.secretKey)+'\n');console.log('New wallet address: '+k.publicKey.toBase58())" && cd ..
 
 # Convert to studio/keypair.json (+ optional devnet airdrop of 5 SOL)
 pnpm studio generate-keypair --network devnet --airdrop
@@ -62,6 +64,11 @@ pnpm studio start-test-validator
 # Airdrop on localnet
 pnpm studio airdrop-sol --network localnet   # fixed 5 SOL per call; no --amount flag
 ```
+
+The validator preloads **all** Meteora programs — DLMM, DAMM v1, DAMM v2, DBC, Alpha
+Vault, Dynamic Vault, Met Lock, and Dynamic Fee Sharing, plus **Presale**, **Stake2Earn
+(M3M3)**, **Zap**, and **Pool Farms** — so every product's golden path is testable on
+localnet without faucets.
 
 ## Verify Setup
 

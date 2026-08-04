@@ -1,7 +1,7 @@
 # DAMM v1 — Dynamic AMM (legacy)
 
 > **Source of truth:** `@meteora-ag/dynamic-amm-sdk@1.4.1` (github.com/MeteoraAg/damm-v1-sdk,
-> TS client in `ts-client/`) — verified against SDK source 2026-08-01. Repo is quiet
+> TS client in `ts-client/`) — as of 2026-08-01. Repo is quiet
 > (last change 2025-08); check npm for newer versions before trusting this pin.
 > **Review by 2026-12-01:** legacy product — re-check deprecation status and whether this
 > pack should shrink to lock-escrow/Stake2Earn maintenance flows only.
@@ -53,8 +53,7 @@ places — the current field is `pool.tokenBMint.address`.**
 | Static reads | `AmmImpl.searchPoolsByToken(connection, mint)` · `getPoolConfig` / `getFeeConfigurations` / `getPoolConfigsWithPoolCreatorAuthority` · `fetchMultipleUserBalance` |
 | Standalone utils | `calculateSwapQuote`, `calculatePoolInfo`, `checkPoolExists`, `getTokensMintFromPoolAddress`, `derivePoolAddress`; deep-import `derivePoolAddressWithConfig`, `deriveLockEscrowPda` from `@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils` |
 
-## Core flow: swap (verified from SDK README + source)
-
+## Core flow: swap
 ```ts
 await pool.updateState()                                 // refresh cached reserves/clock first
 

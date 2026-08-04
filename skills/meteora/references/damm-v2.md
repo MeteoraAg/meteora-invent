@@ -1,7 +1,7 @@
 # DAMM v2 — Constant-Product AMM (CP-AMM)
 
 > **Source of truth:** `@meteora-ag/cp-amm-sdk@1.4.5` (github.com/MeteoraAg/damm-v2-sdk) —
-> verified against SDK source 2026-08-01.
+> as of 2026-08-01.
 > Program ID (mainnet **and** devnet): `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG`
 > Deps: web3.js v1 (^1.95), Anchor 0.31, `bn.js`, `decimal.js`. Full per-function reference:
 > `docs.md` in the SDK repo (~4,350 lines) and
@@ -55,8 +55,7 @@ PDAs: `derivePoolAddress`, `deriveCustomizablePoolAddress`, `derivePositionAddre
 Fee params: `getBaseFeeParams` (dispatches by mode), `getDynamicFeeParams`,
 `bpsToFeeNumerator` / `feeNumeratorToBps`. Helper: `getTokenProgram(poolState.tokenAFlag)`.
 
-## Core flow: quote + swap (verified from SDK scripts)
-
+## Core flow: quote + swap
 ```ts
 import { BN } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getMint, Mint } from '@solana/spl-token'
@@ -93,8 +92,7 @@ const swapTx = await cpAmm.swap({
 // set feePayer + recentBlockhash, sign with wallet, send
 ```
 
-## Core flow: positions + claim fees (verified from SDK examples)
-
+## Core flow: positions + claim fees
 ```ts
 import { getTokenProgram } from '@meteora-ag/cp-amm-sdk'
 
@@ -113,8 +111,7 @@ const claimTx = await cpAmm.claimPositionFee({
 })
 ```
 
-## Core flow: deposit into an existing position (verified from the studio implementation)
-
+## Core flow: deposit into an existing position
 ```ts
 const poolState = await cpAmm.fetchPoolState(poolAddress)
 const [userPosition] = await cpAmm.getUserPositionByPool(poolAddress, wallet.publicKey)
@@ -145,8 +142,8 @@ const addTx = await cpAmm.addLiquidity({
   positionNftAccount: userPosition.positionNftAccount,
   liquidityDelta: depositQuote.liquidityDelta,
   maxAmountTokenA, maxAmountTokenB,
-  // max* / *Threshold bound what the instruction may consume per side; the studio's
-  // verified implementation sets thresholds equal to the max amounts
+  // max* / *Threshold bound what the instruction may consume per side; the studio sets
+  // thresholds equal to the max amounts
   tokenAAmountThreshold: maxAmountTokenA, tokenBAmountThreshold: maxAmountTokenB,
   tokenAMint: poolState.tokenAMint, tokenBMint: poolState.tokenBMint,
   tokenAVault: poolState.tokenAVault, tokenBVault: poolState.tokenBVault,

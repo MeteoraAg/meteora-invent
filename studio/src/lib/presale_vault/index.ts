@@ -1,7 +1,13 @@
 import { Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { PresaleVaultConfig, PresaleVaultTypeConfig, PresaleConfig } from '../../utils/types';
-import { Presale, derivePresale, PRESALE_PROGRAM_ID, Rounding } from '@meteora-ag/presale';
+import {
+  Presale,
+  derivePresale,
+  PRESALE_PROGRAM_ID,
+  Rounding,
+  getOnChainTimestamp,
+} from '@meteora-ag/presale';
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
 import { runSimulateTransaction } from '../../helpers/transaction';
@@ -65,7 +71,7 @@ export async function createFcfsPresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
@@ -208,7 +214,7 @@ export async function createProrataPresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
@@ -366,7 +372,7 @@ export async function createFixedPricePresaleVault(
   console.log(
     `  - Whitelist mode: ${presaleArgs.whitelistMode} (0=permissionless, 1=merkle_proof, 2=authority)`
   );
-  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=burn, 1=refund)`);
+  console.log(`  - Unsold token action: ${presaleArgs.unsoldTokenAction} (0=refund, 1=burn)`);
 
   let lockedVestingArgs;
   if (params.lockedVestingArgs) {
@@ -471,6 +477,62 @@ export async function createPermissionedFixedPricePresaleVaultWithMerkleProof() 
   throw new Error('Not implemented yet');
 }
 
+/**
+ * Guard `presaleArgs.presaleStartTime`/`presaleEndTime` against a configuration the presale
+ * program can never actually run.
+ *
+ * Verified against @meteora-ag/presale@0.1.1's own `getPresaleProgressState` (the client-side
+ * mirror of the on-chain state machine): a presale is `NotStarted` while
+ * `now < presaleStartTime`, `Ongoing` while `now < presaleEndTime`, and otherwise
+ * `Completed`/`Failed` — deposits only succeed in the `Ongoing` state, and the program itself
+ * rejects a deposit against an already-ended presale on-chain with `PresaleEnded` (error 6016).
+ * A `presaleEndTime` at or before the current time is therefore `Completed`/`Failed` from the
+ * instant the vault is created: nobody can ever deposit into it. `presaleStartTime: 0` is the
+ * SDK/program's own "start immediately" sentinel, so it is not flagged as past here; only
+ * `presaleEndTime` is checked against on-chain time.
+ *
+ * Also guards the two fields' relationship: if `presaleStartTime` is a real (nonzero) future
+ * timestamp, `presaleEndTime` must be after it, or the state machine above jumps straight from
+ * `NotStarted` to `Completed`/`Failed` and the presale is never `Ongoing`. The program also
+ * enforces a minimum duration between the effective start and end, so passing this check alone
+ * does not guarantee on-chain acceptance; leave a comfortable margin.
+ *
+ * Uses the on-chain clock (`getOnChainTimestamp`), not the local wall clock — this program's
+ * state machine is defined in terms of the validator's Clock sysvar, not the caller's machine.
+ */
+async function assertPresaleTimesAreValid(
+  connection: Connection,
+  presaleArgs: { presaleStartTime: BN; presaleEndTime: BN }
+): Promise<void> {
+  const nowSec = Number(await getOnChainTimestamp(connection));
+  const presaleStartTime = Number(presaleArgs.presaleStartTime);
+  const presaleEndTime = Number(presaleArgs.presaleEndTime);
+
+  if (presaleEndTime <= nowSec) {
+    const behindSeconds = nowSec - presaleEndTime;
+    throw new Error(
+      `presale_vault_config.jsonc presaleArgs.presaleEndTime is ${presaleEndTime} ` +
+        `(${new Date(presaleEndTime * 1000).toISOString()}), which is ${behindSeconds} second(s) at or ` +
+        `behind the current on-chain time (${nowSec}, ${new Date(nowSec * 1000).toISOString()}). Per the ` +
+        "presale program's own state machine, a presale is Completed/Failed (never Ongoing) once " +
+        'now >= presaleEndTime, so this vault would be unable to accept a single deposit from the moment ' +
+        'it is created, and any deposit attempt is rejected on-chain with PresaleEnded (error 6016). Fix ' +
+        'it by setting presaleEndTime to a value after the current on-chain time, e.g. ' +
+        'Math.floor(Date.now() / 1000) + 86400 for 24h from now.'
+    );
+  }
+
+  if (presaleStartTime !== 0 && presaleEndTime <= presaleStartTime) {
+    throw new Error(
+      `presale_vault_config.jsonc presaleArgs.presaleEndTime (${presaleEndTime}, ` +
+        `${new Date(presaleEndTime * 1000).toISOString()}) must be after presaleArgs.presaleStartTime ` +
+        `(${presaleStartTime}, ${new Date(presaleStartTime * 1000).toISOString()}) — otherwise the ` +
+        'presale jumps directly from NotStarted to Completed/Failed and is never Ongoing, so nobody can ' +
+        'ever deposit. Fix presaleEndTime (or set presaleStartTime to 0 to start immediately).'
+    );
+  }
+}
+
 export async function createPresaleVault(
   connection: Connection,
   wallet: Wallet,
@@ -484,6 +546,8 @@ export async function createPresaleVault(
   if (!config.quoteMint) {
     throw new Error('Quote mint configuration is missing');
   }
+
+  await assertPresaleTimesAreValid(connection, config.presaleVault.presaleArgs);
 
   const quoteMint = new PublicKey(config.quoteMint);
   const presaleVaultType = config.presaleVaultType;

@@ -1,0 +1,79 @@
+{
+  /* rpcUrl is required. You can switch between mainnet, devnet and localnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com | localnet: http://localhost:8899
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": true, // Set to false only after you understand what will happen
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* feeSharingCreate is only used in the following actions:
+   * 1. fee-sharing-create-vault (requires --baseMint flag; the token mint whose fees will be
+   *    shared, e.g. a DBC or DAMM v2 pool's base/quote mint)
+   * userShares: 2-5 recipients ({address, share}) — the program allows at most 5 users per
+   * vault. `share` is a relative integer weight, NOT a percentage — it does not need to sum to
+   * 100; getFeeBreakdown later computes each user's cut as their share divided by the sum of
+   * every user's share.
+   * useKeypairVault: true creates the vault via a fresh KEYPAIR that co-signs once (the vault
+   * address is that keypair's public key — logged prominently after creation, save it); false
+   * creates the vault as a PDA off a fresh `base` keypair instead (vault address is derived
+   * and deterministic from base + tokenMint, also logged).
+   * Planning to use fee-sharing-fund-from-damm-v2 or -reward on this vault? Set
+   * useKeypairVault to false (PDA-variant — the on-chain program rejects a keypair-variant
+   * vault for those two actions specifically) and include the wallet that will run them as one
+   * of userShares (the program requires the funding transaction's signer to be a registered
+   * recipient — being the vault's owner/creator alone is not enough). Every other fee-sharing
+   * action (fund, fund-from-dbc, claim, get-status) works with either vault variant.
+   */
+  "feeSharingCreate": {
+    "userShares": [
+      { "address": "YOUR_RECIPIENT_ADDRESS_1", "share": 60 },
+      { "address": "YOUR_RECIPIENT_ADDRESS_2", "share": 40 }
+    ],
+    "useKeypairVault": true
+  },
+
+  /* feeSharingFund is only used in the following actions:
+   * 1. fee-sharing-fund (requires --vault flag)
+   * Directly funds the vault from the wallet's own token account. amount is in the vault's
+   * tokenMint human units (converted via the mint's own decimals).
+   */
+  "feeSharingFund": {
+    "amount": 1
+  },
+
+  /* feeSharingFundDbc is only used in the following actions:
+   * 1. fee-sharing-fund-from-dbc (requires --vault + --baseMint flags)
+   * Routes to the matching DBC fee-sharing bridge instruction based on role x source — the
+   * fee vault must already be set as the DBC pool config's creator (role "creator") or
+   * feeClaimer (role "partner") for the on-chain claim to succeed:
+   *   creator + tradingFee   -> fundByClaimDbcCreatorTradingFee2
+   *   partner + tradingFee   -> fundByClaimDbcPartnerTradingFee2
+   *   creator + surplus      -> fundByWithdrawDbcCreatorSurplus
+   *   partner + surplus      -> fundByWithdrawDbcPartnerSurplus
+   *   creator/partner + migrationFee -> fundByWithdrawDbcMigrationFee (isPartner flag set accordingly)
+   */
+  "feeSharingFundDbc": {
+    "role": "creator",
+    "source": "tradingFee"
+  },
+
+  /* feeSharingFundDammV2Reward is only used in the following actions:
+   * 1. fee-sharing-fund-from-damm-v2-reward (requires --vault + --poolAddress flags)
+   * Sweeps a DAMM v2 position's REWARD emissions into the vault via fundByClaimDammV2Reward —
+   * distinct from fee-sharing-fund-from-damm-v2, which sweeps trading FEES. Reuses the same
+   * vault-owned-position discovery, so the position NFT must already be owned by the fee vault
+   * first (run fee-sharing-transfer-damm-v2-position once). Also requires the vault to be
+   * PDA-variant (useKeypairVault: false) and the CLI's wallet to be a registered userShares
+   * recipient of the vault — see feeSharingCreate's comment above.
+   * rewardIndex: which of the pool's reward slots to claim (0 or 1 — DAMM v2 pools have 2 reward
+   * slots at most); the target slot must already be initialized on the pool.
+   */
+  "feeSharingFundDammV2Reward": {
+    "rewardIndex": 0
+  }
+}

@@ -1,7 +1,7 @@
 # DLMM — Dynamic Liquidity Market Maker
 
 > **Source of truth:** `@meteora-ag/dlmm@1.9.14` (github.com/MeteoraAg/dlmm-sdk, TS client in
-> `ts-client/`) — verified against SDK source 2026-08-01.
+> `ts-client/`) — as of 2026-08-01.
 > Program ID (mainnet **and** devnet): `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo`
 > Deps: web3.js v1 (^1.91), Anchor 0.31, `bn.js`, `decimal.js`.
 > ⚠️ The SDK README's "Static functions" table lists `createPermissionLbPair`,
@@ -54,8 +54,7 @@ before quoting/building if the instance is not fresh.
 | Reads | `getActiveBin()` · `getBinsAroundActiveBin` · `getBinsBetweenMinAndMaxPrice` · `getFeeInfo()` · `getDynamicFee()` · `getPosition(pubkey)` · `getPositionsByUserAndLbPair(user)` · static `DLMM.getAllLbPairPositionsByUser(connection, user)` · static `DLMM.getPositionsByUserAndTokenAddress` (1.9.13) · `getLbPairLockInfo` |
 | Price/bin math | `DLMM.getPricePerLamport(xDec, yDec, price)` · `DLMM.getBinIdFromPrice(price, binStep, min)` · instance `toPricePerLamport` / `fromPricePerLamport` · helper `getPriceOfBinByBinId` (standalone export, not a method) |
 
-## Core flow: quote + swap (verified from SDK examples)
-
+## Core flow: quote + swap
 ```ts
 const swapForY = true                            // true: sell X for Y; false: buy X with Y
 const binArrays = await dlmm.getBinArrayForSwap(swapForY)
@@ -81,8 +80,7 @@ const swapTx = await dlmm.swap({
 })
 ```
 
-## Core flow: open position + add liquidity (verified from SDK README/tests)
-
+## Core flow: open position + add liquidity
 ```ts
 import { StrategyType } from '@meteora-ag/dlmm'
 import { Keypair, sendAndConfirmTransaction } from '@solana/web3.js'
