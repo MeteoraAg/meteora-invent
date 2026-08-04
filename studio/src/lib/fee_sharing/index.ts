@@ -5,8 +5,10 @@ import {
   deriveFeeVaultPdaAddress,
   getTokenProgram,
   checkPositionOwnership,
+  setTokenAccountOwnerTx,
+  FeeVault,
 } from '@meteora-ag/dynamic-fee-sharing-sdk';
-import { CpAmm } from '@meteora-ag/cp-amm-sdk';
+import { CpAmm, validateRewardIndex } from '@meteora-ag/cp-amm-sdk';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import {
   getAccount,
@@ -23,6 +25,7 @@ import {
   getAmountInLamports,
   getAmountInTokens,
   modifyComputeUnitPriceIx,
+  promptForSelection,
   runSimulateTransaction,
 } from '../../helpers';
 import {
@@ -272,15 +275,268 @@ export async function fund(
 }
 
 /**
- * Fund a fee vault by sweeping fees straight out of a DAMM v2 position (`fundByClaimDammV2Fee`).
+ * Resolve the DAMM v2 position(s) on `poolAddress` whose position-NFT account is owned by
+ * `vault` — the shared discovery used by both `fundFromDammV2` and `fundFromDammV2Reward`.
+ *
+ * Queried via `cpAmm.getUserPositionByPool(poolAddress, vault)`: despite the SDK naming that
+ * second param "user", it resolves to a plain `connection.getTokenAccountsByOwner(vault,
+ * {programId: TOKEN_2022_PROGRAM_ID})` scan under the hood (verified in the installed SDK's
+ * compiled `getAllPositionNftAccountByOwner`) — a read-only RPC filter that works for ANY owner
+ * pubkey, including a PDA such as a `createFeeVaultPda` vault, no signature required. Pointed at
+ * the vault instead of the wallet, this returns ONLY vault-held position NFTs, without ever
+ * touching a wallet-owned one.
+ *
+ * F1 fix note: the old code queried `getUserPositionByPool(poolAddress, wallet.publicKey)` (the
+ * WALLET) and then filtered those results for a position whose NFT account was owned by the
+ * VAULT. Since an SPL token account has exactly one owner, those two conditions can never both
+ * hold — every input hit one of the two guard errors and `fundByClaimDammV2Fee` was never
+ * reached. Fixed by querying the vault directly instead of the wallet.
+ *
+ * Ownership must already have been transferred to the vault — via
+ * `transferDammV2PositionToVault` (action: `fee-sharing-transfer-damm-v2-position`, wraps the
+ * SDK's `setTokenAccountOwnerTx`) — before this finds anything. Both `fundByClaimDammV2Fee` and
+ * `fundByClaimDammV2Reward` re-verify ownership internally via their own `checkPositionOwnership`
+ * call and throw a raw `InvalidPositionOwnership` error if it was never transferred (verified in
+ * the SDK's compiled `dfs.ts`); the check below exists only to fail fast with an actionable,
+ * vault-naming message instead of that opaque SDK error.
+ */
+async function findVaultOwnedDammV2Position(
+  connection: Connection,
+  vault: PublicKey,
+  poolAddress: PublicKey
+): Promise<{ position: PublicKey; positionNftAccount: PublicKey }> {
+  const cpAmm = new CpAmm(connection);
+  const vaultPositions = await cpAmm.getUserPositionByPool(poolAddress, vault);
+
+  console.log(`- Pool ${poolAddress.toString()}`);
+
+  if (vaultPositions.length === 0) {
+    throw new Error(
+      `No DAMM v2 position owned by fee vault ${vault.toString()} on pool ${poolAddress.toString()}. ` +
+        'Transfer the position NFT to the vault first — run ' +
+        `fee-sharing-transfer-damm-v2-position --vault ${vault.toString()} --poolAddress ${poolAddress.toString()} ` +
+        "(wraps the SDK's setTokenAccountOwnerTx) — see studio-actions.md for details."
+    );
+  }
+  console.log(
+    `- Found ${vaultPositions.length} position(s) already owned by the fee vault on the pool`
+  );
+
+  for (const candidate of vaultPositions) {
+    const isOwnedByVault = await checkPositionOwnership(
+      connection,
+      DEFAULT_COMMITMENT_LEVEL,
+      candidate.positionNftAccount,
+      vault,
+      TOKEN_2022_PROGRAM_ID
+    );
+    if (isOwnedByVault) {
+      return { position: candidate.position, positionNftAccount: candidate.positionNftAccount };
+    }
+  }
+
+  // Defense-in-depth only: getUserPositionByPool(vault) already filters by vault ownership via
+  // getTokenAccountsByOwner, so every candidate above is expected to pass. Reaching here would
+  // mean ownership changed between the query and this re-check (e.g. a concurrent transfer out).
+  throw new Error(
+    `None of the DAMM v2 position NFTs found for fee vault ${vault.toString()} on pool ` +
+      `${poolAddress.toString()} passed re-verification — ownership may have changed since the ` +
+      `query. Candidate position(s) checked: ${vaultPositions.map((p) => p.position.toString()).join(', ')}`
+  );
+}
+
+/**
+ * `fundByClaimDammV2Fee` and `fundByClaimDammV2Reward` both route through the DFS program's
+ * shared `fund_by_claiming_fee` instruction, which enforces two on-chain constraints — verified
+ * directly against the program's own Rust source (`ix_fund_by_claiming_fee.rs`), reached via
+ * empirical localnet testing after F1's query fix and a real position transfer still hit an
+ * on-chain `InvalidSigner` (0x1778) error:
+ *   1. `require!(fee_vault.fee_vault_type == 1, FeeVaultError::InvalidFeeVault)` — only
+ *      PDA-variant vaults are supported (`feeSharingCreate.useKeypairVault: false` /
+ *      `createFeeVaultPda`); a keypair-variant vault (`useKeypairVault: true` / `createFeeVault`)
+ *      is rejected outright, regardless of who signs.
+ *   2. `require!(fee_vault.is_share_holder(signer), FeeVaultError::InvalidSigner)` — the
+ *      transaction's `signer` must be one of the vault's registered `userShare` recipients. The
+ *      vault's `owner` field (whoever ran `fee-sharing-create-vault`) is a SEPARATE concept the
+ *      program never checks here — being the vault's creator/owner is not sufficient on its own
+ *      unless that same wallet is also a recipient.
+ * Both are checked here so a mismatched vault fails fast with an actionable message instead of
+ * the program's opaque `InvalidFeeVault` / `InvalidSigner` errors.
+ */
+async function assertVaultSupportsClaimingFeeBridge(
+  client: DynamicFeeSharingClient,
+  vault: PublicKey,
+  feeVaultState: FeeVault,
+  signer: PublicKey
+): Promise<void> {
+  if (feeVaultState.feeVaultType !== 1) {
+    throw new Error(
+      `Fee vault ${vault.toString()} is a KEYPAIR-variant vault (feeSharingCreate.useKeypairVault: ` +
+        'true when it was created) — the on-chain program only supports PDA-variant vaults for ' +
+        "the DAMM v2 fee/reward bridges (fee_vault_type must be 1; this is the program's own " +
+        'check, not a client-side choice). Create a new vault with useKeypairVault: false ' +
+        '(fee-sharing-create-vault) and transfer the position there instead with ' +
+        'fee-sharing-transfer-damm-v2-position.'
+    );
+  }
+
+  const breakdown = await client.getFeeBreakdown(vault);
+  const isShareHolder = breakdown.userFees.some((user) => user.address.equals(signer));
+  if (!isShareHolder) {
+    const shareholders =
+      breakdown.userFees.map((user) => user.address.toString()).join(', ') || '(none)';
+    throw new Error(
+      `Wallet ${signer.toString()} is not a registered shareholder of fee vault ${vault.toString()} ` +
+        "— the DAMM v2 fee/reward bridges require the transaction's signer to be one of the " +
+        "vault's userShare recipients (the program's own fee_vault.is_share_holder(signer) check). " +
+        "Being the vault's owner/creator alone is not enough unless that wallet is also a " +
+        `recipient. Registered shareholder(s): ${shareholders}`
+    );
+  }
+}
+
+/**
+ * Transfer a DAMM v2 position NFT's token-account ownership from this wallet to a fee vault —
+ * the on-chain prerequisite `fee-sharing-fund-from-damm-v2` / `-reward` document but that no
+ * studio action actually performed (F1: without it, those two actions were unreachable — every
+ * input hit a guard error). Wraps the DFS SDK's own `setTokenAccountOwnerTx(tokenAccount, from,
+ * to, tokenProgramId)` (verified in the SDK's own `docs.md` — "Can be used to transfer DAMM v2
+ * position NFT to the fee vault" — and its `scripts/fundByClaimDammV2Fee.s.ts` fixture, which
+ * performs exactly this transfer before its own fund-from-damm-v2 example runs): a plain SPL
+ * Token-2022 `SetAuthority(AccountOwner)` instruction re-pointing the position NFT account's
+ * owner. Only the CURRENT owner (this wallet) signs — the new owner (the vault, whether a PDA
+ * from `createFeeVaultPda` or a plain keypair address from `createFeeVault`) never needs to sign
+ * a SetAuthority instruction that merely names it as the new authority.
+ *
  * Resolves the wallet's position(s) on `poolAddress` via `cpAmm.getUserPositionByPool` (same
- * lookup `damm_v2` actions use), then picks the first one whose position-NFT account is already
- * owned by the fee vault — verified via the SDK's own `checkPositionOwnership` helper, since
- * DAMM v2 position NFTs are always Token-2022 (matches the SDK's internal call for this exact
- * bridge). Ownership must already have been transferred to the vault (the SDK's
- * `setTokenAccountOwnerTx` helper, a one-time manual step outside this action's scope) — if no
- * candidate position qualifies, this throws a clear, actionable error instead of attempting a
- * doomed transaction.
+ * lookup `damm-v2-get-positions` uses) and mirrors `damm_v2`'s `closePosition` disambiguation
+ * convention: auto-select when there's exactly one position, otherwise prompt interactively.
+ *
+ * ONE-WAY DOOR for this CLI: once transferred, only the vault (via the DFS program's own
+ * instructions) can move this position again — the wallet can no longer manage it with
+ * `damm-v2-*` actions (close, remove liquidity, etc.). Refuses to run if the position's NFT
+ * account is already owned by anyone other than this wallet or the target vault.
+ */
+export async function transferDammV2PositionToVault(
+  config: FeeSharingConfig,
+  connection: Connection,
+  wallet: Wallet,
+  vault: PublicKey,
+  poolAddress: PublicKey
+) {
+  console.log('\n> Initializing DAMM v2 position transfer to fee vault...');
+  await assertFunded(connection, wallet.publicKey);
+
+  const client = new DynamicFeeSharingClient(connection, DEFAULT_COMMITMENT_LEVEL);
+  await loadFeeVault(client, vault);
+
+  const cpAmm = new CpAmm(connection);
+  const walletPositions = await cpAmm.getUserPositionByPool(poolAddress, wallet.publicKey);
+
+  console.log(`- Pool ${poolAddress.toString()}`);
+
+  if (walletPositions.length === 0) {
+    throw new Error(
+      `No DAMM v2 position found for wallet ${wallet.publicKey.toString()} on pool ` +
+        `${poolAddress.toString()} — create one first (damm-v2-create-balanced-pool / ` +
+        '-one-sided-pool, or damm-v2-add-liquidity on an existing pool).'
+    );
+  }
+  console.log(`- Found ${walletPositions.length} position(s) owned by this wallet on the pool`);
+
+  let chosen: (typeof walletPositions)[number] | undefined;
+  if (walletPositions.length === 1) {
+    chosen = walletPositions[0];
+    console.log('> Only one position found, transferring that position...');
+  } else {
+    const options = walletPositions.map(
+      (p, i) =>
+        `Position ${i + 1}: ${p.position.toString()} (NFT account ${p.positionNftAccount.toString()})`
+    );
+    const selectedIndex = await promptForSelection(
+      options,
+      'Which position would you like to transfer to the fee vault?'
+    );
+    chosen = walletPositions[selectedIndex];
+  }
+
+  if (!chosen) {
+    throw new Error('No position selected');
+  }
+
+  console.log(`- Position ${chosen.position.toString()}`);
+  console.log(`- Position NFT account ${chosen.positionNftAccount.toString()}`);
+
+  const alreadyOwnedByVault = await checkPositionOwnership(
+    connection,
+    DEFAULT_COMMITMENT_LEVEL,
+    chosen.positionNftAccount,
+    vault,
+    TOKEN_2022_PROGRAM_ID
+  );
+  if (alreadyOwnedByVault) {
+    console.log(
+      `> Position NFT account is already owned by fee vault ${vault.toString()} — nothing to do.`
+    );
+    return;
+  }
+
+  const nftAccountInfo = await getAccount(
+    connection,
+    chosen.positionNftAccount,
+    connection.commitment,
+    TOKEN_2022_PROGRAM_ID
+  );
+  if (!nftAccountInfo.owner.equals(wallet.publicKey)) {
+    throw new Error(
+      `Position NFT account ${chosen.positionNftAccount.toString()} is owned by ` +
+        `${nftAccountInfo.owner.toString()} — not this wallet (${wallet.publicKey.toString()}) and ` +
+        `not the target vault (${vault.toString()}). Refusing to transfer an account this wallet doesn't own.`
+    );
+  }
+
+  console.log(
+    `\n> Transferring position NFT account ownership: ${wallet.publicKey.toString()} -> ${vault.toString()}`
+  );
+  const transferTx = setTokenAccountOwnerTx(
+    chosen.positionNftAccount,
+    wallet.publicKey,
+    vault,
+    TOKEN_2022_PROGRAM_ID
+  );
+  modifyComputeUnitPriceIx(transferTx, config.computeUnitPriceMicroLamports ?? 0);
+
+  if (config.dryRun) {
+    console.log('\n> Simulating position-transfer transaction...');
+    await runSimulateTransaction(connection, [wallet.payer], wallet.publicKey, [transferTx]);
+    console.log('> Position-transfer simulation successful');
+    console.log(
+      '> DRY RUN — ownership was NOT changed. Re-run with dryRun=false to transfer for real.'
+    );
+  } else {
+    console.log('\n>> Sending position-transfer transaction...');
+    const txHash = await sendAndConfirmTransaction(connection, transferTx, [wallet.payer], {
+      commitment: connection.commitment,
+      maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
+    });
+    console.log(
+      `>>> Position NFT account ownership transferred successfully with tx hash: ${txHash}`
+    );
+    console.log(
+      `>>> Now run fee-sharing-fund-from-damm-v2 (or -reward) with --vault ${vault.toString()} ` +
+        `--poolAddress ${poolAddress.toString()}`
+    );
+  }
+}
+
+/**
+ * Fund a fee vault by sweeping fees straight out of a DAMM v2 position (`fundByClaimDammV2Fee`).
+ * Resolves the vault's position via `findVaultOwnedDammV2Position` (queries
+ * `cpAmm.getUserPositionByPool` targeted at the VAULT, not the wallet — see that function's
+ * comment for the F1 fix this replaced). Ownership must already have been transferred to the
+ * vault first with `fee-sharing-transfer-damm-v2-position` — if no candidate position qualifies,
+ * this throws a clear, actionable error naming the vault instead of attempting a doomed
+ * transaction.
  */
 export async function fundFromDammV2(
   config: FeeSharingConfig,
@@ -293,47 +549,18 @@ export async function fundFromDammV2(
   await assertFunded(connection, wallet.publicKey);
 
   const client = new DynamicFeeSharingClient(connection, DEFAULT_COMMITMENT_LEVEL);
-  await loadFeeVault(client, vault);
+  const feeVaultState = await loadFeeVault(client, vault);
+  await assertVaultSupportsClaimingFeeBridge(client, vault, feeVaultState, wallet.publicKey);
 
-  const cpAmm = new CpAmm(connection);
-  const userPositions = await cpAmm.getUserPositionByPool(poolAddress, wallet.publicKey);
-  if (userPositions.length === 0) {
-    throw new Error(
-      `No DAMM v2 position found for wallet ${wallet.publicKey.toString()} on pool ${poolAddress.toString()}.`
-    );
-  }
-
-  console.log(`- Pool ${poolAddress.toString()}`);
-  console.log(`- Found ${userPositions.length} position(s) for this wallet on the pool`);
-
-  let chosen: (typeof userPositions)[number] | undefined;
-  for (const position of userPositions) {
-    const isOwnedByVault = await checkPositionOwnership(
-      connection,
-      DEFAULT_COMMITMENT_LEVEL,
-      position.positionNftAccount,
-      vault,
-      TOKEN_2022_PROGRAM_ID
-    );
-    if (isOwnedByVault) {
-      chosen = position;
-      break;
-    }
-  }
-
-  if (!chosen) {
-    throw new Error(
-      `None of this wallet's DAMM v2 position NFTs on pool ${poolAddress.toString()} are owned ` +
-        `by fee vault ${vault.toString()} yet. Transfer the position NFT account's owner to the ` +
-        "fee vault first (the SDK's setTokenAccountOwnerTx helper) before running " +
-        `fee-sharing-fund-from-damm-v2. Candidate position(s) checked: ` +
-        userPositions.map((p) => p.position.toString()).join(', ')
-    );
-  }
+  const { position, positionNftAccount } = await findVaultOwnedDammV2Position(
+    connection,
+    vault,
+    poolAddress
+  );
 
   console.log(
-    `- Position ${chosen.position.toString()} (NFT account ${chosen.positionNftAccount.toString()}) ` +
-      'is owned by the fee vault — sweeping its fees in'
+    `- Position ${position.toString()} (NFT account ${positionNftAccount.toString()}) is owned ` +
+      'by the fee vault — sweeping its fees in'
   );
 
   const fundTx = await client.fundByClaimDammV2Fee({
@@ -341,8 +568,8 @@ export async function fundFromDammV2(
     owner: wallet.publicKey,
     feeVault: vault,
     dammV2Pool: poolAddress,
-    dammV2Position: chosen.position,
-    dammV2PositionNftAccount: chosen.positionNftAccount,
+    dammV2Position: position,
+    dammV2PositionNftAccount: positionNftAccount,
   });
   modifyComputeUnitPriceIx(fundTx, config.computeUnitPriceMicroLamports ?? 0);
 
@@ -357,6 +584,83 @@ export async function fundFromDammV2(
       maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
     });
     console.log(`>>> Funded from DAMM v2 successfully with tx hash: ${txHash}`);
+  }
+}
+
+/**
+ * Fund a fee vault by sweeping a DAMM v2 position's REWARD emissions (`fundByClaimDammV2Reward`)
+ * — distinct from `fundFromDammV2`'s trading fees. M4: direct analog of `fundFromDammV2`, reusing
+ * the same vault-owned-position discovery (`findVaultOwnedDammV2Position`); the only extra input
+ * is `feeSharingFundDammV2Reward.rewardIndex` (DAMM v2 pools have 2 reward slots, so 0 or 1).
+ *
+ * Validated pre-flight two ways before the SDK call: `validateRewardIndex` (bounds check,
+ * cp-amm-sdk) and an `initialized` check on the pool's own reward-slot state — the SDK itself
+ * indexes `poolState.rewardInfos[rewardIndex]` with no bounds/initialized check of its own
+ * (verified in its compiled `dfs.ts`), so an uninitialized or out-of-range index would otherwise
+ * fail deep inside the SDK with an opaque error instead of a clear one here.
+ */
+export async function fundFromDammV2Reward(
+  config: FeeSharingConfig,
+  connection: Connection,
+  wallet: Wallet,
+  vault: PublicKey,
+  poolAddress: PublicKey
+) {
+  if (!config.feeSharingFundDammV2Reward) {
+    throw new Error('Missing feeSharingFundDammV2Reward in configuration');
+  }
+  const { rewardIndex } = config.feeSharingFundDammV2Reward;
+  validateRewardIndex(rewardIndex);
+
+  console.log('\n> Initializing Dynamic Fee Sharing fund-from-DAMM-v2-reward...');
+  await assertFunded(connection, wallet.publicKey);
+
+  const client = new DynamicFeeSharingClient(connection, DEFAULT_COMMITMENT_LEVEL);
+  const feeVaultState = await loadFeeVault(client, vault);
+  await assertVaultSupportsClaimingFeeBridge(client, vault, feeVaultState, wallet.publicKey);
+
+  const { position, positionNftAccount } = await findVaultOwnedDammV2Position(
+    connection,
+    vault,
+    poolAddress
+  );
+
+  const cpAmm = new CpAmm(connection);
+  const poolState = await cpAmm.fetchPoolState(poolAddress);
+  const rewardInfo = poolState.rewardInfos[rewardIndex];
+  if (!rewardInfo || !rewardInfo.initialized) {
+    throw new Error(
+      `Reward index ${rewardIndex} is not initialized on pool ${poolAddress.toString()} — pick ` +
+        'an initialized reward index or double check feeSharingFundDammV2Reward.rewardIndex.'
+    );
+  }
+
+  console.log(
+    `- Position ${position.toString()} (NFT account ${positionNftAccount.toString()}) is owned ` +
+      `by the fee vault — sweeping reward index ${rewardIndex} (mint ${rewardInfo.mint.toString()}) in`
+  );
+
+  const fundTx = await client.fundByClaimDammV2Reward({
+    signer: wallet.publicKey,
+    rewardIndex,
+    feeVault: vault,
+    dammV2Pool: poolAddress,
+    dammV2Position: position,
+    dammV2PositionNftAccount: positionNftAccount,
+  });
+  modifyComputeUnitPriceIx(fundTx, config.computeUnitPriceMicroLamports ?? 0);
+
+  if (config.dryRun) {
+    console.log('\n> Simulating fund-from-DAMM-v2-reward transaction...');
+    await runSimulateTransaction(connection, [wallet.payer], wallet.publicKey, [fundTx]);
+    console.log('> Fund-from-DAMM-v2-reward simulation successful');
+  } else {
+    console.log('\n>> Sending fund-from-DAMM-v2-reward transaction...');
+    const txHash = await sendAndConfirmTransaction(connection, fundTx, [wallet.payer], {
+      commitment: connection.commitment,
+      maxRetries: DEFAULT_SEND_TX_MAX_RETRIES,
+    });
+    console.log(`>>> Funded from DAMM v2 reward successfully with tx hash: ${txHash}`);
   }
 }
 

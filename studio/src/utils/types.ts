@@ -715,6 +715,7 @@ export type FeeSharingConfig = MeteoraConfigBase & {
   feeSharingCreate?: FeeSharingCreateConfig | null;
   feeSharingFund?: FeeSharingFundConfig | null;
   feeSharingFundDbc?: FeeSharingFundDbcConfig | null;
+  feeSharingFundDammV2Reward?: FeeSharingFundDammV2RewardConfig | null;
 };
 
 export interface FeeSharingUserShareConfig {
@@ -737,6 +738,10 @@ export interface FeeSharingFundConfig {
 export interface FeeSharingFundDbcConfig {
   role: 'creator' | 'partner'; // which side of the DBC pool config the fee vault is assigned as
   source: 'tradingFee' | 'surplus' | 'migrationFee'; // which DBC fee bucket to sweep into the vault
+}
+
+export interface FeeSharingFundDammV2RewardConfig {
+  rewardIndex: number; // DAMM v2 reward slot to claim into the vault (0 or 1 — pools have 2 reward slots)
 }
 
 /* Zap */

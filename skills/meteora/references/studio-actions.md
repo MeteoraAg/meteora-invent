@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-77 studio actions (plus the start-test-validator helper), verified against
+79 studio actions (plus the start-test-validator helper), verified against
 `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
@@ -723,11 +723,31 @@ Splits a fee stream among up to 5 fixed recipients — program
 cross-checked against the shipped scripts). Vault creation co-signs with a fresh, ephemeral
 keypair (the vault's own `feeVault` keypair, or a `base` keypair for the PDA variant) — used
 once, and the resulting vault address is logged prominently (save it: every other
-`fee-sharing-*` action needs it via `--vault`). The two `fund-from-*` bridge actions pull fees
-straight out of an existing DAMM v2 position or DBC pool into the vault — no separate
-"claim then transfer" step. DBC bridging always uses the `2`-suffixed trading-fee variants
+`fee-sharing-*` action needs it via `--vault`). The `fund-from-damm-v2*` / `fund-from-dbc` bridge
+actions pull fees (or, for the `-reward` variant, reward emissions) straight out of an existing
+DAMM v2 position or DBC pool into the vault — no separate "claim then transfer" step for the fee
+itself. DBC bridging always uses the `2`-suffixed trading-fee variants
 (`fundByClaimDbcCreatorTradingFee2` / `fundByClaimDbcPartnerTradingFee2`), per the SDK's own
 release notes.
+
+DAMM v2 bridging (`fund-from-damm-v2` and `fund-from-damm-v2-reward`) has its own one-time setup:
+the DAMM v2 position's NFT token account must be **owned by the fee vault**, not the wallet, or
+both bridges throw a pre-flight error naming the vault (they query
+`cpAmm.getUserPositionByPool(pool, VAULT)` — a plain `getTokenAccountsByOwner` scan that works for
+any pubkey owner, including a vault PDA — and the SDK's own `fundByClaimDammV2Fee` /
+`fundByClaimDammV2Reward` re-verify ownership internally too). Get there with
+`fee-sharing-transfer-damm-v2-position`, which wraps the SDK's `setTokenAccountOwnerTx` helper.
+
+**The vault itself must qualify too — verified directly against the on-chain program's own
+source** (`ix_fund_by_claiming_fee.rs`, the shared instruction both DAMM v2 bridges route
+through), not just its `.d.ts`: (1) it must be a **PDA-variant vault**
+(`feeSharingCreate.useKeypairVault: false` at creation — the program rejects a keypair-variant
+vault outright, `fee_vault_type` must be `1`); and (2) the **CLI's wallet must be one of the
+vault's registered `userShares` recipients** (the program checks `fee_vault.is_share_holder
+(signer)` — being the vault's `owner`/creator is a separate field the program never checks here,
+and is not sufficient on its own unless that wallet is also a recipient). Both are checked
+client-side before either bridge builds a transaction, with an actionable error naming the exact
+problem instead of the program's opaque `InvalidFeeVault` / `InvalidSigner` errors.
 
 ### `fee-sharing-create-vault`
 ```bash
@@ -742,6 +762,13 @@ the vault address is a PDA derived from base + tokenMint). Either way **the vaul
 logged prominently — save it**; the co-signing keypair's secret is discarded afterward (never
 needed again). Token-2022 mints are detected automatically (mint owner-program check). ~0.01 SOL.
 
+**Planning to use `fee-sharing-fund-from-damm-v2` or `-reward` on this vault?** Set
+`useKeypairVault: false` (PDA-variant — the other variant is rejected by the on-chain program for
+those two actions specifically) and include the wallet that will run them as one of `userShares`
+(the program requires the funding transaction's signer to be a registered recipient — the vault's
+own creator/owner is not automatically eligible). Every other fee-sharing action (`fund`,
+`fund-from-dbc`, `claim`, `get-status`) works with either vault variant.
+
 ### `fee-sharing-fund`
 ```bash
 pnpm studio fee-sharing-fund --vault <VAULT>
@@ -751,18 +778,49 @@ converted via the mint's own decimals). Pre-checks the wallet's token balance fi
 when the vault's tokenMint is native SOL's wrapped mint, the SDK wraps the requested amount of
 SOL for you internally — no pre-funded wSOL account needed. ~0.002 SOL.
 
+### `fee-sharing-transfer-damm-v2-position`
+```bash
+pnpm studio fee-sharing-transfer-damm-v2-position --vault <VAULT> --poolAddress <POOL>
+```
+Flags: `--vault` + `--poolAddress` (both required). The one-time setup step `fee-sharing-fund-
+from-damm-v2` and `fee-sharing-fund-from-damm-v2-reward` both require: transfers a DAMM v2
+position NFT's token-account ownership from this wallet to the fee vault, via the SDK's
+`setTokenAccountOwnerTx` (a plain SPL Token-2022 `SetAuthority(AccountOwner)` instruction — only
+the current owner, this wallet, signs; the vault never needs to sign). Resolves the wallet's
+position(s) on the pool via `cpAmm.getUserPositionByPool` (same lookup `damm-v2-get-positions`
+uses); auto-selects when there's exactly one, otherwise prompts interactively — same convention
+as `damm-v2-close-position`. **One-way door**: once transferred, only the vault (via
+`fee-sharing-fund-from-damm-v2*`) can move this position again — `damm-v2-*` actions can no
+longer manage it from this wallet. No-ops cleanly if the position is already vault-owned; refuses
+to run if the position NFT belongs to neither this wallet nor the target vault. ~0.001 SOL.
+
 ### `fee-sharing-fund-from-damm-v2`
 ```bash
 pnpm studio fee-sharing-fund-from-damm-v2 --vault <VAULT> --poolAddress <POOL>
 ```
-Flags: `--vault` + `--poolAddress` (both required). Resolves the wallet's position(s) on the
-pool via `cpAmm.getUserPositionByPool` (same lookup `damm-v2-get-positions` uses), then picks
-the first one whose position-NFT account is already owned by the fee vault
-(`checkPositionOwnership`, Token-2022 — DAMM v2 position NFTs always are) and sweeps its fees
-straight into the vault via `fundByClaimDammV2Fee`. **The position NFT must already have been
-transferred to the fee vault** (the SDK's `setTokenAccountOwnerTx` helper — a one-time manual
-step outside this action) or this fails with a clear pre-flight error instead of a doomed
-transaction. ~0.001 SOL.
+Flags: `--vault` + `--poolAddress` (both required). Checks the vault is PDA-variant and that the
+CLI's wallet is a registered `userShares` recipient (see the family intro above) before doing
+anything else. Resolves the fee vault's position(s) on the pool via
+`cpAmm.getUserPositionByPool(pool, VAULT)` — pointed at the vault, not the wallet, so it returns
+only positions already owned by the vault — then re-verifies with `checkPositionOwnership`
+(Token-2022 — DAMM v2 position NFTs always are) and sweeps that position's fees straight into the
+vault via `fundByClaimDammV2Fee`. **The position NFT must already have been transferred to the
+fee vault** — run `fee-sharing-transfer-damm-v2-position` first — or this fails with a clear
+pre-flight error naming the vault instead of a doomed transaction. ~0.001 SOL.
+
+### `fee-sharing-fund-from-damm-v2-reward`
+```bash
+pnpm studio fee-sharing-fund-from-damm-v2-reward --vault <VAULT> --poolAddress <POOL>
+```
+Flags: `--vault` + `--poolAddress` (both required). Same PDA-variant + registered-shareholder
+vault checks and vault-owned-position discovery as `fee-sharing-fund-from-damm-v2`, but sweeps a
+DAMM v2 position's **reward emissions** (not trading fees) into the vault via
+`fundByClaimDammV2Reward`. Reads `feeSharingFundDammV2Reward.rewardIndex` (0 or 1 — DAMM v2 pools
+have 2 reward slots at most); validated pre-flight against the SDK's `validateRewardIndex` bounds
+check plus an `initialized` check on the pool's own reward-slot state, since the SDK itself does
+neither before indexing into it. Same one-time `fee-sharing-transfer-damm-v2-position`
+prerequisite as the fee variant.
+~0.001 SOL.
 
 ### `fee-sharing-fund-from-dbc`
 ```bash
@@ -1029,7 +1087,9 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `vault-get-status` | `--baseMint` | — (read-only) | 0 |
 | `fee-sharing-create-vault` | `--baseMint` | `feeSharingCreate` | 0.01 |
 | `fee-sharing-fund` | `--vault` | `feeSharingFund` | 0.002 |
+| `fee-sharing-transfer-damm-v2-position` | `--vault` + `--poolAddress` | — | 0.001 |
 | `fee-sharing-fund-from-damm-v2` | `--vault` + `--poolAddress` | — | 0.001 |
+| `fee-sharing-fund-from-damm-v2-reward` | `--vault` + `--poolAddress` | `feeSharingFundDammV2Reward` | 0.001 |
 | `fee-sharing-fund-from-dbc` | `--vault` + `--baseMint` | `feeSharingFundDbc` | 0.001 |
 | `fee-sharing-claim` | `--vault` | — | 0.001 |
 | `fee-sharing-get-status` | `--vault` (optional) | — (read-only) | 0 |

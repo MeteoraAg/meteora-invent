@@ -22,6 +22,12 @@
    * address is that keypair's public key — logged prominently after creation, save it); false
    * creates the vault as a PDA off a fresh `base` keypair instead (vault address is derived
    * and deterministic from base + tokenMint, also logged).
+   * Planning to use fee-sharing-fund-from-damm-v2 or -reward on this vault? Set
+   * useKeypairVault to false (PDA-variant — the on-chain program rejects a keypair-variant
+   * vault for those two actions specifically) and include the wallet that will run them as one
+   * of userShares (the program requires the funding transaction's signer to be a registered
+   * recipient — being the vault's owner/creator alone is not enough). Every other fee-sharing
+   * action (fund, fund-from-dbc, claim, get-status) works with either vault variant.
    */
   "feeSharingCreate": {
     "userShares": [
@@ -54,5 +60,20 @@
   "feeSharingFundDbc": {
     "role": "creator",
     "source": "tradingFee"
+  },
+
+  /* feeSharingFundDammV2Reward is only used in the following actions:
+   * 1. fee-sharing-fund-from-damm-v2-reward (requires --vault + --poolAddress flags)
+   * Sweeps a DAMM v2 position's REWARD emissions into the vault via fundByClaimDammV2Reward —
+   * distinct from fee-sharing-fund-from-damm-v2, which sweeps trading FEES. Reuses the same
+   * vault-owned-position discovery, so the position NFT must already be owned by the fee vault
+   * first (run fee-sharing-transfer-damm-v2-position once). Also requires the vault to be
+   * PDA-variant (useKeypairVault: false) and the CLI's wallet to be a registered userShares
+   * recipient of the vault — see feeSharingCreate's comment above.
+   * rewardIndex: which of the pool's reward slots to claim (0 or 1 — DAMM v2 pools have 2 reward
+   * slots at most); the target slot must already be initialized on the pool.
+   */
+  "feeSharingFundDammV2Reward": {
+    "rewardIndex": 0
   }
 }
