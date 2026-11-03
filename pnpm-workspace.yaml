@@ -1,3 +1,7 @@
+# only resolve versions published at least a week ago (in minutes), a compromised release is
+# usually caught and unpublished within days
+minimumReleaseAge: 10080
+
 packages:
   - "studio"
   - "scaffolds/*"
