@@ -2,6 +2,47 @@
 # usually caught and unpublished within days
 minimumReleaseAge: 10080
 
+auditConfig:
+  # Advisories of transitive dependencies with no fix within the versions upstream depends on,
+  # checked as not reachable from the apps. Drop an entry once upstream moves to the patched version.
+  ignoreGhsas:
+    # bigint-buffer has no patched version. @solana/spl-token > @solana/buffer-layout-utils only
+    # passes it the fixed length buffers of its u64/u128 layouts
+    - GHSA-3gc7-fjrx-p6mg
+    # csv-parse 5 and 6 (fixed in 7): studio only parses the operator's own CSV files in its CLI,
+    # and @metaplex-foundation/umi-uploader-irys > @irys/upload only parses CSV in `uploadFolder`,
+    # which umi never calls
+    - GHSA-8cw4-87c7-c6xx
+    # decode-uri-component 0.2 (fixed in 0.5, which is ESM only): @solana/wallet-adapter-wallets >
+    # @walletconnect/utils > query-string only decodes WalletConnect URIs in the user's own browser
+    - GHSA-qr28-fpjm-wq7f
+    - GHSA-vcc3-ghjq-m6fr
+    # elliptic has no patched version. @solana/wallet-adapter-torus > crypto-browserify >
+    # browserify-sign is the browser polyfill of `crypto.createSign`, fun-launch never signs with EC
+    # keys itself
+    - GHSA-848j-6mx2-7j84
+    # image-size 1 (fixed in 2): only metro, the React Native bundler, pulled in by
+    # @tanstack/react-query > react-native as an auto installed peer. fun-launch is a Next.js app
+    # and never runs metro
+    - GHSA-5p2g-fcmc-qvqq
+    - GHSA-w3rx-r6r6-pgpr
+    # minimatch 3, 9 and 10 (via eslint, @typescript-eslint and eslint-config-next, fixed in 11):
+    # eslint only lints the repo's own files with the repo's own globs
+    - GHSA-g3hv-75wg-m249
+    # stream-json 1 (fixed in 3): @solana/web3.js > jayson only uses it in its server and stream
+    # utils, web3.js loads `jayson/lib/client/browser`
+    - GHSA-528h-pc64-c93x
+    - GHSA-hqr4-qq8f-hg3x
+    - GHSA-mjw6-4jj6-33hc
+    # toml 4 (fixed in 5): @coral-xyz/anchor only parses Anchor.toml in `workspace`, which the apps
+    # don't use
+    - GHSA-4qx8-w7c3-pj3p
+    - GHSA-9j65-hcg3-gc64
+    - GHSA-9qmh-m7c6-f92p
+    # zod 3 (fixed in 4.6.6): only constrained arrays, sets and records are affected. fun-launch's
+    # create-pool schema has none, and @reown/appkit-wallet only validates in the user's own browser
+    - GHSA-mrhx-c7xc-m3w5
+
 packages:
   - "studio"
   - "scaffolds/*"

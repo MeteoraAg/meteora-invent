@@ -68,26 +68,6 @@
       "node-fetch@2": "^2.7.0",
       "toml": "^4.2.0",
       "@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4"
-    },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-3gc7-fjrx-p6mg",
-        "GHSA-848j-6mx2-7j84",
-        "GHSA-mh99-v99m-4gvg",
-        "GHSA-8cw4-87c7-c6xx",
-        "GHSA-qr28-fpjm-wq7f",
-        "GHSA-vcc3-ghjq-m6fr",
-        "GHSA-5p2g-fcmc-qvqq",
-        "GHSA-w3rx-r6r6-pgpr",
-        "GHSA-g3hv-75wg-m249",
-        "GHSA-528h-pc64-c93x",
-        "GHSA-hqr4-qq8f-hg3x",
-        "GHSA-mjw6-4jj6-33hc",
-        "GHSA-4qx8-w7c3-pj3p",
-        "GHSA-9j65-hcg3-gc64",
-        "GHSA-9qmh-m7c6-f92p",
-        "GHSA-mrhx-c7xc-m3w5"
-      ]
     }
   }
 }
