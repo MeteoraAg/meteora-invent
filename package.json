@@ -60,6 +60,7 @@
       "eslint-config-next>@typescript-eslint/eslint-plugin": "^8.65.0",
       "eslint-config-next>@typescript-eslint/parser": "^8.65.0",
       "sharp": "^0.35.4",
+      "qs@6": "^6.16.1",
       "ws@8": "^8.21.0",
       "uuid@8": "^11.1.1",
       "uuid@9": "^11.1.1",
@@ -67,13 +68,6 @@
       "node-fetch@2": "^2.7.0",
       "toml": "^4.2.0",
       "@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4"
-    },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-3gc7-fjrx-p6mg",
-        "GHSA-848j-6mx2-7j84",
-        "GHSA-mh99-v99m-4gvg"
-      ]
     }
   }
 }
