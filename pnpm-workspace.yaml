@@ -1,6 +1,21 @@
 # only resolve versions published at least a week ago (in minutes), a compromised release is
 # usually caught and unpublished within days
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - next
+  - eslint-config-next
+  - "@next/eslint-plugin-next"
+  - "@next/swc-darwin-x64"
+  - "@next/swc-darwin-arm64"
+  - "@next/swc-linux-x64-gnu"
+  - "@next/swc-linux-x64-musl"
+  - "@next/swc-linux-arm64-gnu"
+  - "@next/swc-linux-arm64-musl"
+  - "@next/swc-win32-x64-msvc"
+  - "@next/swc-win32-arm64-msvc"
+  - "@next/swc-win32-ia32-msvc"
+  - "@next/env"
+  - "@next/font"
 
 auditConfig:
   # Advisories of transitive dependencies with no fix within the versions upstream depends on,
