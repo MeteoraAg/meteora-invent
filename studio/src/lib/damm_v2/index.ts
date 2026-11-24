@@ -789,7 +789,6 @@ export async function claimPositionFee(
 
   const claimPositionFeeTx = await cpAmmInstance.claimPositionFee({
     owner: wallet.publicKey,
-    receiver: wallet.publicKey,
     pool: poolAddress,
     position: userPosition.position,
     positionNftAccount: userPosition.positionNftAccount,
