@@ -71,7 +71,9 @@ tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }))
 Some SDK builders already estimate CU (helpers like `getEstimatedComputeUnitIxWithBuffer`
 exist in DLMM/CP-AMM); adding a unit *price* is still your job. **DLMM Pro builders add no
 compute budget at all** — set a unit *limit* from a simulation as well as a price, and put
-both instructions first (`dlmm-pro.md` §Gotchas).
+both instructions first (`dlmm-pro.md` §Gotchas). **Zap (2.0.0+) returns bare instructions
+plus lookup tables**, also without a compute budget — compile a v0 message, then set the
+limit and price the same way (`other-products.md` §Zap).
 
 ## Sign & send pattern (web3.js v1)
 

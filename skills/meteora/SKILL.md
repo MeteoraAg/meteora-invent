@@ -17,11 +17,11 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 
 | Protocol | What it is | Choose when | SDK (pinned version) | Program ID (mainnet + devnet) |
 |---|---|---|---|---|
-| **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
-| **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.4.5` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
+| **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@2.0.0` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
+| **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.5.1` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
 | **DLMM** | Bin-based concentrated liquidity, dynamic fees, limit orders | Active LP strategies, capital efficiency, limit orders | `@meteora-ag/dlmm@1.9.14` | `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo` |
 | **DLMM Pro** (beta) | Tick-based concentrated liquidity; multi-range NFT positions, limit orders, scheduled + dynamic fees, activation rules, permanent/vesting locks | Tick-level price control, limit orders beside LP liquidity, timed or price-gated launches, locked liquidity | `@meteora-ag/dlmm-pro-sdk@0.1.3` | `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` |
-| **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@1.4.1` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
+| **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@2.0.0` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | `@meteora-ag/alpha-vault@1.1.16` | `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | `@meteora-ag/presale@0.1.1` | `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` |
 | **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
@@ -146,9 +146,9 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all five SDKs:
 
 1. **web3.js v1 only** (`Connection`, `Transaction`, `PublicKey`, `Keypair`). Never
    `@solana/kit` / web3.js v2 types.
-2. **Anchor split:** DBC, DAMM v2, DLMM use Anchor **0.31**; DLMM Pro uses Anchor **0.32**;
-   DAMM v1 uses Anchor **0.29**. Don't mix DAMM v1 with the others in one package without
-   dependency isolation, and never pass `Program` objects across SDKs.
+2. **Anchor split:** DBC, DAMM v2, DLMM and DAMM v1 use Anchor **0.31** (DAMM v1 since
+   2.0.0; its 1.x releases used 0.29); DLMM Pro uses Anchor **0.32**. Never pass `Program`
+   objects across SDKs.
 3. **Everything returns unsigned transactions** — you attach blockhash, fee payer, and
    signers, then send. Some methods return `Transaction[]` or `{ transaction, keypairs }`
    (extra signers!), and every DLMM Pro builder returns `{ tx, ... }` — check the reference

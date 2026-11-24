@@ -1,10 +1,10 @@
 # DBC — Dynamic Bonding Curve
 
-> **Source of truth:** `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11`
-> (github.com/MeteoraAg/dynamic-bonding-curve-sdk) — as of 2026-08-01.
+> **Source of truth:** `@meteora-ag/dynamic-bonding-curve-sdk@2.0.0`
+> (github.com/MeteoraAg/dynamic-bonding-curve-sdk) — as of 2026-11-15.
 > Program ID (mainnet **and** devnet): `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`
 > Deps: web3.js v1 (^1.98), Anchor 0.31, `bn.js`. Full per-function reference:
-> `packages/dynamic-bonding-curve/docs.md` in the SDK repo (~5,000 lines) and
+> `docs.md` shipped in the package (~7,000 lines) and
 > https://docs.meteora.ag/developer-guides/dbc/typescript-sdk/getting-started.md
 
 ## Mental model
@@ -13,7 +13,7 @@
 2. A **creator** launches a **virtual pool** (+ token mint) on that config.
 3. Traders buy/sell along the curve; quote tokens accumulate as `quoteReserve`.
 4. When `quoteReserve` ≥ `migrationQuoteThreshold`, the pool **graduates**: migrate to
-   DAMM v1 or DAMM v2 (per config), LP is distributed/locked per config, trading moves there.
+   DAMM v2 (configs created before 2.0 may still target DAMM v1), LP is distributed/locked per config, trading moves there.
 
 Roles matter for fee claims: *partner* = `feeClaimer` on the config; *creator* = pool creator.
 Both can have trading-fee shares, surplus, and migration-fee withdrawals.
@@ -29,16 +29,16 @@ Both can have trading-fee shares, surplus, and migration-fee withdrawals.
 | Quote mint | Default SOL `So11111111111111111111111111111111111111112`; USDC on request. |
 | Curve shape | Ask intent → mode: "simple" → `buildCurveMode: 0` (defaults: 20% supply on migration, threshold 10 quote); "target market caps" → mode 1 (`initialMarketCap`, `migrationMarketCap`); advanced → modes 2–5 (below). Set ONLY the chosen mode's shape fields — comment out the other modes' (the template ships mode 0 active). |
 | Graduation cost expectation | The SOL needed to graduate (`migrationQuoteThreshold`) is derived from the curve, not set directly in modes 1–5 — read it right after creation (`pnpm studio dbc-get-status --baseMint <MINT>`, printed in quote base units). Measured example: caps 20→600 SOL with the default 50/40/5/5 LP split ⇒ threshold ≈ 92.6 SOL. Devnet airdrops are 5 SOL/call — use small caps for devnet rehearsals. |
-| Fees | Defaults: fee scheduler 100→100 bps, `dynamicFeeEnabled: true`, `creatorTradingFeePercentage: 50`, `collectFeeMode: 0` (quote). Min base fee **25 bps**. |
+| Fees | Defaults: fee scheduler 100→100 bps, `dynamicFeeEnabled: true`, `creatorTradingFeePercentage: 50`, `collectFeeMode: 0` (quote). Min base fee **25 bps**. Rate limiter (`baseFeeMode: 2`) is rejected for new configs. |
 | Fee-share asks | "X% of trading fees" maps to TWO knobs — clarify which: `creatorTradingFeePercentage` splits **bonding-curve-phase** fees between creator and partner (`feeClaimer`); `liquidityDistribution` percentages set who owns the **post-graduation** LP (and its fees). Self-launches where the owner is both partner and creator receive 100% either way — the split only matters with a launchpad/partner. |
-| Migration target | Default DAMM v2 (`migrationOption: 1`), `migrationFeeOption: 3` (2% LP fee). Option 6 = customizable (needs `migratedPoolFee`). |
+| Migration target | DAMM v2 only (`migrationOption: 1`; DAMM v1 is rejected for new configs), `migrationFeeOption: 3` (2% LP fee). Option 6 = customizable (needs `migratedPoolFee`). |
 | LP distribution | Must total 100% across partner/creator × claimable/permanent-locked; **≥10% locked or vesting ≥1 day post-migration** (protocol rule). |
 | Addresses | **Ask:** `feeClaimer`, `leftoverReceiver`, pool `creator`. |
 | Token-2022 hook | Default no. If yes: `tokenType: 1` + `transferHookProgram` on config AND pool. |
 
 Studio actions: `dbc-create-config` (save the logged config pubkey) → `dbc-create-pool
 --config <that pubkey>` (or run `dbc-create-pool` alone to do both at once) → (trade) →
-`dbc-migrate-to-damm-v2` (or `-v1`). Template: `configs/dbc_config.jsonc`. Swap/claim/status:
+`dbc-migrate-to-damm-v2` (`-v1` only for pools already on a DAMM v1 config). Template: `configs/dbc_config.jsonc`. Swap/claim/status:
 `dbc-swap`, `dbc-claim-trading-fee`, `dbc-get-status`. Post-migration withdrawals (leftover/surplus/migration
 fee) are BUILD-only. Details: `studio-actions.md`.
 
@@ -60,12 +60,12 @@ All methods build **unsigned `Transaction`s** — you set blockhash + feePayer a
 ### `client.partner` — config + partner fees
 | Method | Purpose |
 |---|---|
-| `createConfig` / `createConfigWithTransferHook` | Create pool config from `buildCurve*` output |
+| `createConfig2` / `createConfigWithTransferHook` | Create pool config from `buildCurve*` output. `createConfig2` takes optional `transferFeeParameters` (base-mint transfer fee, Token-2022 only); `createConfig` is deprecated |
 | `createConfigAndPool(WithTransferHook)` | Config + pool in one tx |
 | `createConfigAndPoolWithFirstBuy(WithTransferHook)` | Returns `{ createConfigTx, createPoolWithFirstBuyTx }` — two txs for bundling |
 | `createPartnerMetadata` | Partner metadata for a feeClaimer |
-| `claimPartnerTradingFee` / `claimPartnerTradingFeeToReceiver` | Claim partner share (`maxBaseAmount`, `maxQuoteAmount`) |
-| `claimPartnerTradingFee2` | **Transfer-hook pools only** (renamed semantics in 1.5.8) |
+| `claimPartnerTradingFee` / `claimPartnerTradingFeeToReceiver` | Claim partner share (`maxBaseAmount`, `maxQuoteAmount`); reject transfer-hook pools |
+| `claimPartnerTradingFee2` | **Transfer-hook pools only** (renamed semantics in 1.5.8); takes `receiver` |
 | `partnerWithdrawSurplus` / `partnerWithdrawMigrationFee` / `claimPartnerPoolCreationFee` | Post-migration withdrawals |
 
 ### `client.creator` — pool creation + creator fees
@@ -75,20 +75,20 @@ All methods build **unsigned `Transaction`s** — you set blockhash + feePayer a
 | `createPoolWithFirstBuy(WithTransferHook)` | Pool + optional first buy in one tx |
 | `createPoolWithPartnerAndCreatorFirstBuy(WithTransferHook)` | Pool + partner buy + creator buy |
 | `createPoolMetadata` | Pool metadata (param key is `virtualPool` here) |
-| `claimCreatorTradingFee` / `claimCreatorTradingFeeToReceiver` / `claimCreatorTradingFee2` (hook) | Creator fee claims |
+| `claimCreatorTradingFee` / `claimCreatorTradingFeeToReceiver` / `claimCreatorTradingFee2` (hook) | Creator fee claims; the non-`2` forms reject transfer-hook pools |
 | `creatorWithdrawSurplus` / `creatorWithdrawMigrationFee` / `transferPoolCreator` | Creator ops |
 
 ### `client.pool` — trading
 | Method | Purpose |
 |---|---|
-| `swap` | Exact-in (`owner`, `pool`, `amountIn`, `minimumAmountOut`, `swapBaseForQuote`, `referralTokenAccount`) |
-| `swap2` / `swap2WithTransferHook` | `swapMode`: ExactIn / PartialFill / ExactOut (ExactOut: `amountOut` + `maximumAmountIn`) |
-| `swapQuote` / `swapQuote2` | Off-chain quotes (see snippet — need pool + config state, `currentPoint`) |
+| `swap` | Exact-in (`owner`, `pool`, `amountIn`, `minimumAmountOut`, `swapBaseForQuote`, `referralTokenAccount`); rejects transfer-hook pools |
+| `swap2` / `swap2WithTransferHook` | `swapMode`: ExactIn / PartialFill / ExactOut (ExactOut: `amountOut` + `maximumAmountIn`); `swap2` rejects transfer-hook pools |
+| `swapQuote` / `swapQuote2` | Off-chain quotes (see snippet — need pool + config state, `currentPoint`; Token-2022 quote mints also need `quoteMint` + `currentEpoch`) |
 | `getQuoteFromInputAmount` / `getQuoteFromOutputAmount` | **Pre-launch** quotes simulated from a `buildCurve*` output (1.5.10+) |
 
 ### `client.migration`
 Order — **DAMM v2**: (`createLocker` if locked vesting configured) → `migrateToDammV2`.
-**DAMM v1**: `createDammV1MigrationMetadata` → (`createLocker` if vesting) → `migrateToDammV1`
+**DAMM v1** (existing pools only): `createDammV1MigrationMetadata` → (`createLocker` if vesting) → `migrateToDammV1`
 → `lockDammV1LpToken` → `claimDammV1LpToken`. Plus `withdrawLeftover` after migration.
 
 `migrateToDammV2` returns **`{ transaction, firstPositionNftKeypair, secondPositionNftKeypair }`
@@ -96,13 +96,14 @@ Order — **DAMM v2**: (`createLocker` if locked vesting configured) → `migrat
 `DAMM_V2_MIGRATION_FEE_ADDRESS[0..6]` / `DAMM_V1_MIGRATION_FEE_ADDRESS[0..5]` (index = `migrationFeeOption`).
 
 ### `client.state` — reads (no wallet needed)
-`getPoolConfig(s)(ByOwner)` · `getPool(s)` · `getPoolsByConfig/ByCreator` ·
+`getPoolConfig(s)(ByOwner)` (`ByOwner` matches the config's `feeClaimer`) · `getPool(s)` · `getPoolsByConfig/ByCreator` ·
 `getPoolByBaseMint(mint)` · `getPoolMigrationQuoteThreshold` ·
 `getPoolQuoteTokenCurveProgress(poolAddress): Promise<number>` (0–1; same for
 `...BaseToken...`) · `getPoolFeeMetrics` · `getPoolFeeBreakdown(poolAddress)` →
 `{ creator: {...}, partner: {...} }`, each with `unclaimedBaseFee`, `unclaimedQuoteFee`,
 `claimedBaseFee`, `claimedQuoteFee`, `totalBaseFee`, `totalQuoteFee` (all `BN`, base units) ·
-`getPoolsFeesByConfig/ByCreator` · `getPoolMetadata` / `getPartnerMetadata`.
+`getPoolsFeesByConfig/ByCreator` · `getPoolMetadata` / `getPartnerMetadata` (the account, or `null`) ·
+`getDammV1MigrationMetadata` (account or `null`).
 
 **Post-graduation detection & successor pool:** `pool.poolState.isMigrated` (numeric flag,
 0 = on curve) is set once the pool has migrated (progress reaches 1.0 at the threshold;
@@ -161,7 +162,7 @@ const curveConfig = buildCurveWithMarketCap({
 })
 
 const config = Keypair.generate()
-const tx = await client.partner.createConfig({
+const tx = await client.partner.createConfig2({
   config: config.publicKey,
   feeClaimer: FEE_CLAIMER, leftoverReceiver: LEFTOVER_RECEIVER,
   payer: wallet.publicKey, quoteMint: QUOTE_MINT,
@@ -181,6 +182,7 @@ Other builders (same nested base params, different shape inputs): `buildCurve`
 ## Core flow: quote + swap on a live pool
 ```ts
 import BN from 'bn.js'
+import { getSwapQuoteTransferFees } from '@meteora-ag/dynamic-bonding-curve-sdk'
 
 const pool = await client.state.getPoolByBaseMint(baseMint)           // ProgramAccount | null
 const virtualPoolState = await client.state.getPool(pool!.publicKey)
@@ -201,8 +203,10 @@ const quote = await client.pool.swapQuote({
   currentPoint: new BN(currentTime!),      // see activationType note above
   eligibleForFirstSwapWithMinFee: false,   // true ONLY for the very first swap on a pool
                                            // whose config set enableFirstSwapWithMinFee
+  ...(await getSwapQuoteTransferFees(connection, poolConfigState, { baseMint })),  // quoteMint + currentEpoch for Token-2022
 })
-// quote: { actualInputAmount, outputAmount, minimumAmountOut, nextSqrtPrice, tradingFee, protocolFee, referralFee }
+// quote: { actualInputAmount, outputAmount, minimumAmountOut, nextSqrtPrice, tradingFee, protocolFee, referralFee,
+//          includedTransferFeeAmountIn, excludedTransferFeeAmountOut }
 
 const swapTx = await client.pool.swap({
   owner: wallet.publicKey, pool: pool!.publicKey,
@@ -224,6 +228,17 @@ const swapTx = await client.pool.swap({
 - Market-cap fee scheduler takes `priceMultiple` (ending/starting market-cap ratio), not `sqrtPriceStepBps` / market-cap pair (final form 1.5.8).
 - `createDammV2MigrationMetadata` → removed (1.4.6); DAMM v2 migration needs no metadata step.
 - `swapQuote` requires `eligibleForFirstSwapWithMinFee` and `currentPoint` — omitting them is a pre-1.5.2 signature.
+- `client.partner.createConfig` → deprecated in 2.0.0, use `createConfig2` (`createConfigAndPool*` already call it). `createConfig` and `createConfigWithTransferHook` reject a quote mint with a non-zero transfer fee.
+- `BaseFeeMode.RateLimiter` and `MigrationOption.MET_DAMM` (DAMM v1) → rejected by `createConfig`, `createPool` and `buildCurve*` for new configs since 1.5.12. Existing pools still quote, swap and migrate. `getRateLimiterParams` is deprecated; `getBaseFeeParams` no longer takes `tokenQuoteDecimal` / `activationType`.
+- `new PoolService(connection, commitment)` and the other service constructors → unsupported in 2.0.0; use `DynamicBondingCurveClient` (its `create` factory is gone, the constructor defaults `commitment` to `confirmed`).
+- Imports: only `@meteora-ag/dynamic-bonding-curve-sdk` and `@meteora-ag/dynamic-bonding-curve-sdk/math` resolve in 2.0.0. The curve/fee/swap math (`getSwapResult`, `getFeeMode`, `SafeMath`, `mulDiv`, ...) moved to `./math`; `swapQuoteExactIn/ExactOut/PartialFill` and `DynamicBondingCurveProgram` are no longer exported.
+- `deriveEscrow` → `deriveLockerEscrowAddress`. `createDbcProgram` returns the `Program`, not `{ program }`. `getProgram()` on services → `program`.
+- `swap`, `swap2`, `claim*TradingFee` and `claim*TradingFeeToReceiver` reject transfer-hook pools; use `swap2WithTransferHook` and `claim*TradingFee2`. Standard pool creation rejects a transfer-hook config and the reverse.
+- `tempWSolAcc` is gone from `claimPartnerTradingFee` / `claimCreatorTradingFee`: with a SOL quote the fee is wrapped into the claimer's own token account and unwrapped to `receiver`, so only the claimer signs.
+- Swap quotes for a Token-2022 quote mint throw without `quoteMint` and `currentEpoch`; spread `await getSwapQuoteTransferFees(connection, config, { baseMint })` into the params.
+- `getPoolMetadata` / `getPartnerMetadata` return the account or `null`, not an array. `getDammV1MigrationMetadata` returns `null` instead of throwing when absent.
+- `getPoolConfigsByOwner` filters on the config's `feeClaimer` (it filtered on `leftoverReceiver` before).
+- `tokenQuoteDecimal` accepts any quote mint decimals since 1.5.13 (not only 6-9); `tokenBaseDecimal` stays 6-9.
 
 ## Deep links
 

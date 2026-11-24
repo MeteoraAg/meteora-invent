@@ -199,6 +199,7 @@ export async function createDammV2Config(
     poolCreatorAuthority,
     collectFeeMode: 1,
     activationType: 0,
+    permission: new BN(0),
   };
 
   const transaction = await program.methods

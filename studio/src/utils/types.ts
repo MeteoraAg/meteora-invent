@@ -190,10 +190,6 @@ export type DammV2BaseFee =
       feeTimeSchedulerParam: FeeSchedulerParams;
     }
   | {
-      baseFeeMode: 2;
-      rateLimiterParam: RateLimiterParams & { maxFeeBps: number };
-    }
-  | {
       baseFeeMode: 3 | 4;
       feeMarketCapSchedulerParam: FeeMarketCapSchedulerParams;
     };
@@ -422,28 +418,16 @@ export type DbcConfig = MeteoraConfigBase & {
   dbcTransferPoolCreator?: DbcTransferPoolCreator | null;
 };
 
-export type DbcBaseFee =
-  | {
-      baseFeeMode: 0 | 1;
-      feeSchedulerParam: FeeSchedulerParams;
-    }
-  | {
-      baseFeeMode: 2;
-      rateLimiterParam: RateLimiterParams;
-    };
+export type DbcBaseFee = {
+  baseFeeMode: 0 | 1;
+  feeSchedulerParam: FeeSchedulerParams;
+};
 
 export type FeeSchedulerParams = {
   startingFeeBps: number;
   endingFeeBps: number;
   numberOfPeriod: number;
   totalDuration: number;
-};
-
-export type RateLimiterParams = {
-  baseFeeBps: number;
-  feeIncrementBps: number;
-  referenceAmount: number;
-  maxLimiterDuration: number;
 };
 
 export type FeeMarketCapSchedulerParams = {
@@ -903,7 +887,7 @@ export interface ZapInDlmmConfig {
   // singleSided — whenever singleSided is not null (mirrors the SDK's own example).
   favorXInActiveId: boolean;
   maxActiveBinSlippage: number; // bins the active bin id may drift between quoting and landing on-chain
-  maxAccounts: number; // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+  maxAccounts: number; // account budget of Jupiter's quote for the rebalancing swap
   maxTransferAmountExtendPercentage: number; // % buffer the SDK adds on top of the swap estimate's max-transfer ceiling
   // NOTE: zap-in-dlmm ALWAYS creates a brand-new position (a throwaway keypair co-signs once) —
   // the zap-sdk's buildZapInDlmmTransaction has no "existing position" mode; depositing into an

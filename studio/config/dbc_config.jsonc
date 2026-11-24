@@ -88,22 +88,13 @@
     /* Fee Configuration */
     "fee": {
       "baseFeeParams": {
-        "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
+        "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential
         "feeSchedulerParam": {
           "startingFeeBps": 100, // starting fee (max 99% fee === 9900 bps)
           "endingFeeBps": 100, // ending fee (minimum 0.25% fee === 25 bps)
           "numberOfPeriod": 0, // number of period
           "totalDuration": 0 // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
         }
-        /*
-              "baseFeeMode": 2, // 2 - Rate Limiter
-              "rateLimiterParam": {
-                  "baseFeeBps": 200, // base fee (max 99% base fee === 9900 bps)
-                  "feeIncrementBps": 200, // fee increment (max fee increment = 9900 bps - baseFeeBps)
-                  "referenceAmount": 1, // reference amount (not in lamports)
-                  "maxLimiterDuration": 3600 // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
-              }
-              */
       },
       "dynamicFeeEnabled": true, // If true, dynamic fee will add 20% of minimum base fee to the total fee.
       "collectFeeMode": 0, // 0 - Quote Token | 1 - Output Token
@@ -119,7 +110,7 @@
 
     /* Migration Configuration */
     "migration": {
-      "migrationOption": 1, // 0 - Migrate to DAMM v1 | 1 - Migrate to DAMM v2
+      "migrationOption": 1, // 1 - Migrate to DAMM v2 (0 - DAMM v1 is rejected for new configs)
       "migrationFeeOption": 3, // 0 - LP Fee 0.25% | 1 - LP Fee 0.3% | 2 - LP Fee 1% | 3 - LP Fee 2% | 4 - LP Fee 4% | 5 - LP Fee 6% | 6 - Customizable
       "migrationFee": {
         "feePercentage": 0, // Percentage of fee taken from migration quote threshold once pool migrates (0% to 50%)
@@ -146,8 +137,6 @@
 
     /* LP Distribution Configuration (must total 100%)
      * IMPORTANT: At least 10% of LP must remain locked/vesting for at least 1 day post-migration.
-     *
-     * For DAMM v1: partnerPermanentLockedLiquidityPercentage + creatorPermanentLockedLiquidityPercentage >= 10%
      *
      * For DAMM v2: 3 options to achieve 10% locked/vesting:
      *   Option 1 (Permanent Only): Set creator + partner permanent locked percentages >= 10% (LP locked forever)

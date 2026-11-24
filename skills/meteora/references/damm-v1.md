@@ -1,12 +1,13 @@
 # DAMM v1 — Dynamic AMM (legacy)
 
-> **Source of truth:** `@meteora-ag/dynamic-amm-sdk@1.4.1` (github.com/MeteoraAg/damm-v1-sdk,
-> TS client in `ts-client/`) — as of 2026-08-01. Repo is quiet
-> (last change 2025-08); check npm for newer versions before trusting this pin.
+> **Source of truth:** `@meteora-ag/dynamic-amm-sdk@2.0.0` (github.com/MeteoraAg/damm-v1-sdk,
+> TS client in `ts-client/`) — as of 2026-11-15. Check npm for newer versions before
+> trusting this pin.
 > **Review by 2026-12-01:** legacy product — re-check deprecation status and whether this
 > pack should shrink to lock-escrow/Stake2Earn maintenance flows only.
 > Program ID: `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB`
-> Deps: web3.js v1 (**pinned 1.98.0**), **Anchor 0.29** (not 0.31!), `@meteora-ag/vault-sdk`.
+> Deps: web3.js v1 (**pinned 1.98.0**), **Anchor 0.31.1** (pinned; 1.x releases used 0.29),
+> `@meteora-ag/vault-sdk`.
 > ⚠️ **Legacy product** — don't start new projects here. Use DAMM v2 unless the user has
 > existing v1 pools, needs Stake2Earn (M3M3) fee farms, or the v1 memecoin-launch flow.
 
@@ -19,9 +20,9 @@ memecoin pools (auto lock + optional M3M3 fee vault). LP can be permanently lock
 **lock escrow** that still accrues claimable fees — the basis of "locked liquidity" launches
 and Stake2Earn.
 
-Studio actions (ACT path): `damm-v1-create-pool`, `damm-v1-lock-liquidity`,
+Studio actions (ACT path): `damm-v1-create-pool`, `damm-v1-swap`, `damm-v1-lock-liquidity`,
 `damm-v1-create-stake2earn-farm`, `damm-v1-lock-liquidity-stake2earn`.
-Template: `configs/damm_v1_config.jsonc`. No studio swap/deposit — BUILD path.
+Template: `configs/damm_v1_config.jsonc`. No studio deposit/withdraw — BUILD path.
 
 ## Client setup
 
@@ -47,11 +48,11 @@ places — the current field is `pool.tokenBMint.address`.**
 | Create (static) | `createPermissionlessConstantProductPoolWithConfig(2)` (config-based; `2` adds `activationPoint`, `stakeLiquidity`) · `createCustomizablePermissionlessConstantProductPool` (creator-set fees/activation) · `createPermissionlessPool` (legacy; `isStable` flag for stable pools) · `createPermissionlessConstantProductMemecoinPoolWithConfig` (mints token opt., locks LP, optional M3M3 vault) · `createConfig` |
 | Deposit/withdraw | `getDepositQuote(tokenAIn, tokenBIn, balance, slippage)` → `deposit(owner, tokenAIn, tokenBIn, poolTokenOut)` · `getWithdrawQuote(lpAmount, slippage, tokenMint?)` → `withdraw(owner, lpAmount, tokenAOut, tokenBOut)` |
 | Swap | `getSwapQuote(inTokenMint, inAmountLamport, slippage, swapInitiator?)` → `swap(owner, inTokenMint, inAmountLamport, minOutAmountLamport, referralOwner?)` · `getMaxSwapInAmount` / `getMaxSwapOutAmount` · `swapAndStakeForFee` (M3M3) |
-| Lock escrow | `lockLiquidity(owner, amount, feePayer?, { stakeLiquidity? })` · `getUserLockEscrow(owner)` · `getLockedLpAmount()` · `claimLockFee2(owner, maxAmount, payer, receiver)` (**preferred**; plain `claimLockFee` needs manual temp-wSOL) · `moveLockedLP` · static `AmmImpl.getLockedLpAmountByUser(connection, user)` |
+| Lock escrow | `lockLiquidity(owner, amount, feePayer?, { stakeLiquidity? })` · `getUserLockEscrow(owner)` · `getLockedLpAmount()` · `claimLockFee2(owner, maxAmount, payer, receiver)` (**preferred**; plain `claimLockFee` needs manual temp-wSOL) · static `AmmImpl.getLockedLpAmountByUser(connection, user)` |
 | Partner | `partnerClaimFees(partnerAddress, maxAmountA, maxAmountB)` |
 | State | `updateState()` (**call before every quote**) · `getPoolTokenMint()` · `getLpSupply()` · `getUserBalance(owner)` |
 | Static reads | `AmmImpl.searchPoolsByToken(connection, mint)` · `getPoolConfig` / `getFeeConfigurations` / `getPoolConfigsWithPoolCreatorAuthority` · `fetchMultipleUserBalance` |
-| Standalone utils | `calculateSwapQuote`, `calculatePoolInfo`, `checkPoolExists`, `getTokensMintFromPoolAddress`, `derivePoolAddress`; deep-import `derivePoolAddressWithConfig`, `deriveLockEscrowPda` from `@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils` |
+| Standalone utils | `calculateSwapQuote`, `calculatePoolInfo`, `getVaultLpSupply`, `checkPoolExists`, `getTokensMintFromPoolAddress`, `derivePoolAddress`; deep-import `derivePoolAddressWithConfig`, `deriveLockEscrowPda` from `@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils` |
 
 ## Core flow: swap
 ```ts
@@ -88,7 +89,9 @@ Imbalanced / single-side deposits are **stable-pool features** — the SDK
 ## Version fences
 
 - Package is `@meteora-ag/dynamic-amm-sdk` — `@mercurial-finance/dynamic-amm-sdk` is the dead pre-1.2.0 name.
-- **Anchor 0.29** (`new Program(idl, programId, provider)`, `.accounts({...})`). Mixing with the Anchor-0.31 Meteora SDKs in one package causes type/BN identity conflicts — isolate dependencies if you must combine.
+- **2.0.0 moved to Anchor 0.31.1** (was 0.29 in 1.x), the same line as DBC, DAMM v2 and DLMM. `AmmIdl` is now the Anchor 0.30+ IDL JSON: load it with `new Program({ ...AmmIdl, address }, provider)`, not the 0.29 `new Program(idl, programId, provider)` form.
+- **2.0.0 LP supply:** pool LP is priced with `pool.lpMintSupply` (`getLpSupply()` / `poolState.lpSupply` return it) and vault LP with `getVaultLpSupply(vault, lpMintSupply)`. Standalone `calculateSwapQuote` and `calculatePoolInfo` callers must pass `vaultALpSupply` / `vaultBLpSupply` from `getVaultLpSupply`; reading the LP mint supply directly misprices version 1 vaults. `AmmImpl` quotes already do this.
+- **2.0.0 removed `moveLockedLP`** — the program has no such endpoint.
 - No `exports` map and no `types` field in package.json: use `moduleResolution: "node"` (or path aliases); deep imports from `dist/cjs/src/amm/utils` are the documented way to reach extra derivation helpers.
 - `claimLockFee2` exists only from 1.3.9+ and is the reliable fee-claim path (plain `claimLockFee` had repeated wSOL bugs).
 - Pool-creation `*WithConfig*`/memecoin variants return **`Transaction[]`** — sign and send sequentially.

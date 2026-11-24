@@ -173,9 +173,7 @@ export async function createDammV2OneSidedPool(
       };
     } else {
       let flatFeeBps: number;
-      if (baseFee.baseFeeMode === 2) {
-        flatFeeBps = baseFee.rateLimiterParam.baseFeeBps;
-      } else if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
+      if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
         flatFeeBps = baseFee.feeMarketCapSchedulerParam.startingFeeBps;
       } else if (baseFee.baseFeeMode === 0 || baseFee.baseFeeMode === 1) {
         flatFeeBps = baseFee.feeTimeSchedulerParam.startingFeeBps;
@@ -186,7 +184,7 @@ export async function createDammV2OneSidedPool(
     }
   }
 
-  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee, quoteDecimals, activationType);
+  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee);
 
   const poolFeesParams: PoolFeesParams = {
     baseFee: baseFeeParams,
@@ -422,9 +420,7 @@ export async function createDammV2BalancedPool(
       };
     } else {
       let flatFeeBps: number;
-      if (baseFee.baseFeeMode === 2) {
-        flatFeeBps = baseFee.rateLimiterParam.baseFeeBps;
-      } else if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
+      if (baseFee.baseFeeMode === 3 || baseFee.baseFeeMode === 4) {
         flatFeeBps = baseFee.feeMarketCapSchedulerParam.startingFeeBps;
       } else if (baseFee.baseFeeMode === 0 || baseFee.baseFeeMode === 1) {
         flatFeeBps = baseFee.feeTimeSchedulerParam.startingFeeBps;
@@ -435,7 +431,7 @@ export async function createDammV2BalancedPool(
     }
   }
 
-  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee, quoteDecimals, activationType);
+  const baseFeeParams: BaseFee = getBaseFeeParams(baseFee);
 
   const compoundingFeeBps = collectFeeMode === 2 ? (poolFees.compoundingFeeBps ?? 0) : 0;
   if (collectFeeMode === 2) {

@@ -527,7 +527,9 @@ pnpm studio dbc-claim-trading-fee --baseMint <YOUR_BASE_MINT_ADDRESS>
 
 If you already have an existing DBC pool, with `poolState.quoteReserve` >
 `poolConfig.migrationQuoteThreshold` (100% bonding curve progress), you can run the following
-command with the `--baseMint` flag to migrate the DBC pool to DAMM v1.
+command with the `--baseMint` flag to migrate the DBC pool to DAMM v1. New DBC configs can only
+migrate to DAMM v2, so this applies to pools whose config was created with `migrationOption: 0`
+before that.
 
 ```bash
 pnpm studio dbc-migrate-to-damm-v1 --baseMint <YOUR_BASE_MINT_ADDRESS>

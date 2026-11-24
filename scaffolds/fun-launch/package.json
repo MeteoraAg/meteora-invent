@@ -21,7 +21,7 @@
     "@iconify-json/solar": "^1.2.5",
     "@iconify/tailwind": "^1.2.0",
     "@jup-ag/wallet-adapter": "^0.2.6",
-    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.11",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^2.0.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
