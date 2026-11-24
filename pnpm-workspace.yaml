@@ -1,6 +1,10 @@
 # only resolve versions published at least a week ago (in minutes), a compromised release is
 # usually caught and unpublished within days
 minimumReleaseAge: 10080
+# Meteora's own SDK, published from MeteoraAg/dlmm-pro-sdk. DLMM Pro is in beta and studio follows
+# its releases as they ship, so it is exempt from the wait
+minimumReleaseAgeExclude:
+  - "@meteora-ag/dlmm-pro-sdk"
 
 auditConfig:
   # Advisories of transitive dependencies with no fix within the versions upstream depends on,

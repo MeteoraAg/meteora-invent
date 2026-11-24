@@ -5,9 +5,10 @@ launches. Part of the **Meteora Invent** toolkit.
 
 ## 🏗️ Structure
 
-Studio consists of 4 main pool types, each with dedicated actions and configurations:
+Studio consists of 5 main pool types, each with dedicated actions and configurations:
 
 - **DLMM** (Dynamic Liquidity Market Maker) - Dynamic fees and precise liquidity concentration
+- **DLMM Pro** - Tick-based concentrated liquidity with limit orders and launch controls (beta)
 - **DAMM V2** (Dynamic AMM V2) - Enhanced constant product AMM with advanced features
 - **DAMM V1** (Dynamic AMM V1) - Constant product AMM with lending integration
 - **DBC** (Dynamic Bonding Curve) - Permissionless launch pool protocol
@@ -64,6 +65,7 @@ pnpm generate-keypair --network localnet
 4. Configure the config files in the `studio/config` directory:
 
 - [DLMM Config](./config/dlmm_config.jsonc)
+- [DLMM Pro Config](./config/dlmm_pro_config.jsonc)
 - [DAMM v2 Config](./config/damm_v2_config.jsonc)
 - [DAMM v1 Config](./config/damm_v1_config.jsonc)
 - [DBC Config](./config/dbc_config.jsonc)
@@ -199,6 +201,71 @@ pnpm dlmm-get-limit-orders --poolAddress <POOL_ADDRESS>
 
 ```bash
 pnpm dlmm-cancel-limit-order --poolAddress <POOL_ADDRESS> --limitOrder <LIMIT_ORDER_ADDRESS>
+```
+
+### DLMM Pro Actions
+
+DLMM Pro is in beta. Its actions run on devnet and mainnet; the local test validator does not load
+the DLMM Pro program.
+
+**Create a DLMM Pro Pool**
+
+```bash
+pnpm dlmm-pro-create-pool --baseMint <BASE_MINT_ADDRESS>
+```
+
+**Open a Position**
+
+```bash
+pnpm dlmm-pro-open-position --poolAddress <POOL_ADDRESS>
+```
+
+**Remove Liquidity**
+
+```bash
+pnpm dlmm-pro-remove-liquidity --poolAddress <POOL_ADDRESS> --position <POSITION_NFT_MINT>
+```
+
+**Lock a Position**
+
+```bash
+pnpm dlmm-pro-lock-position --poolAddress <POOL_ADDRESS> --position <POSITION_NFT_MINT>
+```
+
+**Claim Fees**
+
+```bash
+pnpm dlmm-pro-claim-fees --poolAddress <POOL_ADDRESS>
+```
+
+**List Positions**
+
+```bash
+pnpm dlmm-pro-get-positions --poolAddress <POOL_ADDRESS>
+```
+
+**Swap**
+
+```bash
+pnpm dlmm-pro-swap --poolAddress <POOL_ADDRESS>
+```
+
+**Place a Limit Order**
+
+```bash
+pnpm dlmm-pro-place-limit-order --poolAddress <POOL_ADDRESS>
+```
+
+**List Limit Orders**
+
+```bash
+pnpm dlmm-pro-get-limit-orders --poolAddress <POOL_ADDRESS>
+```
+
+**Cancel a Limit Order**
+
+```bash
+pnpm dlmm-pro-cancel-limit-order --poolAddress <POOL_ADDRESS> --limitOrder <LIMIT_ORDER_NFT_MINT>
 ```
 
 ### DAMM v2 Actions
@@ -345,6 +412,13 @@ Vaults. DAMM v2 is a new program, and not an upgrade of the Dynamic AMM v1 progr
 DLMM (Dynamic Liquidity Market Maker) gives LPs access to dynamic fees to capitalize on volatility,
 and precise liquidity concentration all in real-time, with the flexibility to select their preferred
 volatility strategy.
+
+### DLMM Pro
+
+DLMM Pro is a concentrated liquidity AMM built on ticks, each a 0.01% price step. One position NFT
+holds up to 45 price ranges, limit orders rest in the same pool as LP liquidity and fill at the
+exact tick price, and a pool's fee schedule, fee token and activation rules are fixed when it is
+created. DLMM Pro is a separate program from DLMM and is in beta.
 
 ### Alpha Vault
 

@@ -1,6 +1,6 @@
 # Wallets, RPC, and Transactions
 
-Shared rules for every Meteora action. All four SDKs are **web3.js v1** — legacy
+Shared rules for every Meteora action. All five SDKs are **web3.js v1** — legacy
 `Connection` / `Transaction` / `Keypair`. Do not use `@solana/kit` / web3.js v2.
 
 ## Keypairs
@@ -44,7 +44,7 @@ into chat, advise rotating it after the task.
 |---|---|---|
 | devnet | `https://api.devnet.solana.com` | Default for first runs; free airdrops |
 | mainnet-beta | `https://api.mainnet-beta.solana.com` | Rate-limited; fine for reads/tests only |
-| localnet | `http://localhost:8899` | `pnpm studio start-test-validator` (Meteora programs preloaded) |
+| localnet | `http://localhost:8899` | `pnpm studio start-test-validator` (Meteora programs preloaded, except DLMM Pro) |
 
 For mainnet writes use a paid RPC (Helius / QuickNode / Triton) — public mainnet RPC
 drops transactions under load. All Meteora program IDs are identical on mainnet and devnet.
@@ -69,7 +69,9 @@ tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }))
 ```
 
 Some SDK builders already estimate CU (helpers like `getEstimatedComputeUnitIxWithBuffer`
-exist in DLMM/CP-AMM); adding a unit *price* is still your job.
+exist in DLMM/CP-AMM); adding a unit *price* is still your job. **DLMM Pro builders add no
+compute budget at all** — set a unit *limit* from a simulation as well as a price, and put
+both instructions first (`dlmm-pro.md` §Gotchas).
 
 ## Sign & send pattern (web3.js v1)
 
@@ -84,8 +86,9 @@ const sig = await sendAndConfirmTransaction(connection, tx, signers, { commitmen
 
 - **Check the return shape** before assuming one tx + one signer:
   `Transaction[]` (DLMM removes/claims, DAMM v1 pool creation) → send sequentially;
-  `{ transaction, ...keypairs }` (DBC `migrateToDammV2`) and generated account keypairs
-  (DBC config, DLMM position, CP-AMM position NFT) → **extra signers**.
+  `{ transaction, ...keypairs }` (DBC `migrateToDammV2`), `{ tx, ... }` (every DLMM Pro
+  builder) and generated account keypairs (DBC config, DLMM position, CP-AMM position NFT,
+  DLMM Pro position and limit order NFT mints) → **extra signers**.
 - Simulate before sending real value: set blockhash + feePayer, **sign first**, then
   `await connection.simulateTransaction(tx)` and read the program logs
   (the studio's `runSimulateTransaction` helper follows this order).

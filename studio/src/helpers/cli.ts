@@ -71,6 +71,9 @@ export function parseCliArguments(): CliArguments {
       limitOrder: {
         type: 'string',
       },
+      position: {
+        type: 'string',
+      },
       airdrop: {
         type: 'boolean',
       },

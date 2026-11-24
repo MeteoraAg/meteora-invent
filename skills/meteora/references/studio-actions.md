@@ -1,6 +1,6 @@
 # Studio CLI — Full Action Reference (ACT path)
 
-81 studio actions (plus the start-test-validator helper), read from
+91 studio actions (plus the start-test-validator helper), read from
 `studio/src/actions/` and `studio/src/helpers/cli.ts`.
 Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-invent repo root.
 
@@ -13,18 +13,18 @@ Bootstrap: `studio-setup.md` (sibling file). Run everything from the meteora-inv
 2. **Flags are selectors only.** The full set the parser accepts (anything else errors):
    `--network <mainnet-beta|devnet|localnet>`, `--baseMint <pubkey>`, `--poolAddress <pubkey>`,
    `--vault <pubkey>`, `--escrow <pubkey>`, `--farm <pubkey>`, `--limitOrder <pubkey>`,
-   `--airdrop` (boolean), `--config <pubkey>` (ONE action only, see `dbc-create-pool`),
-   `--help`.
+   `--position <pubkey>` (DLMM Pro only), `--airdrop` (boolean), `--config <pubkey>` (ONE
+   action only, see `dbc-create-pool`), `--help`.
 3. Every config file shares the same base fields: `rpcUrl`, `dryRun`, `keypairFilePath`
    (resolved from `studio/`), `computeUnitPriceMicroLamports` — plus `quoteMint` where the
-   protocol trades against a quote token (5 of the 11 templates — `dynamic_vault`, `farming`,
+   protocol trades against a quote token (5 of the 12 templates — `dynamic_vault`, `farming`,
    `fee_sharing`, `lock`, `zap` — have no `quoteMint` field by design). `dryRun`
    applies to every action reading that file — **flip it to `false` only for the action
    the owner just confirmed, and set it back to `true` immediately after** (a stale
    `false` is a live-execution hazard for the next action). Addresses printed by a DRY RUN
    for actions that generate a fresh keypair (lock escrow, fee-sharing vault, stake2earn
-   unstake account, zap position) are throwaway placeholders — only save the address printed
-   by the real (`dryRun: false`) run.
+   unstake account, zap position, DLMM Pro position and limit order NFT mints) are throwaway
+   placeholders — only save the address printed by the real (`dryRun: false`) run.
 4. Amounts in config files are **human token units** unless the field's comment says
    otherwise (notable exceptions called out below).
 
@@ -62,7 +62,8 @@ pnpm studio start-test-validator
 Local validator at `http://localhost:8899` preloaded with every Meteora program this studio
 uses: DLMM, DAMM v1, DAMM v2, DBC, Alpha Vault, Dynamic Vault, Met Lock, and Dynamic Fee
 Sharing, plus Presale, Stake2Earn (M3M3), Zap, and Pool Farms — plus a metaplex fixture and a
-transfer-hook fixture.
+transfer-hook fixture. **DLMM Pro is not preloaded** — run `dlmm-pro-*` actions on devnet or
+mainnet.
 
 ## DBC actions — config file: `studio/config/dbc_config.jsonc`
 
@@ -233,6 +234,155 @@ pnpm studio dlmm-get-positions --poolAddress <POOL>
 ```
 Flags: `--poolAddress` (required). **Read-only.** Prints the active bin and, per position:
 bin range, X/Y amounts (base units), unclaimed feeX/feeY.
+
+## DLMM Pro actions — config file: `studio/config/dlmm_pro_config.jsonc`
+
+DLMM Pro is a separate program from DLMM (ticks, not bins) and is in beta. Read this before
+any `dlmm-pro-*` action:
+
+- Pools created here use the **base token as token X and the quote token as token Y**.
+  Every price in the config is **token Y per 1 token X**, in whole tokens.
+- Positions and limit orders are NFTs. The actions print and accept their **NFT mint**
+  (`--position`, `--limitOrder`), not the account address.
+- Devnet and mainnet only (same program ID); the local test validator has no DLMM Pro.
+- Every write is simulated first, also when `dryRun` is false, and the compute unit limit is
+  taken from that simulation. A failed simulation prints the program logs and the DLMM Pro
+  error name (e.g. `DLMM Pro error 6033 (PositionIsNotEmpty)`).
+- Steps that must land together (open + deposit, remove + claim + close, cancel + close)
+  go out as **one atomic transaction when they fit**, so a dry run covers all of them. When
+  they do not fit they are sent one after another, and a dry run skips the steps that depend
+  on an earlier one and says so.
+
+### `dlmm-pro-create-pool`
+```bash
+pnpm studio dlmm-pro-create-pool --baseMint <MINT>
+```
+Flags: `--baseMint` — either pass it, or omit it and fill the `createBaseToken` block to
+mint a new token (never both; minting needs `dryRun: false`). Reads `quoteMint` and
+`dlmmProConfig`: `poolType`, `initialPrice`, `configIndex`, `poolParameters`.
+
+| `poolType` | Settings come from | Requirements |
+|---|---|---|
+| `static` | The published static config `configIndex` (tick spacing, fees, fee token, extensions) | None. One pool per pair per config |
+| `launch` | `poolParameters` | Wallet holds a non-zero balance of both tokens. One launch pool per pair |
+| `dynamic` | `poolParameters` | Wallet is the pool creator authority of dynamic config `configIndex` (issued by Meteora) |
+
+`poolParameters` (launch and dynamic only): `tickSpacing` (1–256), `baseFee` (`baseFeeMode`
+0 Fixed with `feeBps`; 1/2 time scheduler with `startingBaseFeeBps`, `endingBaseFeeBps`,
+`numberOfPeriod`, `totalDuration`; 3/4 market cap scheduler with `priceMultiple`,
+`schedulerExpirationDuration` instead of `totalDuration`), `dynamicFee` (bool),
+`collectFeeMode` (0 OutputToken, 1 OnlyY — quote must be SOL, USDC or badged),
+`activationType` (0 slot, 1 timestamp), `liquidityMining` (bool), `activation` (null, or
+whitelists + `bondingCurveTargetBps` and/or `timeBased` points for a timed or
+price-gated launch).
+Static config index: `924 × extension + 132 × schedule + 4 × tier + variant`; the template's
+`60` is tick spacing 32, fixed 0.25%, dynamic fee on, fees in the output token. Full table:
+https://docs.meteora.ag/developer-guides/dlmm-pro/pool-fee-configs.md — the action prints
+the config's settings, so dry-run to confirm the index before going live.
+**The pool starts on the usable tick at or below `initialPrice`** (within one tick spacing,
+0.01% per tick); the actual starting price is logged. Output: pool address logged — save
+it, every other action takes `--poolAddress`. A new pool has no liquidity until
+`dlmm-pro-open-position`. ~0.02 SOL.
+
+### `dlmm-pro-open-position`
+```bash
+pnpm studio dlmm-pro-open-position --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `openPosition`: `strategy` (`spot` even, `curve`
+concentrated at the price, `bidAsk` weighted to the edges, `wave` even near the price and
+rising to the edges), `minPrice`/`maxPrice` (snapped outward to usable ticks), `amountX`/
+`amountY` (**maximums**, human units), `layout` (`vertical`/`horizontal`), `maxRanges` (≤45).
+Always opens a NEW position and deposits as much of both budgets as the shape allows at the
+current price; the planned deposit is logged before sending.
+A range above the current price takes only X, below it only Y, around it both — a missing
+side fails with `amountX and amountY must fund non-zero liquidity`. **To seed a new pool with
+the base token only, set `minPrice` to the pool's `initialPrice` and `amountY` to 0.**
+**Output: the position NFT mint is logged — save it for `--position`.** Rent grows with the
+number of ranges (~0.013 SOL for 1 range, ~0.04 SOL for 10) and is refunded when the
+position is closed.
+
+### `dlmm-pro-remove-liquidity`
+```bash
+pnpm studio dlmm-pro-remove-liquidity --poolAddress <POOL> [--position <NFT_MINT>]
+```
+Flags: `--poolAddress` (required), `--position` (required only when the wallet has more than
+one position on the pool; the error lists them). Reads `removeLiquidity`: `bps` (share of
+the **unlocked** liquidity of every range, 10000 = 100%), `slippageBps`, `closePosition`.
+With `closePosition: true` (needs `bps: 10000`) it also claims fees and every reward, then
+closes the position and refunds its rent — this is the full exit, and it also closes a
+position that is already empty. Locked or unvested liquidity stays, and a position still
+holding any cannot close (`PositionIsNotEmpty`).
+
+### `dlmm-pro-lock-position`
+```bash
+pnpm studio dlmm-pro-lock-position --poolAddress <POOL> [--position <NFT_MINT>]
+```
+Flags: as `dlmm-pro-remove-liquidity`. Reads `lockPosition`: `bps` (share of the unlocked
+liquidity to lock) and `vesting`. `vesting: null` is a **permanent lock — irreversible, the
+liquidity can never be withdrawn** (it keeps earning fees and rewards); confirm with the
+owner twice. A `vesting` object (`cliffPoint`, `cliffUnlockBps`, `bpsPerPeriod`,
+`periodFrequency`, `numberOfPeriod`, with `cliffUnlockBps + bpsPerPeriod × numberOfPeriod =
+10000`) releases the liquidity over time instead; one schedule per position, in slots or
+seconds per the pool's activation type.
+
+### `dlmm-pro-claim-fees`
+```bash
+pnpm studio dlmm-pro-claim-fees --poolAddress <POOL> [--position <NFT_MINT>]
+```
+Flags: `--poolAddress` (required), `--position` (optional — default is every position of
+the wallet on the pool). Claims swap fees, plus every initialized reward on liquidity
+mining pools (claimable fees logged per position first). Fees inside limit orders are NOT
+claimed here — cancel the order to collect those.
+
+### `dlmm-pro-get-positions`
+```bash
+pnpm studio dlmm-pro-get-positions --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). **Read-only.** Prints the pool's mints, price, current
+tick and tick spacing, then per position: NFT mint, each range with its price bounds and
+token amounts, locked/vesting liquidity, unclaimed fees, and rewards as credited at the last
+refresh. Also the way to verify a freshly created pool (it prints the pool, then
+`No positions found`).
+
+### `dlmm-pro-swap`
+```bash
+pnpm studio dlmm-pro-swap --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `dlmmProSwap`: `amountIn` (human units of the INPUT
+token), `slippageBps`, `swapForY` (true = sell token X for Y, false = buy X with Y). Quotes
+first (out, min-out, price before and after logged), then simulates or sends. Stops with
+`Not enough liquidity for this input` when the pool cannot take the whole amount — lower
+`amountIn`.
+
+### `dlmm-pro-place-limit-order`
+```bash
+pnpm studio dlmm-pro-place-limit-order --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Reads `placeLimitOrder`: `side` ("bid" = buy X with Y at
+or below the current price, "ask" = sell X above it), `ticks[]` of `{ price, amount }`
+(amount in human units — Y for bid, X for ask; max 25 ticks). An ask price rounds **up** to
+the next usable tick and a bid **down**, so an order never rests at a worse price than
+asked; the resolved ticks and prices are logged. Any DLMM Pro pool accepts limit orders.
+**Output: the limit order NFT mint is logged — save it for `--limitOrder`.** ~0.012 SOL
+rent, refunded on cancel.
+
+### `dlmm-pro-get-limit-orders`
+```bash
+pnpm studio dlmm-pro-get-limit-orders --poolAddress <POOL>
+```
+Flags: `--poolAddress` (required). Read-only: lists the wallet's orders with, per tick,
+side, deposit and fill state (`not filled` / `partly filled (a of b)` / `filled` /
+`cancelled`).
+
+### `dlmm-pro-cancel-limit-order`
+```bash
+pnpm studio dlmm-pro-cancel-limit-order --poolAddress <POOL> --limitOrder <NFT_MINT>
+pnpm studio dlmm-pro-cancel-limit-order --poolAddress <POOL>    # with cancelLimitOrder.cancelAll: true
+```
+Flags: `--poolAddress` (required), `--limitOrder` (optional, the order's **NFT mint**).
+Cancels every open tick — withdrawing unfilled deposits, filled proceeds and the order's fee
+share — then closes the order and refunds its rent. This is the only way to collect a
+filled order's proceeds.
 
 ## DAMM v2 actions — config file: `studio/config/damm_v2_config.jsonc`
 
@@ -1121,6 +1271,16 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 | `dlmm-swap` | `--poolAddress` | `dlmmSwap` | 0.001 |
 | `dlmm-claim-fees` | `--poolAddress` | — | 0.001 |
 | `dlmm-get-positions` | `--poolAddress` | — (read-only) | 0 |
+| `dlmm-pro-create-pool` | `--baseMint` or `createBaseToken` | `dlmmProConfig` | 0.02 |
+| `dlmm-pro-open-position` | `--poolAddress` | `openPosition` | 0.015-0.05 |
+| `dlmm-pro-remove-liquidity` | `--poolAddress` (`--position` opt.) | `removeLiquidity` | 0.001 |
+| `dlmm-pro-lock-position` | `--poolAddress` (`--position` opt.) | `lockPosition` | 0.001 |
+| `dlmm-pro-claim-fees` | `--poolAddress` (`--position` opt.) | — | 0.001 |
+| `dlmm-pro-get-positions` | `--poolAddress` | — (read-only) | 0 |
+| `dlmm-pro-swap` | `--poolAddress` | `dlmmProSwap` | 0.001 |
+| `dlmm-pro-place-limit-order` | `--poolAddress` | `placeLimitOrder` | 0.012 |
+| `dlmm-pro-get-limit-orders` | `--poolAddress` | — (read-only) | 0 |
+| `dlmm-pro-cancel-limit-order` | `--poolAddress` (`--limitOrder` opt.) | `cancelLimitOrder` | 0.001 |
 | `damm-v2-create-balanced-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` (+ `alphaVault` if enabled) | 0.05 |
 | `damm-v2-create-one-sided-pool` | `--baseMint` or `createBaseToken` | `dammV2Config` (+ `alphaVault` if enabled) | 0.05 |
 | `damm-v2-add-liquidity` | `--poolAddress` | `addLiquidity` | 0.01 |
@@ -1185,6 +1345,7 @@ never the SDK's own `getUserBalance` (throws for a never-staked wallet) or `getU
 
 Min-SOL values are rough rent+fee estimates; the `dryRun` simulation is the authoritative check.
 
-> Not here by design: DLMM add-to-existing-position / rebalance, CP-AMM position
-> management beyond the listed actions, and vault/presale user flows — BUILD-path tasks;
-> see the protocol reference packs and `other-products.md`.
+> Not here by design: DLMM add-to-existing-position / rebalance, DLMM Pro
+> add-to-existing-position / range resizing / fee compounding / reward campaigns, CP-AMM
+> position management beyond the listed actions, and vault/presale user flows — BUILD-path
+> tasks; see the protocol reference packs and `other-products.md`.

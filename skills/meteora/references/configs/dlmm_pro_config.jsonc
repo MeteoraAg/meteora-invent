@@ -1,0 +1,193 @@
+{
+  /* rpcUrl is required. You can switch between mainnet and devnet or use your own RPC URL. */
+  "rpcUrl": "https://api.devnet.solana.com", // mainnet: https://api.mainnet-beta.solana.com | devnet: https://api.devnet.solana.com
+
+  /* dryRun is required. If true, transactions will be simulated and not executed. If false, transactions will be executed. */
+  "dryRun": true, // Set to false only after you understand what will happen
+
+  /* keypairFilePath is required and will be the payer + signer for all transactions */
+  "keypairFilePath": "./keypair.json",
+
+  /* computeUnitPriceMicroLamports is required and can be adjusted to fit your needs */
+  "computeUnitPriceMicroLamports": 100000,
+
+  /* quoteMint is required for the following actions:
+   * 1. dlmm-pro-create-pool
+   * The base token becomes token X of the pool and the quote token becomes token Y.
+   * SOL: So11111111111111111111111111111111111111112 | USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v | any other token address
+   */
+  "quoteMint": "So11111111111111111111111111111111111111112",
+
+  /* If you have a baseMint already created, you can specify it in the cli command via --baseMint flag. If you don't have a baseMint, you can create a new one using createBaseToken.
+   * Either use --baseMint flag or createBaseToken, but not both.
+   */
+  "createBaseToken": {
+    "supply": 1000000000, // total amount of base token to be minted
+    "decimals": 6, // decimals of the base token
+    // "tokenMintKeypairFilePath": "./mint-keypair.json", // path to token mint keypair if you have a specific keypair for the token mint. If not provided, a new keypair will be generated.
+    "name": "YOUR_TOKEN_NAME", // token name
+    "symbol": "YOUR_TOKEN_SYMBOL", // token symbol
+    "authorities": {
+      "mint": "YOUR_MINT_AUTHORITY_ADDRESS", // token mint authority address. <PublicKey | null>
+      "freeze": "YOUR_FREEZE_AUTHORITY_ADDRESS", // token freeze authority address. <PublicKey | null>
+      "update": "YOUR_UPDATE_AUTHORITY_ADDRESS" // token update authority address. <PublicKey | null>
+    },
+    /* Optional Metaplex Token Metadata Properties
+     * Read more about the properties here: https://www.metaplex.com/docs/smart-contracts/token-metadata
+     */
+    "sellerFeeBasisPoints": 0, // Royalty fee in basis points (0-10000)
+    "creators": null, // Array of creator objects of the token (optional)
+    "collection": null, // Collection info (optional)
+    "uses": null, // Usage restrictions (optional)
+    "metadata": {
+      // "uri": "https://gateway.irys.xyz/123456789", // if you already have a metadata URI created, you can specify it here
+
+      /* Only use the following parameters for createBaseToken if you don't have an existing metadata uri
+       * This will create an image uri and a new metadata uri and upload everything to Irys
+       */
+      "image": "./data/image/test-token.jpg", // this can be a URL of the image address (e.g. https://example.com/token-image.png) or the image file path (e.g. ./data/image/test-token.jpg)
+      "description": "YOUR_TOKEN_DESCRIPTION", // token description
+      "website": "https://example.com", // project website
+      "twitter": "https://x.com/yourproject", // twitter URL
+      "telegram": "https://t.me/yourproject" // telegram URL
+    }
+  },
+
+  /* dlmmProConfig is only used in the following actions:
+   * 1. dlmm-pro-create-pool
+   * There are 3 pool types:
+   * - static: the pool takes its tick spacing, fees, fee token and extensions from a published static config. One pool per token pair per config.
+   * - launch: you choose the settings in poolParameters. Needs no config, the wallet must hold some of both tokens, and there is one launch pool per token pair.
+   * - dynamic: you choose the settings in poolParameters. The wallet must be the pool creator authority of a dynamic config issued by Meteora.
+   * Published static configs: https://docs.meteora.ag/developer-guides/dlmm-pro/pool-fee-configs
+   */
+  "dlmmProConfig": {
+    "poolType": "static", // static | launch | dynamic
+    "initialPrice": 1.333, // Initial price (quote tokens per 1 base token). The pool starts on the usable tick at or below this price
+    "configIndex": 60, // static: index of the static config (60 = tick spacing 32, fixed 0.25% base fee, dynamic fee on, fees in the output token) | dynamic: index of the wallet's dynamic config | launch: not used
+
+    /* poolParameters is only used when poolType is launch or dynamic */
+    "poolParameters": {
+      "tickSpacing": 32, // Ticks between usable ticks, from 1 to 256. One tick is a 0.01% price step, so 32 puts range edges and limit orders 0.32% apart
+      "baseFee": {
+        "baseFeeMode": 0, // 0 - Fixed | 1 - Time Scheduler: Linear | 2 - Time Scheduler: Exponential | 3 - Market Cap Scheduler: Linear | 4 - Market Cap Scheduler: Exponential
+        "feeBps": 25 // Only for baseFeeMode 0: trading fee in basis points (25 = 0.25% fee per swap, from 1 to 9900)
+
+        /* Only use the following parameters for baseFeeMode 1 or 2 (the fee falls over time from the activation point) */
+        // "startingBaseFeeBps": 5000, // starting base fee in basis points (5000 = 50%)
+        // "endingBaseFeeBps": 100, // ending base fee in basis points, below startingBaseFeeBps
+        // "numberOfPeriod": 30, // number of reductions until the fee settles
+        // "totalDuration": 1800 // time until the fee settles (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+
+        /* Only use the following parameters for baseFeeMode 3 or 4 (the fee falls as the price rises above the initial price) */
+        // "startingBaseFeeBps": 1000, // starting base fee in basis points (1000 = 10%)
+        // "endingBaseFeeBps": 25, // ending base fee in basis points, below startingBaseFeeBps
+        // "numberOfPeriod": 50, // number of reductions until the fee settles
+        // "priceMultiple": 100, // multiple of the initial price at which the fee settles (100 = 100x)
+        // "schedulerExpirationDuration": 86400 // time after the activation point when the fee settles regardless of price (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+      },
+      "dynamicFee": true, // If true, adds a fee that rises with volatility, up to 20% of the base fee
+      "collectFeeMode": 0, // 0 - OutputToken (fee in the output token of each swap) | 1 - OnlyY (fee always in the quote token, which must be SOL, USDC or a token with a token badge)
+      "activationType": 1, // 0 - Slot | 1 - Timestamp
+      "liquidityMining": false, // If true, the pool has two reward slots for liquidity mining
+      "activation": null // null = swaps, deposits and withdrawals are open as soon as the pool is created
+
+      /* Optional Configuration: activation
+       * Controls when swaps, deposits and withdrawals open. A whitelisted wallet can do its action before the pool opens it to everyone.
+       * - bondingCurveTargetBps only: swaps are open, deposits and withdrawals open once a swap takes the sqrt price to the target. Needs whitelistedAddLiquidity.
+       * - timeBased only: swaps, deposits and withdrawals open at their own points.
+       * - both: swaps open at swapPoint, deposits and withdrawals open once the target is reached.
+       */
+      // "activation": {
+      //   "whitelistedSwap": null, // wallet that can swap before swaps open. <PublicKey | null>
+      //   "whitelistedAddLiquidity": "YOUR_WHITELISTED_ADD_LIQUIDITY_ADDRESS", // wallet that can deposit before deposits open. <PublicKey | null>
+      //   "whitelistedRemoveLiquidity": null, // wallet that can withdraw before withdrawals open. <PublicKey | null>
+      //   "bondingCurveTargetBps": null, // sqrt price target in basis points of the initial sqrt price, above 10000 (20000 = 2x the sqrt price = 4x the price). <number | null>
+      //   "timeBased": {
+      //     "swapPoint": 1893456000, // When swaps open, at most 30 days after pool creation. Fee schedulers start here (Calculate in slots if activationType is 0 (slots) | Calculate in seconds if activationType is 1 (timestamp))
+      //     "addLiquidityPoint": 1893456000, // When deposits open, at most 30 days after pool creation
+      //     "removeLiquidityPoint": 1893456000 // When withdrawals open, at most 30 days after pool creation
+      //   } // <object | null>
+      // }
+    }
+  },
+
+  /* openPosition is only used in the following actions:
+   * 1. dlmm-pro-open-position (requires --poolAddress flag)
+   * Opens a new position, spreads liquidity over the price range in the shape of the strategy, and deposits as much of both amounts as the shape allows at the current price.
+   * A range above the current price takes only token X and a range below it takes only token Y, so the other amount can be 0.
+   * On a new pool, a range that starts at the pool's initialPrice takes only token X.
+   */
+  "openPosition": {
+    "strategy": "spot", // spot = even across the range | curve = concentrated around the current price | bidAsk = weighted to the edges of the range | wave = even near the current price, rising to the edges
+    "minPrice": 1.2, // Lower price of the range (token Y per 1 token X), rounded down to a usable tick
+    "maxPrice": 1.5, // Upper price of the range (token Y per 1 token X), rounded up to a usable tick
+    "amountX": 1000, // Maximum amount of token X to deposit (in token units)
+    "amountY": 1, // Maximum amount of token Y to deposit (in token units)
+    "layout": "horizontal", // vertical = ranges side by side | horizontal = stacked ranges, which usually needs fewer ranges for curve and bidAsk
+    "maxRanges": 10 // Maximum number of ranges of the position (max 45). The shape is coarsened to fit. Fewer ranges cost less rent and compute
+  },
+
+  /* removeLiquidity is only used in the following actions:
+   * 1. dlmm-pro-remove-liquidity (requires --poolAddress flag, optional --position flag)
+   * Withdraws from every range of the position. Locked and unvested liquidity stays in the position.
+   */
+  "removeLiquidity": {
+    "bps": 10000, // Share of the unlocked liquidity to withdraw in basis points (10000 = 100%)
+    "slippageBps": 100, // slippage tolerance in bps (100 = 1%)
+    "closePosition": false // Only with bps 10000. If true, also claims the position's fees and rewards, then closes it and refunds its rent
+  },
+
+  /* lockPosition is only used in the following actions:
+   * 1. dlmm-pro-lock-position (requires --poolAddress flag, optional --position flag)
+   * Locked liquidity keeps earning fees and rewards. A permanent lock can never be withdrawn.
+   */
+  "lockPosition": {
+    "bps": 10000, // Share of the unlocked liquidity to lock in basis points (10000 = 100%)
+    "vesting": null // null = permanent lock
+
+    /* Optional Configuration: vesting
+     * Releases the locked liquidity over time instead of locking it permanently. One vesting schedule per position.
+     * cliffUnlockBps + bpsPerPeriod * numberOfPeriod must equal 10000.
+     */
+    // "vesting": {
+    //   "cliffPoint": null, // When the cliff share unlocks, depending on the pool's activation type (slot or timestamp). null = now. <number | null>
+    //   "cliffUnlockBps": 5000, // Share released at the cliff in basis points
+    //   "bpsPerPeriod": 1000, // Share released each period after the cliff in basis points
+    //   "periodFrequency": 86400, // Length of a period, depending on the pool's activation type (slots or seconds)
+    //   "numberOfPeriod": 5 // Number of periods
+    // }
+  },
+
+  /* placeLimitOrder is only used in the following actions:
+   * 1. dlmm-pro-place-limit-order (requires --poolAddress flag)
+   * A limit order rests on one or more ticks (max 25) and fills as the market price crosses them.
+   * An ask price rounds up to the next usable tick and a bid price rounds down to it.
+   */
+  "placeLimitOrder": {
+    "side": "bid", // "ask" = sell token X above the current price | "bid" = buy token X with token Y at or below the current price
+    "ticks": [
+      {
+        "price": 1.2, // price (token Y per 1 token X) for this portion of the order
+        "amount": 100 // amount in token units: token X amount for "ask" orders, token Y amount for "bid" orders
+      }
+    ]
+  },
+
+  /* cancelLimitOrder is only used in the following actions:
+   * 1. dlmm-pro-cancel-limit-order (requires --poolAddress flag, optional --limitOrder flag)
+   * Cancelling withdraws unfilled deposits, filled proceeds and earned fees, then closes the order and refunds its rent.
+   */
+  "cancelLimitOrder": {
+    "cancelAll": false // when true and no --limitOrder flag is passed, cancels every order on the pool
+  },
+
+  /* dlmmProSwap is only used in the following actions:
+   * 1. dlmm-pro-swap (requires --poolAddress flag)
+   */
+  "dlmmProSwap": {
+    "amountIn": 0.1, // amount of the INPUT token to swap, in human token units (input = X when swapForY is true, Y otherwise)
+    "slippageBps": 100, // slippage tolerance in bps (100 = 1%)
+    "swapForY": true // true = sell token X for token Y | false = buy token X with token Y
+  }
+}

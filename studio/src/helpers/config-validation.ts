@@ -267,6 +267,46 @@ export function validateDlmmConfigFields(config: {
 }
 
 // ─────────────────────────────────────────────
+// DLMM Pro Config
+// ─────────────────────────────────────────────
+
+export function validateDlmmProConfigFields(config: {
+  dlmmProConfig?: {
+    poolParameters?: {
+      activation?: {
+        whitelistedSwap?: string | null;
+        whitelistedAddLiquidity?: string | null;
+        whitelistedRemoveLiquidity?: string | null;
+      } | null;
+    } | null;
+  } | null;
+}): void {
+  const CONFIG_FILE = 'config/dlmm_pro_config.jsonc';
+  const errors: ValidationError[] = [];
+
+  const activation = config.dlmmProConfig?.poolParameters?.activation;
+  if (activation) {
+    const whitelists = {
+      whitelistedSwap: activation.whitelistedSwap,
+      whitelistedAddLiquidity: activation.whitelistedAddLiquidity,
+      whitelistedRemoveLiquidity: activation.whitelistedRemoveLiquidity,
+    };
+    for (const [name, address] of Object.entries(whitelists)) {
+      if (address != null) {
+        const err = validateAddress(
+          `dlmmProConfig.poolParameters.activation.${name}`,
+          address,
+          CONFIG_FILE
+        );
+        if (err) errors.push(err);
+      }
+    }
+  }
+
+  throwIfErrors(errors, 'DLMM Pro Config');
+}
+
+// ─────────────────────────────────────────────
 // Alpha Vault Config
 // ─────────────────────────────────────────────
 
