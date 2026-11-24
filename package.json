@@ -21,11 +21,6 @@
     "studio": "pnpm --filter @meteora-invent/studio",
     "scaffold": "pnpm --filter '@meteora-invent/scaffold-*'",
     "validate-env": "turbo validate-env",
-    "studio:damm-v1": "pnpm --filter @meteora-invent/studio run damm-v1:*",
-    "studio:damm-v2": "pnpm --filter @meteora-invent/studio run damm-v2:*",
-    "studio:dlmm": "pnpm --filter @meteora-invent/studio run dlmm:*",
-    "studio:dbc": "pnpm --filter @meteora-invent/studio run dbc:*",
-    "studio:alpha-vault": "pnpm --filter @meteora-invent/studio run alpha-vault:*",
     "prepare": "husky install",
     "syncpack:check": "syncpack list-mismatches",
     "syncpack:fix": "syncpack fix-mismatches"
