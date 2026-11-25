@@ -1077,8 +1077,8 @@ gate, the SDK returns the **instructions in execution order plus the lookup tabl
 order, into as few v0 transactions as fit, and sets each transaction's compute unit limit from
 a simulation run right before it is sent (units consumed × 1.2), with the config's
 `computeUnitPriceMicroLamports` as the price. Instructions that must share a transaction are
-passed as a group, which is never split. A DAMM v2 zap-in or zap-out normally fits in **one**
-transaction, which makes it atomic.
+passed as a group, which is never split and is sent as a transaction of its own. A DAMM v2
+zap-in or zap-out normally fits in **one** transaction, which makes it atomic.
 
 **What a zap dry run does and does not verify.** It simulates the first transaction only. When
 everything fits in one transaction, that is the whole zap, zap-in instruction included. When
@@ -1188,8 +1188,9 @@ into `outputMint` so the position exits into a single token. The removal and the
 one on-chain transaction — the swap reads a pre/post token-account balance delta to know how much
 the removal actually freed up — so they are passed to `sendOrderedInstructions` as one group,
 which is never split. DLMM's `removeLiquidity` can still return several transactions for wide
-positions; only the last one is grouped with the swap, and the earlier ones go first as their
-own groups. Vested/permanent-locked liquidity is out of scope — only unlocked
+positions; only the last one is grouped with the swap, and each earlier one goes first as a
+transaction of its own, as the DLMM SDK sized it. Vested/permanent-locked liquidity is out of
+scope — only unlocked
 liquidity is removed. If the position is already single-sided in `outputMint`, the swap step is
 skipped automatically. ~0.001-0.002 SOL.
 

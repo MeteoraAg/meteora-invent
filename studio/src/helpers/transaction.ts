@@ -271,15 +271,17 @@ async function buildSizedTransaction(
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(
     connection.commitment
   );
-  const compile = (units: number) =>
+  const compile = (units: number, microLamports: number) =>
     compileV0Transaction(
       payer,
       blockhash,
-      [...computeBudgetInstructions(units, computeUnitPriceMicroLamports), ...instructions],
+      [...computeBudgetInstructions(units, microLamports), ...instructions],
       addressLookupTableAccounts
     );
 
-  const { value } = await connection.simulateTransaction(compile(MAX_COMPUTE_UNIT_LIMIT), {
+  // Simulated at a zero price. A price on the maximum limit would make the fee payer cover a
+  // priority fee several times what the sized transaction pays.
+  const { value } = await connection.simulateTransaction(compile(MAX_COMPUTE_UNIT_LIMIT, 0), {
     sigVerify: false,
     commitment: connection.commitment,
   });
@@ -299,7 +301,11 @@ async function buildSizedTransaction(
   console.log(
     `>>> Simulated successfully, ${value.unitsConsumed} compute units (limit ${unitLimit})`
   );
-  return { tx: compile(unitLimit), blockhash, lastValidBlockHeight };
+  return {
+    tx: compile(unitLimit, computeUnitPriceMicroLamports),
+    blockhash,
+    lastValidBlockHeight,
+  };
 }
 
 /**
@@ -308,16 +314,19 @@ async function buildSizedTransaction(
  * fit. The compute unit limit of each transaction comes from a simulation run right before it
  * is sent, so a later transaction is sized against the state the earlier ones left behind.
  *
- * Instructions given as an array are a group and are never split across transactions. Any
- * other split keeps the order and is valid for the zap SDK, but it gives up atomicity: a live
- * send aborts on the first failure and the thrown error says what already landed, following
- * `retry`'s guidance without ever printing a secret key.
+ * Instructions given as an array are a group: a transaction its SDK already sized. A group is
+ * never split and never shares a transaction with anything else, because packing by size alone
+ * can put more work in a transaction than the compute limit allows. Any other split keeps the
+ * order and is valid for the zap SDK, but it gives up atomicity: a live send aborts on the
+ * first failure and the thrown error says what already landed, following `retry`'s guidance
+ * without ever printing a secret key.
  *
  * A dry run simulates only the first transaction. Later ones read accounts the earlier ones
  * create, so simulating them against unchanged chain state would report false failures; they
  * are listed as deferred instead and only a live send verifies them.
  * @param connection - The connection to the cluster
  * @param instructions - The instructions in execution order; an array entry is a group
+ *   sent as its own transaction
  * @param addressLookupTableAccounts - The lookup tables the instructions use
  * @param payer - The fee payer and default signer
  * @param extraSigners - Further keypairs, used only by the transactions that require them
@@ -337,32 +346,44 @@ export async function sendOrderedInstructions(
 ): Promise<void> {
   // The compute unit limit and price are set here; an instruction that sets them again would
   // make the transaction fail as a duplicate.
-  const groups = instructions
-    .map((item) => (Array.isArray(item) ? item : [item]))
-    .map((group) => group.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId)))
-    .filter((group) => group.length > 0);
+  const units = instructions
+    .map((item) => ({
+      isGroup: Array.isArray(item),
+      instructions: (Array.isArray(item) ? item : [item]).filter(
+        (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
+      ),
+    }))
+    .filter((unit) => unit.instructions.length > 0);
 
-  if (groups.length === 0) {
+  if (units.length === 0) {
     console.log('> No instructions to send — nothing to do.');
     return;
   }
 
   const batches: TransactionInstruction[][] = [];
-  for (const group of groups) {
-    const current = batches[batches.length - 1];
+  let lastBatchIsOpen = false;
+  for (const unit of units) {
+    const open = lastBatchIsOpen ? batches[batches.length - 1] : undefined;
     if (
-      current &&
-      fitsInTransaction(payer.publicKey, [...current, ...group], addressLookupTableAccounts)
+      open &&
+      !unit.isGroup &&
+      fitsInTransaction(
+        payer.publicKey,
+        [...open, ...unit.instructions],
+        addressLookupTableAccounts
+      )
     ) {
-      current.push(...group);
-    } else if (fitsInTransaction(payer.publicKey, group, addressLookupTableAccounts)) {
-      batches.push([...group]);
-    } else {
+      open.push(...unit.instructions);
+      continue;
+    }
+    if (!fitsInTransaction(payer.publicKey, unit.instructions, addressLookupTableAccounts)) {
       throw new Error(
-        `${group.length} instruction(s) that must share a transaction do not fit in one ` +
+        `${unit.instructions.length} instruction(s) that must share a transaction do not fit in one ` +
           '(or could not be compiled). Nothing was sent.'
       );
     }
+    batches.push([...unit.instructions]);
+    lastBatchIsOpen = !unit.isGroup;
   }
 
   const labels = batches.map((batch) => `${batch.length} instruction(s)`);
