@@ -20,7 +20,7 @@ This skill covers **doing actions on-chain** and **writing code against the SDKs
 | **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@2.0.0` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
 | **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.5.1` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
 | **DLMM** | Bin-based concentrated liquidity, dynamic fees, limit orders | Active LP strategies, capital efficiency, limit orders | `@meteora-ag/dlmm@1.9.14` | `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo` |
-| **DLMM Pro** (beta) | Tick-based concentrated liquidity; multi-range NFT positions, limit orders, scheduled + dynamic fees, activation rules, permanent/vesting locks | Tick-level price control, limit orders beside LP liquidity, timed or price-gated launches, locked liquidity | `@meteora-ag/dlmm-pro-sdk@0.1.3` | `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` |
+| **DLMM Pro** (beta) | Tick-based concentrated liquidity; multi-range NFT positions, limit orders, scheduled + dynamic fees, activation rules, permanent/vesting locks | Tick-level price control, limit orders beside LP liquidity, timed or price-gated launches, locked liquidity | `@meteora-ag/dlmm-pro-sdk@0.1.4` | `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` |
 | **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@2.0.0` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | `@meteora-ag/alpha-vault@1.1.16` | `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | `@meteora-ag/presale@0.1.1` | `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` |
@@ -66,7 +66,7 @@ studio action.
 | List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `dlmm-pro-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
 | Claim DLMM or DLMM Pro fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` / `pnpm studio dlmm-pro-claim-fees --poolAddress <POOL>` |
 | DLMM add/remove/rebalance an existing position | BUILD | Read `references/dlmm.md`, write against `@meteora-ag/dlmm@1.9.14` |
-| DLMM Pro: add to an existing position, resize ranges, compound fees, delegates, reward campaigns | BUILD | Read `references/dlmm-pro.md`, write against `@meteora-ag/dlmm-pro-sdk@0.1.3` |
+| DLMM Pro: add to an existing position, resize ranges, compound fees, delegates, reward campaigns | BUILD | Read `references/dlmm-pro.md`, write against `@meteora-ag/dlmm-pro-sdk@0.1.4` |
 | Trading bot, backend, integration | BUILD | Read the protocol reference pack, then code against the pinned SDK |
 | Launchpad / token UI | BUILD | `references/scaffolds.md` (fun-launch or custom via `references/dbc.md`) |
 | Aggregated multi-DEX swap routing, DCA across venues | **Defer** | Jupiter APIs — not this skill |

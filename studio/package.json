@@ -119,7 +119,7 @@
     "@meteora-ag/alpha-vault": "^1.1.16",
     "@meteora-ag/cp-amm-sdk": "^1.5.1",
     "@meteora-ag/dlmm": "^1.9.14",
-    "@meteora-ag/dlmm-pro-sdk": "^0.1.3",
+    "@meteora-ag/dlmm-pro-sdk": "^0.1.4",
     "@meteora-ag/dynamic-amm-sdk": "^2.0.0",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^2.0.0",
     "@meteora-ag/dynamic-fee-sharing-sdk": "^1.1.0",

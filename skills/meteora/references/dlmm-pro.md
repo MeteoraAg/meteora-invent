@@ -1,13 +1,13 @@
 # DLMM Pro — Tick-Based Concentrated Liquidity
 
-> **Source of truth:** `@meteora-ag/dlmm-pro-sdk@0.1.3` (github.com/MeteoraAg/dlmm-pro-sdk,
-> per-function reference in `docs.md`) — as of 2026-11-15. DLMM Pro is in beta: read the
+> **Source of truth:** `@meteora-ag/dlmm-pro-sdk@0.1.4` (github.com/MeteoraAg/dlmm-pro-sdk,
+> per-function reference in `docs.md`) — as of 2026-11-25. DLMM Pro is in beta: read the
 > SDK `CHANGELOG.md` before trusting a snippet against a newer version.
 > Program ID (mainnet **and** devnet): `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n`
 > Access registry (token badges): `regUFehW9oycnaV2auYyfqyYjKG1W1uLNT7rtUeemQr`
 > Deps: web3.js v1 (^1.98), Anchor 0.32, `bn.js`, `decimal.js`, `@solana/spl-token` 0.4.
-> TypeScript: set `moduleResolution` to `Bundler` (or `Node`). Under `Node16`/`NodeNext` the
-> package's enums and types (`BaseFeeMode`, `StrategyType`, `Pool`, ...) fail to resolve.
+> TypeScript: the types resolve under `Bundler`, `Node16` and `NodeNext`, from ES modules and
+> CommonJS (0.1.4+; earlier versions lose the enums and types under `Node16`/`NodeNext`).
 > **DLMM Pro is a separate program from DLMM — bins, `@meteora-ag/dlmm` and DLMM pool
 > addresses do not apply here.**
 
@@ -320,8 +320,8 @@ const launched = await client.pool.initializeLaunchPool({
 - Errors: builders throw `PoolError` with a `code` from `PoolErrorCode`, which uses the
   program's numbering — `PoolErrorCode[6020]` is `"NotConsumingFullAmountIn"` for a failed
   transaction's `{ Custom: 6020 }`.
-- `tickUiPrice` loses precision at very low prices (ticks below about -200,000). For display
-  there, compute `1.0001^tick × 10^(decimalsX − decimalsY)` with `decimal.js` instead.
+- `tickPrice` / `tickUiPrice` keep full precision at every tick from 0.1.4. In 0.1.3 and
+  earlier they lost precision below about tick -200,000.
 - Amounts are `BN` base units everywhere; `emissionPerSecond` for rewards is Q64.64.
 - Operator and admin instructions are not wrapped; build them with
   `client.program.methods.<instruction>(...)`.
