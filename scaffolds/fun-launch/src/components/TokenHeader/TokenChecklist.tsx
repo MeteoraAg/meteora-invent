@@ -10,6 +10,7 @@ import { getAuditScore } from '../Explore/pool-utils';
 import { cn } from '@/lib/utils';
 import { HoverPopover, HoverPopoverContent, HoverPopoverTrigger } from '../ui/HoverPopover';
 import { formatReadablePercentChange } from '@/lib/format/number';
+import { useQuery } from '@tanstack/react-query';
 
 type ChecklistProps = {
   className?: string;
@@ -24,6 +25,7 @@ export const Checklist: React.FC<ChecklistProps> = ({ className }) => {
       <div className="flex flex-col gap-2">
         <ChecklistAuthority />
         <ChecklistTopHolders />
+        <ChecklistGraduationLp />
       </div>
     </div>
   );
@@ -111,6 +113,57 @@ const ChecklistTopHolders: React.FC = () => {
           audit?.topHoldersPercentage === undefined ? undefined : audit?.topHoldersPercentage / 100,
           { hideSign: 'positive' }
         )}
+      </div>
+    </div>
+  );
+};
+
+type GraduationLp = { lockedPct: number; vestingPct: number; withdrawablePct: number };
+
+// Share of the liquidity that stays locked in the DAMM pool after graduation, from the DBC pool's config. LP that is
+// not permanently locked can be withdrawn by the partner or creator after graduation (or as it vests).
+const ChecklistGraduationLp: React.FC = () => {
+  const { data: poolId } = useTokenInfo((data) =>
+    data?.dex === 'met-dbc' ? data.id : data?.baseAsset.firstPool?.id
+  );
+  const { data: lp } = useQuery({
+    queryKey: ['graduation-lp', poolId],
+    queryFn: async (): Promise<GraduationLp | null> => {
+      const res = await fetch(`/api/graduation-lp?pool=${poolId}`);
+      return res.ok ? res.json() : null;
+    },
+    enabled: !!poolId,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  if (!lp) {
+    return null;
+  }
+
+  return (
+    <div className="flex justify-between gap-1">
+      <HoverPopover root={true}>
+        <HoverPopoverTrigger>
+          <div className="truncate text-sm text-neutral-500 underline decoration-neutral-700 decoration-dashed underline-offset-4 group-hover:decoration-neutral-200">
+            Graduation LP
+          </div>
+        </HoverPopoverTrigger>
+        <HoverPopoverContent>
+          <AuditTooltipInfo
+            approved={lp.lockedPct === 100}
+            label={`${lp.lockedPct}% permanently locked`}
+            description={`Set by the pool config. ${lp.withdrawablePct}% of the DAMM liquidity goes to the partner and creator as positions they can withdraw after graduation${lp.vestingPct ? `, and ${lp.vestingPct}% as it vests` : ''}.`}
+          />
+        </HoverPopoverContent>
+      </HoverPopover>
+
+      <div
+        className={cn(
+          'inline-flex items-center text-sm',
+          lp.lockedPct === 100 ? 'text-emerald' : 'text-rose'
+        )}
+      >
+        {lp.lockedPct}% locked
       </div>
     </div>
   );
