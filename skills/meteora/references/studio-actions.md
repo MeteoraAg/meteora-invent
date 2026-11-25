@@ -257,7 +257,8 @@ any `dlmm-pro-*` action:
 - Steps that must land together (open + deposit, remove + claim + close, cancel + close)
   go out as **one atomic transaction when they fit**, so a dry run covers all of them. When
   they do not fit they are sent one after another, and a dry run skips the steps that depend
-  on an earlier one and says so.
+  on an earlier one and says so. If a later one fails in a live run, the error lists the ones
+  that already landed.
 
 ### `dlmm-pro-create-pool`
 ```bash

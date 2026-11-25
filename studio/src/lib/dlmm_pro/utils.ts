@@ -47,6 +47,10 @@ const PRICE_DIGITS = 10;
 
 const MAX_COMPUTE_UNITS = 1_400_000;
 const COMPUTE_UNIT_HEADROOM = 1.2;
+const SIGNATURE_SIZE = 64;
+const PUBLIC_KEY_SIZE = 32;
+const BLOCKHASH_SIZE = 32;
+const MESSAGE_HEADER_SIZE = 3;
 const MAX_ACCOUNTS_PER_REQUEST = 100;
 
 // What converts between a price in whole tokens and the pool's ticks.
@@ -375,13 +379,38 @@ function withComputeBudget(tx: Transaction, units: number, microLamports: number
   return budgeted;
 }
 
+/** Bytes of the compact-u16 that prefixes an array of `length` items. */
+function compactLengthSize(length: number): number {
+  if (length < 0x80) return 1;
+  return length < 0x4000 ? 2 : 3;
+}
+
+/**
+ * Size of the signed transaction on the wire. Counted from the compiled message, because
+ * `Message.serialize()` throws once the instructions outgrow a packet instead of reporting a
+ * size over the limit.
+ */
 function transactionSize(tx: Transaction, microLamports: number): number {
   const probe = withComputeBudget(tx, MAX_COMPUTE_UNITS, microLamports);
   // The size does not depend on the blockhash, so any 32 bytes stand in for it.
   probe.recentBlockhash = PublicKey.default.toString();
   const message = probe.compileMessage();
-  const signaturesSize = 1 + message.header.numRequiredSignatures * 64;
-  return signaturesSize + message.serialize().length;
+
+  const signatureCount = message.header.numRequiredSignatures;
+  const signatures = compactLengthSize(signatureCount) + signatureCount * SIGNATURE_SIZE;
+  const accountKeys =
+    compactLengthSize(message.accountKeys.length) + message.accountKeys.length * PUBLIC_KEY_SIZE;
+  const instructions = message.compiledInstructions.reduce(
+    (size, instruction) =>
+      size +
+      1 + // program id index
+      compactLengthSize(instruction.accountKeyIndexes.length) +
+      instruction.accountKeyIndexes.length +
+      compactLengthSize(instruction.data.length) +
+      instruction.data.length,
+    compactLengthSize(message.compiledInstructions.length)
+  );
+  return signatures + MESSAGE_HEADER_SIZE + accountKeys + BLOCKHASH_SIZE + instructions;
 }
 
 function assertFitsInOneTransaction(tx: Transaction, microLamports: number, label: string): void {
@@ -431,7 +460,9 @@ export async function executeTransaction(
   assertFitsInOneTransaction(tx, microLamports, label);
 
   console.log(`\n> Simulating ${label} tx...`);
-  const simulated = withComputeBudget(tx, MAX_COMPUTE_UNITS, microLamports);
+  // Simulated at a zero price. A price on the maximum limit would make the fee payer cover a
+  // priority fee several times what the sized transaction pays.
+  const simulated = withComputeBudget(tx, MAX_COMPUTE_UNITS, 0);
   const { value: simulation } = await connection.simulateTransaction(simulated, signers);
   if (simulation.err) {
     if (simulation.logs?.length) {
@@ -487,6 +518,7 @@ export async function executeSteps(
   for (const step of steps) {
     assertFitsInOneTransaction(step.tx, microLamports, step.label);
   }
+  const sent: string[] = [];
   for (const step of steps) {
     if (config.dryRun && step.dependsOnPriorStep) {
       console.log(
@@ -494,6 +526,19 @@ export async function executeSteps(
       );
       continue;
     }
-    await executeTransaction(connection, config, step.tx, step.signers, step.label);
+    try {
+      await executeTransaction(connection, config, step.tx, step.signers, step.label);
+    } catch (error) {
+      if (sent.length === 0) {
+        throw error;
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `${reason}\nThe earlier transactions already landed (${sent.join(', ')}). Check the position or order on-chain before running this action again.`
+      );
+    }
+    if (!config.dryRun) {
+      sent.push(step.label);
+    }
   }
 }
