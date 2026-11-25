@@ -78,6 +78,7 @@ pnpm studio generate-keypair --network localnet --airdrop
 4. Configure the config files in the `studio/config` directory.
 
 - Configure [DLMM](./studio/config/dlmm_config.jsonc)
+- Configure [DLMM Pro](./studio/config/dlmm_pro_config.jsonc)
 - Configure [DAMM v2](./studio/config/damm_v2_config.jsonc)
 - Configure [DAMM v1](./studio/config/damm_v1_config.jsonc)
 - Configure [DBC](./studio/config/dbc_config.jsonc)
@@ -189,6 +190,140 @@ proceeds, and earned fees, then closes the order account and refunds its rent.
 
 ```bash
 pnpm studio dlmm-cancel-limit-order --poolAddress <YOUR_POOL_ADDRESS> --limitOrder <YOUR_LIMIT_ORDER_ADDRESS>
+```
+
+---
+
+#### DLMM Pro Actions
+
+DLMM Pro is in beta. Its actions run on devnet and mainnet; the local test validator does not load
+the DLMM Pro program. Pools created here use the base token as token X and the quote token as token
+Y, and every price in `dlmm_pro_config.jsonc` is in token Y per 1 token X. Positions and limit
+orders are NFTs, and the actions print and accept their NFT mint.
+
+##### Create a DLMM Pro Pool
+
+Configure `dlmmProConfig` in `dlmm_pro_config.jsonc` file and run the following command to create
+the DLMM Pro pool. `poolType` selects how the pool is created:
+
+- `static` takes the tick spacing, fees, fee token and extensions from a published static config
+  (`configIndex`).
+- `launch` takes them from `poolParameters`. It needs no config, the wallet must hold some of both
+  tokens, and each token pair has one launch pool.
+- `dynamic` takes them from `poolParameters`. The wallet must be the pool creator authority of a
+  dynamic config issued by Meteora (`configIndex`).
+
+_If you don't have a base mint, you can configure `createBaseToken` in the config file and run the
+following command._
+
+```bash
+pnpm studio dlmm-pro-create-pool
+```
+
+_If you already have a base mint created, you can provide it via the CLI with a `--baseMint` flag
+and run the following command._
+
+```bash
+pnpm studio dlmm-pro-create-pool --baseMint <YOUR_BASE_MINT_ADDRESS>
+```
+
+**Note:** The pool starts on the usable tick at or below `initialPrice`. The command prints the
+price the pool starts at.
+
+##### Open a DLMM Pro Position
+
+Configure `openPosition` in `dlmm_pro_config.jsonc` file and run the following command to open a new
+position and deposit into it. The liquidity is spread over the price range in the shape of the
+`strategy` (`spot`, `curve`, `bidAsk` or `wave`).
+
+**Note:** To seed a new pool with the base token only, set `minPrice` to the pool's `initialPrice`
+and `amountY` to `0`.
+
+```bash
+pnpm studio dlmm-pro-open-position --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Remove DLMM Pro Liquidity
+
+Configure `removeLiquidity` in `dlmm_pro_config.jsonc` file and run the following command to withdraw
+a share of the unlocked liquidity of a position. With `closePosition` set to `true`, the command
+also claims the position's fees and rewards, then closes it and refunds its rent.
+
+**Note:** The `--position` flag is only needed when your wallet has more than one position on the
+pool.
+
+```bash
+pnpm studio dlmm-pro-remove-liquidity --poolAddress <YOUR_POOL_ADDRESS> --position <YOUR_POSITION_NFT_MINT>
+```
+
+##### Lock a DLMM Pro Position
+
+Configure `lockPosition` in `dlmm_pro_config.jsonc` file and run the following command to lock a
+share of the unlocked liquidity of a position, either permanently or on a vesting schedule. Locked
+liquidity keeps earning fees and rewards.
+
+**Note:** A permanent lock cannot be undone. The locked liquidity can never be withdrawn.
+
+```bash
+pnpm studio dlmm-pro-lock-position --poolAddress <YOUR_POOL_ADDRESS> --position <YOUR_POSITION_NFT_MINT>
+```
+
+##### Claim DLMM Pro Fees
+
+Run the following command to claim the swap fees of your positions on the DLMM Pro pool, and the
+rewards on pools with liquidity mining. Omit the `--position` flag to claim for every position.
+
+```bash
+pnpm studio dlmm-pro-claim-fees --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Get DLMM Pro Positions
+
+Run the following command to print the pool's price and your positions on it, with the price range
+and token amounts of each range, locked liquidity and unclaimed fees.
+
+```bash
+pnpm studio dlmm-pro-get-positions --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Swap on a DLMM Pro Pool
+
+Configure `dlmmProSwap` in `dlmm_pro_config.jsonc` file and run the following command to quote and
+swap on the DLMM Pro pool.
+
+```bash
+pnpm studio dlmm-pro-swap --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Place a DLMM Pro Limit Order
+
+Configure `placeLimitOrder` in `dlmm_pro_config.jsonc` file and run the following command to place a
+limit order on the DLMM Pro pool. The order rests on one or more ticks (max 25) and fills as the
+market price crosses them. Every DLMM Pro pool accepts limit orders.
+
+```bash
+pnpm studio dlmm-pro-place-limit-order --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Get DLMM Pro Limit Orders
+
+Run the following command to list the limit orders owned by your wallet on the DLMM Pro pool, with
+the fill state of each tick.
+
+```bash
+pnpm studio dlmm-pro-get-limit-orders --poolAddress <YOUR_POOL_ADDRESS>
+```
+
+##### Cancel a DLMM Pro Limit Order
+
+Run the following command to cancel a limit order. Cancelling withdraws unfilled deposits, filled
+proceeds, and earned fees, then closes the order and refunds its rent.
+
+**Note:** Omit the `--limitOrder` flag and set `cancelLimitOrder.cancelAll` to `true` in
+`dlmm_pro_config.jsonc` to cancel every order on the pool.
+
+```bash
+pnpm studio dlmm-pro-cancel-limit-order --poolAddress <YOUR_POOL_ADDRESS> --limitOrder <YOUR_LIMIT_ORDER_NFT_MINT>
 ```
 
 ---
@@ -392,7 +527,9 @@ pnpm studio dbc-claim-trading-fee --baseMint <YOUR_BASE_MINT_ADDRESS>
 
 If you already have an existing DBC pool, with `poolState.quoteReserve` >
 `poolConfig.migrationQuoteThreshold` (100% bonding curve progress), you can run the following
-command with the `--baseMint` flag to migrate the DBC pool to DAMM v1.
+command with the `--baseMint` flag to migrate the DBC pool to DAMM v1. New DBC configs can only
+migrate to DAMM v2, so this applies to pools whose config was created with `migrationOption: 0`
+before that.
 
 ```bash
 pnpm studio dbc-migrate-to-damm-v1 --baseMint <YOUR_BASE_MINT_ADDRESS>
@@ -493,7 +630,7 @@ pnpm --filter @meteora-invent/scaffold/fun-launch build
 teaches AI agents (Claude Code, OpenClaw, Hermes, Cursor, and any Agent-Skills-compatible
 runtime) how to run every studio action safely — devnet-first, dry-run-first, with explicit
 owner confirmation gates — and how to write correct TypeScript against the Meteora SDKs
-(version-pinned reference packs for DBC, DAMM v1/v2, and DLMM, plus runnable one-shot
+(version-pinned reference packs for DBC, DAMM v1/v2, DLMM, and DLMM Pro, plus runnable one-shot
 scripts for swaps, quotes, positions, and fee claims).
 
 **Install:**
@@ -535,6 +672,7 @@ meteora-invent/
     │   ├── damm_v2_config.jsonc
     │   ├── dbc_config.jsonc
     │   ├── dlmm_config.jsonc
+    │   ├── dlmm_pro_config.jsonc
     │   ├── dynamic_vault_config.jsonc
     │   ├── farming_config.jsonc
     │   ├── fee_sharing_config.jsonc
@@ -590,6 +728,17 @@ meteora-invent/
     │   │   │   ├── seed_liquidity_lfg.ts
     │   │   │   ├── seed_liquidity_single_bin.ts
     │   │   │   └── set_pool_status.ts
+    │   │   ├── dlmm_pro
+    │   │   │   ├── cancel_limit_order.ts
+    │   │   │   ├── claim_fees.ts
+    │   │   │   ├── create_pool.ts
+    │   │   │   ├── get_limit_orders.ts
+    │   │   │   ├── get_positions.ts
+    │   │   │   ├── lock_position.ts
+    │   │   │   ├── open_position.ts
+    │   │   │   ├── place_limit_order.ts
+    │   │   │   ├── remove_liquidity.ts
+    │   │   │   └── swap.ts
     │   │   ├── dynamic_vault
     │   │   │   ├── deposit.ts
     │   │   │   ├── get_status.ts
@@ -654,8 +803,13 @@ meteora-invent/
     │   │   │   └── index.ts
     │   │   ├── dbc
     │   │   │   └── index.ts
-    │   │   └── dlmm
-    │   │       └── index.ts
+    │   │   ├── dlmm
+    │   │   │   └── index.ts
+    │   │   └── dlmm_pro
+    │   │       ├── index.ts
+    │   │       ├── status.ts
+    │   │       ├── trading.ts
+    │   │       └── utils.ts
     │   ├── tests
     │   │   ├── artifacts
     │   │   │   ├── accounts

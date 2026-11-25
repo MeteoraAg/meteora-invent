@@ -4,7 +4,7 @@
 > studio (as of 2026-08-03). Creation flows for alpha/presale
 > vaults are ACT-path (`studio-actions.md`); this file covers the SDK surface — above all
 > the **read/verify calls** the studio doesn't expose. All are web3.js v1.
-> ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · the rest 0.31) —
+> ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · zap-sdk `@anchor-lang/core` 1.x · the others in this file 0.31) —
 > never pass `Program`/`BN` objects across these SDK boundaries.
 
 ## Alpha Vault — `@meteora-ag/alpha-vault@1.1.16`
@@ -119,35 +119,42 @@ every fee vault on the program as `{ publicKey, account }[]`, with `account.pool
 farms sit on DAMM v1 memecoin pools (`is_meme: true` in `damm-api.meteora.ag` pool search
 results — see `data-and-apis.md`).
 
-## Zap — `@meteora-ag/zap-sdk@1.3.2`
+## Zap — `@meteora-ag/zap-sdk@2.0.0`
 
 Program `zapvX9M3uf5pvy4wRPAbQgdQsM1xmuiFnkfHKPvwMiz`. Single-token in/out of DAMM v2 and DLMM
-positions. `new Zap(connection, { jupiterApiUrl?, jupiterApiKey? })` — one config object (the
-README's 3-arg example is stale); both fields are optional — the SDK defaults to Jupiter's own
-keyless endpoint (`https://api.jup.ag`) at a shared, low rate limit, an API key
-(`https://developers.jup.ag/portal`) only raises it. Two-phase: `getZapInDammV2DirectPoolParams(...)`
+positions. `new Zap(connection, { jupiterApiUrl?, jupiterApiKey?, jupiterApiVersion? })` — one
+config object (the README's 3-arg example is stale); all fields are optional — the SDK defaults to
+Jupiter's own keyless endpoint (`https://api.jup.ag`, keyless requests are capped at 0.5 RPS), an
+API key (`https://developers.jup.ag/portal`) only raises it, and to Jupiter API v2
+(`JupiterApiVersion.V2`; V1 is deprecated). Two-phase: `getZapInDammV2DirectPoolParams(...)`
 → `buildZapInDammV2Transaction(...)`; same for DLMM (`...Dlmm...`); `zapOut*` variants; also
 `rebalanceDlmmPosition(params)`. DLMM zap-in's own `estimateDlmmDirectSwap` unconditionally
 calls Jupiter's quote API to price its rebalancing swap — DAMM v2's direct route never touches
-Jupiter (see `studio-actions.md`'s Zap section). Build results are
-**multi-transaction bundles** (`setupTransaction`, `swapTransactions[]`, `zapInTransaction`,
-`cleanUpTransaction`) — send in order.
+Jupiter (see `studio-actions.md`'s Zap section). The build methods and every `zapOut*` return a
+`ZapInstructionsResponse`: `instructions` in execution order plus the `addressLookupTableAccounts`
+they use, not transactions. They carry **no compute budget instructions** — set the limit
+yourself (simulate, add headroom) and the price. Compile a v0 message with the lookup tables;
+the instructions may be split across transactions at any point, in order, but splitting loses
+atomicity, so a later transaction can fail after earlier ones landed.
 
-Two gotchas found by testing zap-in on localnet, both worth knowing before you build on this
-SDK. First, keep `zapInTransaction` **alone in its own transaction** — that separate response
-field is a requirement, not a size convenience. The zap program swaps by CPI into cp-amm, and
-merging that instruction with others trips cp-amm's single-swap validation. Second, **a
-Rate-Limiter-fee-mode DAMM v2 pool cannot be zapped into at all**: it fails on-chain with
-cp-amm error 6049 (`FailToValidateSingleSwapInstruction`) even when the zap-in instruction is
-completely alone. Since a fresh pool created from `damm_v2_config.jsonc`'s defaults uses that
-fee mode, check the pool's base-fee mode before you attempt a zap — decode it from the pool
-state with cp-amm's `getBaseFeeHandlerFromBorshData` (the mode is Borsh-packed inside
+Jupiter parameters moved: `maxAccounts` and other query options go in `jupiterQuoteOptions`
+(estimators, `getJupAndDammV2Quotes`) or `queryParams` (`getJupiterQuote`, which takes one object),
+not in the zap-in param types. Estimators and quote helpers require `user`, the wallet the swap is
+built for.
+
+Gotcha found by testing zap-in on localnet: **a Rate-Limiter-fee-mode DAMM v2 pool cannot be
+zapped into at all**. The zap program swaps by CPI into cp-amm, and the rate limiter rejects that
+with cp-amm error 6049 (`FailToValidateSingleSwapInstruction`) however the instructions are
+arranged, even with the zap-in instruction alone in its own transaction. New pools can no longer
+use that fee mode, but existing ones remain, so check the pool's base-fee mode before you
+attempt a zap — decode it from the pool state with cp-amm's
+`getBaseFeeHandlerFromPodAlignedData` (the mode is POD-packed inside
 `poolFees.baseFee.baseFeeInfo.data`, not a plain field) and compare against `FeeRateLimiter`.
 
 Studio actions: `zap-in-damm-v2` (direct), `zap-in-dlmm` (Jupiter-quoted), `zap-out` (direct) —
 see `studio-actions.md`.
 
-## Dynamic Vault — `@meteora-ag/vault-sdk@2.3.1`
+## Dynamic Vault — `@meteora-ag/vault-sdk@2.4.0`
 
 Program `24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi`. The yield layer under DAMM v1 pool
 reserves. **Anchor 0.28, oldest stack.** `VaultImpl.create(connection, tokenMint)` (keys off
@@ -157,7 +164,10 @@ DAMM v1's `AmmImpl` already exposes these per-pool as `pool.vaultA` / `pool.vaul
 `withdraw`'s second parameter is misleadingly named `baseTokenAmount` in the `.d.ts` — verified
 against the compiled source + vault program IDL, it actually burns **vault LP tokens**
 (`unmintAmount`), not base-mint units; convert with the exported `getAmountByShare` /
-`getUnmintAmount` helpers.
+`getUnmintAmount` helpers. Since 2.4.0 (vault program 0.9.5) version 1 vaults price shares with
+the vault's `totalLpSupply`, not the LP mint supply: take the supply from `getVaultSupply()` or
+`getVaultLpSupply(vault, lpMintSupply)`, never from `lpMint.supply` directly. `collectDust` and
+`withdraw2` are gone from the IDL.
 
 Studio actions: `vault-*` — see `studio-actions.md`.
 

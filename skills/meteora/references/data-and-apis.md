@@ -57,7 +57,8 @@ curl -s "https://damm-api.meteora.ag/pools/search?q=USDC&page=0&size=5" \
 Each base URL serves a Swagger UI with the full schemas — fetch it when a param is unknown
 rather than guessing. Notes: REST data is indexed (may lag a few seconds); don't use it for
 pre-trade exactness. No dedicated DBC REST API is published — use the DBC SDK `state`
-service. There is also still no REST read for alpha vault state, but the SDK is now covered
+service. No DLMM Pro REST API is covered here either — use the SDK `state` service or the
+`dlmm-pro-get-positions` / `dlmm-pro-get-limit-orders` actions. There is also still no REST read for alpha vault state, but the SDK is now covered
 by this skill and has an ACT-path verification call: `pnpm studio alpha-vault-get-status
 --vault <VAULT>` (or `--poolAddress <POOL>`) — see `other-products.md` for the underlying
 SDK surface.
@@ -74,6 +75,10 @@ SDK surface.
 | DLMM pool state | `DLMM.create(connection, pool)` → `getActiveBin()`, `getFeeInfo()`, `getDynamicFee()` |
 | DLMM user positions | ACT: `pnpm studio dlmm-get-positions --poolAddress <POOL>` · SDK: `dlmm.getPositionsByUserAndLbPair(user)` · `DLMM.getAllLbPairPositionsByUser(connection, user)` (all pools — heavy) · `DLMM.getPositionsByUserAndTokenAddress(connection, user, mint)` |
 | DLMM limit orders | `dlmm.getLimitOrderByUserAndLbPair(user)` · `DLMM.getLimitOrdersByUserAndTokenAddress(...)` |
+| DLMM Pro pool state | `client.state.fetchPool(pool)` (price, tick, fees, status) · `fetchPoolWithExtensions(pool)` (+ rewards, activation rules) |
+| DLMM Pro user positions | ACT: `pnpm studio dlmm-pro-get-positions --poolAddress <POOL>` · SDK: no index by owner — list the wallet's Token 2022 NFT mints, then `fetchPositionArrayWithPositions(derivePosition(nftMint), { withReward })` (recipe in `dlmm-pro.md`) |
+| DLMM Pro fees owed | `client.position.getClaimableFees({ pool, nftMint })` |
+| DLMM Pro limit orders | ACT: `pnpm studio dlmm-pro-get-limit-orders --poolAddress <POOL>` · SDK: `client.state.decodeLimitOrderData(deriveLimitOrder(nftMint))` |
 | DAMM v1 pool | `AmmImpl.create(connection, pool)` → `updateState()` → `poolInfo` |
 | DAMM v1 pools by token | `AmmImpl.searchPoolsByToken(connection, mint)` |
 | DAMM v1 lock escrow / fees | `pool.getUserLockEscrow(owner)` |

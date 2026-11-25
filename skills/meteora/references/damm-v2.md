@@ -1,7 +1,7 @@
 # DAMM v2 — Constant-Product AMM (CP-AMM)
 
-> **Source of truth:** `@meteora-ag/cp-amm-sdk@1.4.5` (github.com/MeteoraAg/damm-v2-sdk) —
-> as of 2026-08-01.
+> **Source of truth:** `@meteora-ag/cp-amm-sdk@1.5.1` (github.com/MeteoraAg/damm-v2-sdk) —
+> as of 2026-11-15.
 > Program ID (mainnet **and** devnet): `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG`
 > Deps: web3.js v1 (^1.95), Anchor 0.31, `bn.js`, `decimal.js`. Full per-function reference:
 > `docs.md` in the SDK repo (~4,350 lines) and
@@ -13,7 +13,7 @@
 Constant-product pools with **positions as NFTs** (not LP tokens). A position tracks
 liquidity, unclaimed fees, and up to 2 farming rewards. Pools come from a shared **config**
 (permissionless `createPool`) or fully custom (`createCustomPool`). Fees support time
-schedulers, **market-cap schedulers**, rate limiters, and three collect modes — including
+schedulers, **market-cap schedulers**, and three collect modes — including
 **Compounding** (fees auto-compound into liquidity; constant-product, no price range).
 Liquidity can be vested, locked, or permanently locked. This is the default DBC graduation
 target.
@@ -47,12 +47,13 @@ Flat class. Action methods return `Promise<Transaction>` **except**
 | Lock/vest | `lockPosition` (union: `{vestingAccount}` OR `{innerPosition: true}`) · `permanentLockPosition` · `refreshVesting` · `splitPosition` (7 percentages) · `splitPosition2` (single `numerator` / 1e9) |
 | Fees | `claimPositionFee` · `claimPositionFee2` (explicit receiver required) |
 | Rewards | `initializeReward` · `initializeAndFundReward` · `fundReward` · `claimReward` · `updateRewardDuration/Funder` · `withdrawIneligibleReward` · `withdrawDeadLiquidityReward` (Compounding pools only) |
-| Delegate | `updateDelegatePermission` (1.4.4+: SPL-approve + on-chain permission bitmask; revoke with `permission: 0`) |
+| Delegate | `updateDelegatePermission` (SPL-approve + on-chain permission bitmask; revoke with `permission: 0`; 1.5.1 takes `position` + `positionNftAccount`, the token account that holds the NFT now) · `getPositionsByDelegate` · `getDelegatePositionByPool` · `getPositionsByDelegateAndTokenMint` |
 | Reads | `fetchPoolState` · `fetchConfigState` · `fetchPositionState` · `fetchPoolFees` · `fetchPoolStatesByTokenAMint/BMint/Mint` · `getAllConfigs` / `getStaticConfigs` · `getAllPools/Positions` · `getAllPositionsByPool` · `getUserPositionByPool` · `getPositionsByUser` (sorted by liquidity desc) · `getPositionsByUserAndTokenMint` · `getAllVestingsByPosition` · `isLockedPosition` / `isPermanentLockedPosition` / `canUnlockPosition` · `isPoolExist` |
 
 PDAs: `derivePoolAddress`, `deriveCustomizablePoolAddress`, `derivePositionAddress`,
 `derivePositionNftAccount`, `deriveTokenVaultAddress`, `deriveRewardVaultAddress`, …
-Fee params: `getBaseFeeParams` (dispatches by mode), `getDynamicFeeParams`,
+Fee params: `getBaseFeeParams(baseFee)` (dispatches by mode; one argument since 1.4.6),
+`getDynamicFeeParams`,
 `bpsToFeeNumerator` / `feeNumeratorToBps`. Helper: `getTokenProgram(poolState.tokenAFlag)`.
 
 ## Core flow: quote + swap
@@ -165,6 +166,11 @@ pattern as the token-2022 `{ tx, pool, position }` creators). Withdraw:
 - `CollectFeeMode` here = `{ BothToken=0, OnlyB=1, Compounding=2 }` — **not** the DBC or DLMM enums.
 - `claimPartnerFee` / `ClaimPartnerFeeParams` → **removed** (1.3.7). Fee results expose `claimingFee` + `compoundingFee`, not `tradingFee`/`partnerFee`.
 - `BaseFeeMode` has 5 variants; param renamed `feeSchedulerParam` → `feeTimeSchedulerParam` (1.2.7); market-cap scheduler takes `priceMultiple` (1.4.2), not starting/ending market caps.
+- `BaseFeeMode.RateLimiter` is **rejected for new configs and pools** (1.4.6): `getBaseFeeParams`, `validatePoolFees`, `createPool`, `createCustomPool` and `createCustomPoolWithDynamicConfig` throw on it, and `getBaseFeeParams` dropped its `tokenBDecimal` / `activationType` arguments. Existing rate-limiter pools still quote and swap; `getRateLimiterParams` remains for them.
+- `updateDelegatePermission` takes `position` and `positionNftAccount` instead of `positionNft` (1.5.1) — pass the token account that currently holds the position NFT. Delegate reads skip positions whose `delegatePermission` is 0.
+- `ConfigState.permission` is a u128 bitmask (1.4.8): read it with `isConfigPermissionAllow(config.permission, ConfigPermission.CreatePoolWithoutMintValidation)`. Pool creation and `initializeReward` reject Token-2022 wrapped SOL (`NATIVE_MINT_2022`).
+- `CollectFeeMode.Compounding` accepts `compoundingFeeBps = 0` (1.5.0): the fee stays claimable and nothing compounds.
+- `claimPositionFee` with `receiver` set on a SOL pool also needs `tempWSolAccount`; omit `receiver` to claim to the owner's own accounts and have SOL unwrapped for you.
 - Max total fee is 99% only on pool layout V1 (`MAX_FEE_BPS_V1 = 9900`); legacy V0 pools cap at 50%. `PoolVersion` → renamed `LayoutVersion`.
 - On-chain signer account renamed `owner` → `signer` on position instructions (1.4.4) — affects hand-built instructions only; SDK param names unchanged.
 - `lockPosition` is a discriminated union — pass `vestingAccount` OR `innerPosition: true`, never both.

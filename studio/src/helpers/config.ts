@@ -1,5 +1,6 @@
 import path from 'path';
 import {
+  DlmmProConfig,
   DynamicVaultConfig,
   FarmingConfig,
   FeeSharingConfig,
@@ -7,6 +8,12 @@ import {
   LockConfig,
 } from '../utils/types';
 import { safeParseJsonFromFile } from './utils';
+
+export async function getDlmmProConfig(): Promise<DlmmProConfig> {
+  const configPath = path.join(__dirname, '../../config/dlmm_pro_config.jsonc');
+  const config: DlmmProConfig = await safeParseJsonFromFile(configPath);
+  return config;
+}
 
 export async function getDynamicVaultConfig(): Promise<DynamicVaultConfig> {
   const configPath = path.join(__dirname, '../../config/dynamic_vault_config.jsonc');

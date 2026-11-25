@@ -28,7 +28,7 @@ import {
   deriveBaseKeyForLocker,
   deriveDammV1MigrationMetadataAddress,
   deriveDbcPoolAuthority,
-  deriveEscrow,
+  deriveLockerEscrowAddress,
   DynamicBondingCurveClient,
   TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
@@ -118,7 +118,7 @@ export async function createDbcConfig(
       transferHookProgram: new PublicKey(transferHookProgram),
     });
   } else {
-    createConfigTx = await dbcInstance.partner.createConfig(createConfigParams);
+    createConfigTx = await dbcInstance.partner.createConfig2(createConfigParams);
   }
 
   modifyComputeUnitPriceIx(createConfigTx, config.computeUnitPriceMicroLamports ?? 0);
@@ -358,7 +358,7 @@ export async function migrateDammV1(
   if (poolConfig.lockedVestingConfig.amountPerPeriod.gt(new BN(0))) {
     // check if locker already exists
     const base = deriveBaseKeyForLocker(poolAddress);
-    const escrow = deriveEscrow(base);
+    const escrow = deriveLockerEscrowAddress(base);
     const escrowAccount = await connection.getAccountInfo(escrow);
 
     if (!escrowAccount) {
@@ -430,17 +430,7 @@ export async function migrateDammV1(
   transactions.length = 0;
 
   // fetch the migration metadata after it has been created
-  let dammv1MigrationMetadata;
-  try {
-    dammv1MigrationMetadata = await dbcInstance.state.getDammV1MigrationMetadata(poolAddress);
-  } catch (error) {
-    if (config.dryRun) {
-      console.log('> Cannot fetch migration metadata in dry-run mode (expected)');
-      console.log('> Skipping LP claim/lock operations in dry-run mode');
-      return;
-    }
-    throw new Error(`DAMM v1 migration metadata not found for ${poolAddress.toString()}: ${error}`);
-  }
+  const dammv1MigrationMetadata = await dbcInstance.state.getDammV1MigrationMetadata(poolAddress);
 
   // check if creator and partner are the same address
   const creator = poolState.creator;
@@ -707,7 +697,7 @@ export async function migrateDammV2(
   if (poolConfig.lockedVestingConfig.amountPerPeriod.gt(new BN(0))) {
     // check if locker already exists
     const base = deriveBaseKeyForLocker(poolAddress);
-    const escrow = deriveEscrow(base);
+    const escrow = deriveLockerEscrowAddress(base);
     const escrowAccount = await connection.getAccountInfo(escrow);
 
     if (!escrowAccount) {

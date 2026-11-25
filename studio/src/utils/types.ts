@@ -1,4 +1,5 @@
 import { Creator, Collection, Uses } from '@metaplex-foundation/mpl-token-metadata';
+import type { BaseFeeBpsParams } from '@meteora-ag/dlmm-pro-sdk';
 import { ILockedVestingArgs, IPresaleArgs, IPresaleRegistryArgs } from '@meteora-ag/presale';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -12,6 +13,7 @@ export interface CliArguments {
   escrow?: string | undefined;
   farm?: string | undefined;
   limitOrder?: string | undefined;
+  position?: string | undefined;
   airdrop?: boolean | undefined;
   help?: boolean | undefined;
 }
@@ -30,6 +32,7 @@ export type MeteoraConfig =
   | DammV1Config
   | DammV2Config
   | DlmmConfig
+  | DlmmProConfig
   | DbcConfig
   | AlphaVaultConfig
   | DynamicVaultConfig
@@ -187,10 +190,6 @@ export type DammV2BaseFee =
       feeTimeSchedulerParam: FeeSchedulerParams;
     }
   | {
-      baseFeeMode: 2;
-      rateLimiterParam: RateLimiterParams & { maxFeeBps: number };
-    }
-  | {
       baseFeeMode: 3 | 4;
       feeMarketCapSchedulerParam: FeeMarketCapSchedulerParams;
     };
@@ -293,6 +292,116 @@ export interface DlmmCancelLimitOrderConfig {
   // when true and no --limitOrder flag is passed, cancels every open order on the pool
   cancelAll: boolean;
 }
+/* DLMM Pro */
+
+export type DlmmProConfig = MeteoraConfigBase & {
+  createBaseToken: TokenConfig | null;
+  dlmmProConfig: DlmmProPoolConfig | null;
+  openPosition?: DlmmProOpenPositionConfig | null;
+  removeLiquidity?: DlmmProRemoveLiquidityConfig | null;
+  lockPosition?: DlmmProLockPositionConfig | null;
+  placeLimitOrder?: DlmmProPlaceLimitOrderConfig | null;
+  cancelLimitOrder?: DlmmProCancelLimitOrderConfig | null;
+  dlmmProSwap?: DlmmProSwapConfig | null;
+};
+
+export interface DlmmProPoolConfig {
+  // static: settings come from a published static config
+  // dynamic: settings come from poolParameters, and the wallet is the dynamic config's pool creator authority
+  // launch: settings come from poolParameters, no config, one pool per token pair
+  poolType: 'static' | 'dynamic' | 'launch';
+  // quote tokens per 1 base token
+  initialPrice: number | string;
+  // index of the static config, or of the wallet's dynamic config
+  configIndex?: number | null;
+  // required for dynamic and launch pools
+  poolParameters?: DlmmProPoolParameters | null;
+}
+
+export interface DlmmProPoolParameters {
+  tickSpacing: number;
+  baseFee: BaseFeeBpsParams;
+  dynamicFee: boolean;
+  // 0 - OutputToken | 1 - OnlyY
+  collectFeeMode: number;
+  // 0 - Slot | 1 - Timestamp
+  activationType: number;
+  liquidityMining: boolean;
+  activation?: DlmmProActivationConfig | null;
+}
+
+export interface DlmmProActivationConfig {
+  whitelistedSwap?: string | null;
+  whitelistedAddLiquidity?: string | null;
+  whitelistedRemoveLiquidity?: string | null;
+  // sqrt price target in basis points of the initial sqrt price, above 10000
+  bondingCurveTargetBps?: number | null;
+  // slots or unix seconds, depending on activationType
+  timeBased?: {
+    swapPoint: number;
+    addLiquidityPoint: number;
+    removeLiquidityPoint: number;
+  } | null;
+}
+
+export interface DlmmProOpenPositionConfig {
+  strategy: 'spot' | 'curve' | 'bidAsk' | 'wave';
+  // token Y per 1 token X
+  minPrice: number | string;
+  maxPrice: number | string;
+  // deposit budgets in token units
+  amountX: number | string;
+  amountY: number | string;
+  layout?: 'vertical' | 'horizontal';
+  maxRanges?: number | null;
+}
+
+export interface DlmmProRemoveLiquidityConfig {
+  // share of the unlocked liquidity of every range, 1 to 10000
+  bps: number;
+  slippageBps: number;
+  // with bps 10000: also claim fees and rewards, then close the position
+  closePosition: boolean;
+}
+
+export interface DlmmProLockPositionConfig {
+  // share of the unlocked liquidity to lock, 1 to 10000
+  bps: number;
+  // null locks permanently
+  vesting?: {
+    // slot or unix seconds, depending on the pool's activation type; null starts now
+    cliffPoint: number | null;
+    cliffUnlockBps: number;
+    bpsPerPeriod: number;
+    periodFrequency: number;
+    numberOfPeriod: number;
+  } | null;
+}
+
+export interface DlmmProLimitOrderTickConfig {
+  // token Y per 1 token X
+  price: number | string;
+  // token units: token X for "ask" orders, token Y for "bid" orders
+  amount: number | string;
+}
+
+export interface DlmmProPlaceLimitOrderConfig {
+  // "ask" sells token X above the current price, "bid" buys token X with token Y at or below it
+  side: 'ask' | 'bid';
+  ticks: DlmmProLimitOrderTickConfig[];
+}
+
+export interface DlmmProCancelLimitOrderConfig {
+  // when true and no --limitOrder flag is passed, cancels every open order on the pool
+  cancelAll: boolean;
+}
+
+export type DlmmProSwapConfig = {
+  amountIn: number | string;
+  slippageBps: number;
+  swapForY: boolean;
+};
+
 /* DBC */
 
 export type DbcConfig = MeteoraConfigBase & {
@@ -309,28 +418,16 @@ export type DbcConfig = MeteoraConfigBase & {
   dbcTransferPoolCreator?: DbcTransferPoolCreator | null;
 };
 
-export type DbcBaseFee =
-  | {
-      baseFeeMode: 0 | 1;
-      feeSchedulerParam: FeeSchedulerParams;
-    }
-  | {
-      baseFeeMode: 2;
-      rateLimiterParam: RateLimiterParams;
-    };
+export type DbcBaseFee = {
+  baseFeeMode: 0 | 1;
+  feeSchedulerParam: FeeSchedulerParams;
+};
 
 export type FeeSchedulerParams = {
   startingFeeBps: number;
   endingFeeBps: number;
   numberOfPeriod: number;
   totalDuration: number;
-};
-
-export type RateLimiterParams = {
-  baseFeeBps: number;
-  feeIncrementBps: number;
-  referenceAmount: number;
-  maxLimiterDuration: number;
 };
 
 export type FeeMarketCapSchedulerParams = {
@@ -790,7 +887,7 @@ export interface ZapInDlmmConfig {
   // singleSided — whenever singleSided is not null (mirrors the SDK's own example).
   favorXInActiveId: boolean;
   maxActiveBinSlippage: number; // bins the active bin id may drift between quoting and landing on-chain
-  maxAccounts: number; // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+  maxAccounts: number; // account budget of Jupiter's quote for the rebalancing swap
   maxTransferAmountExtendPercentage: number; // % buffer the SDK adds on top of the swap estimate's max-transfer ceiling
   // NOTE: zap-in-dlmm ALWAYS creates a brand-new position (a throwaway keypair co-signs once) —
   // the zap-sdk's buildZapInDlmmTransaction has no "existing position" mode; depositing into an

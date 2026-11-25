@@ -4,7 +4,11 @@ import { Wallet } from '@coral-xyz/anchor';
 import { getQuoteDecimals, modifyComputeUnitPriceIx, runSimulateTransaction } from '../../helpers';
 import { getAmountInLamports } from '../../helpers/common';
 import { DEFAULT_SEND_TX_MAX_RETRIES } from '../../utils/constants';
-import { DynamicBondingCurveClient, SwapMode } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import {
+  DynamicBondingCurveClient,
+  getSwapQuoteTransferFees,
+  SwapMode,
+} from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getTransferHook, TOKEN_2022_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import BN from 'bn.js';
 
@@ -231,6 +235,7 @@ export async function swap(
     hasReferral: !!config.dbcSwap.referralTokenAccount,
     currentPoint: new BN(currentPoint),
     eligibleForFirstSwapWithMinFee: false,
+    ...(await getSwapQuoteTransferFees(connection, poolConfig, { baseMint })),
   });
 
   const referralTokenAccount = config.dbcSwap.referralTokenAccount

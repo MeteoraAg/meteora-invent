@@ -52,7 +52,7 @@
     "singleSided": null, // "x" | "y" | null — deposit only tokenX or only tokenY (skips the swap entirely); null = balanced two-sided deposit
     "favorXInActiveId": false, // tie-break for the active bin's own X/Y split; ignored (forced to match singleSided) whenever singleSided isn't null
     "maxActiveBinSlippage": 50, // bins the active bin id may drift between quoting and landing on-chain
-    "maxAccounts": 50, // account budget passed to Jupiter's quote/swap-instructions API for the rebalancing swap
+    "maxAccounts": 50, // account budget of Jupiter's quote for the rebalancing swap
     "maxTransferAmountExtendPercentage": 0 // % buffer added on top of the swap estimate's max-transfer ceiling
   },
 

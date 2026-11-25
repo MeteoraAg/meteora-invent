@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, TransactionInstruction } from '@solana/web3.js';
 import { Wallet } from '@coral-xyz/anchor';
 import {
   Zap,
@@ -30,9 +30,7 @@ import {
   getAmountInLamports,
   getAmountInTokens,
   promptForSelection,
-  sendOrderedTransactions,
-  combineTransactions,
-  OrderedTransactionStep,
+  sendOrderedInstructions,
 } from '../../helpers';
 import { SOL_TOKEN_MINT } from '../../utils/constants';
 
@@ -53,8 +51,8 @@ async function assertFunded(connection: Connection, payer: PublicKey): Promise<v
  *
  * The zap program CPIs into cp-amm's swap to rebalance, and the rate limiter rejects that
  * with error 6049 (FailToValidateSingleSwapInstruction) regardless of how the transaction is
- * arranged, so this must run pre-flight — the zap-in step depends on a prior step, and a dry
- * run cannot simulate it.
+ * arranged, so it is refused pre-flight with an actionable message rather than left to surface
+ * as a bare simulation or on-chain error.
  *
  * The fee mode is POD/bytemuck-packed into `baseFeeInfo.data` on a fetched pool, not the
  * Borsh layout used by client-constructed pool-creation params, so it must decode with
@@ -138,8 +136,8 @@ async function assertHoldsAtLeast(
  * there is more than one).
  *
  * Two-phase SDK call: `getZapInDammV2DirectPoolParams` -> `buildZapInDammV2Transaction`. The
- * response is an ordered bundle — setupTransaction? -> swapTransactions[] -> ledgerTransaction
- * -> zapInTransaction -> cleanUpTransaction — sent in that order via `sendOrderedTransactions`.
+ * response is the instructions in execution order plus the lookup tables they use, sent via
+ * `sendOrderedInstructions` together with the create-position instructions in front.
  *
  * Passing `jupiterQuote: null` keeps the SDK on its direct-pool branch, so nothing here
  * reaches Jupiter's API. `dammV2Quote` is a reference quote for one unit of inputMint priced
@@ -233,7 +231,7 @@ export async function zapInDammV2(
   let positionNftMint: PublicKey;
   let positionNftKeypair: Keypair | undefined;
   let positionAddress: PublicKey;
-  const preambleSteps: OrderedTransactionStep[] = [];
+  const preInstructions: TransactionInstruction[] = [];
 
   if (positionMode === 'new') {
     positionNftKeypair = Keypair.generate();
@@ -249,11 +247,7 @@ export async function zapInDammV2(
       pool: poolAddress,
       positionNft: positionNftMint,
     });
-    preambleSteps.push({
-      label: 'create position',
-      tx: createPositionTx,
-      signers: [wallet.payer, positionNftKeypair],
-    });
+    preInstructions.push(...createPositionTx.instructions);
   } else {
     const userPositions = await cpAmm.getUserPositionByPool(poolAddress, wallet.publicKey);
     if (userPositions.length === 0) {
@@ -330,8 +324,6 @@ export async function zapInDammV2(
     positionNftMint,
     maxSqrtPriceChangeBps,
     maxTransferAmountExtendPercentage,
-    // Only read inside the Jupiter branch, which jupiterQuote: null below rules out
-    maxAccounts: 20,
     slippageBps,
     dammV2Quote,
     jupiterQuote: null,
@@ -349,17 +341,12 @@ export async function zapInDammV2(
     console.log('>>> Save this — it identifies the position this zap deposited into.');
   }
 
-  const combinedSigners = positionNftKeypair ? [positionNftKeypair] : [];
-  const steps: OrderedTransactionStep[] = buildDammV2ZapInSteps(
-    preambleSteps,
-    bundle,
-    combinedSigners
-  );
-
-  await sendOrderedTransactions(
+  await sendOrderedInstructions(
     connection,
-    steps,
+    [...preInstructions, ...bundle.instructions],
+    bundle.addressLookupTableAccounts,
     wallet.payer,
+    positionNftKeypair ? [positionNftKeypair] : [],
     config.dryRun,
     config.computeUnitPriceMicroLamports ?? 0,
     {
@@ -370,107 +357,10 @@ export async function zapInDammV2(
 }
 
 /**
- * Builds the ordered step list for a DAMM v2 direct-route zap-in bundle. `preambleSteps` is
- * either `[]` (positionMode "existing") or a single "create position" step (positionMode
- * "new"); `bundle` is the SDK's response from `buildZapInDammV2Transaction`.
- *
- * Create-position, setup and ledger go into one transaction: a dry run simulates each step
- * against unchanged chain state, so a later step reading an account an earlier step creates
- * would otherwise fail simulation on an account that never landed.
- *
- * The zap-in instruction must stay alone in its own transaction. It reaches cp-amm's swap by
- * CPI, and the rate-limiter fee mode rejects a transaction carrying anything else alongside
- * that swap (cp-amm 6049). Zap-in and clean-up therefore keep `dependsOnPriorStep`, which
- * defers their simulation rather than reporting a false failure.
- *
- * A non-empty `bundle.swapTransactions` falls back to fully separate, deferred steps; the
- * direct route never populates it, since `jupiterQuote` is always null.
- */
-function buildDammV2ZapInSteps(
-  preambleSteps: OrderedTransactionStep[],
-  bundle: {
-    setupTransaction?: Transaction;
-    swapTransactions: Transaction[];
-    ledgerTransaction: Transaction;
-    zapInTransaction: Transaction;
-    cleanUpTransaction: Transaction;
-  },
-  combinedSigners: Keypair[]
-): OrderedTransactionStep[] {
-  if (bundle.swapTransactions.length === 0) {
-    const mergeable = [...preambleSteps.map((step) => step.tx)];
-    if (bundle.setupTransaction) {
-      mergeable.push(bundle.setupTransaction);
-    }
-    mergeable.push(bundle.ledgerTransaction);
-
-    return [
-      {
-        label:
-          preambleSteps.length > 0
-            ? 'create position + setup + ledger (combined into one transaction)'
-            : 'setup + ledger (combined into one transaction)',
-        tx: combineTransactions(mergeable),
-        signers: combinedSigners,
-      },
-      {
-        label: 'zap in',
-        tx: bundle.zapInTransaction,
-        signers: [],
-        dependsOnPriorStep: true,
-      },
-      {
-        label: 'clean up',
-        tx: bundle.cleanUpTransaction,
-        signers: [],
-        dependsOnPriorStep: true,
-      },
-    ];
-  }
-
-  // Defensive fallback — see this function's doc. Not exercised by studio's own code today.
-  const steps: OrderedTransactionStep[] = [...preambleSteps];
-  if (bundle.setupTransaction) {
-    steps.push({
-      label: 'setup (wrap SOL / create ATAs)',
-      tx: bundle.setupTransaction,
-      signers: [],
-    });
-  }
-  bundle.swapTransactions.forEach((tx, i) => {
-    steps.push({
-      label: `internal rebalance swap ${i + 1}/${bundle.swapTransactions.length}`,
-      tx,
-      signers: [],
-      dependsOnPriorStep: i > 0,
-    });
-  });
-  steps.push({
-    label: 'ledger update',
-    tx: bundle.ledgerTransaction,
-    signers: [],
-    dependsOnPriorStep: true,
-  });
-  steps.push({
-    label: 'zap in',
-    tx: bundle.zapInTransaction,
-    signers: [],
-    dependsOnPriorStep: true,
-  });
-  steps.push({
-    label: 'clean up',
-    tx: bundle.cleanUpTransaction,
-    signers: [],
-    dependsOnPriorStep: true,
-  });
-  return steps;
-}
-
-/**
  * Jupiter client config resolution order for `zapInDlmm`'s live quote calls: an explicit
  * `JUPITER_API_URL` / `JUPITER_API_KEY` in `studio/.env` (loaded by the action script the same
  * way `generate_keypair.ts` loads `PRIVATE_KEY`) override the zap-sdk's own default. Verified
- * against the installed `@meteora-ag/zap-sdk@1.3.2` dist: the default endpoint is
+ * against the installed `@meteora-ag/zap-sdk@2.0.0` dist: the default endpoint is
  * `DEFAULT_JUPITER_API_URL` (`"https://api.jup.ag"`) and the default API key is `""` — Jupiter's
  * own docs (developers.jup.ag, checked live) confirm that endpoint accepts unauthenticated
  * ("keyless") requests at a shared, low rate limit, so neither env var is required to get a
@@ -485,17 +375,12 @@ function resolveJupiterConfig(): { jupiterApiUrl?: string; jupiterApiKey?: strin
 }
 
 /**
- * `zapInDlmm`'s quote/build phase talks to Jupiter's live API, and the underlying error rarely
- * says why it failed. Verified end-to-end against a live mainnet pool (see studio-actions.md's
- * Zap section / this repo's functional-proof notes): the QUOTE phase (`estimateDlmmDirectSwap`)
- * degrades gracefully when Jupiter's quote endpoint alone is unreachable — internally it falls
- * back to the DLMM pool's own bin quote and only throws a generic "Failed to get ... swap quote"
- * once THAT also fails — but the BUILD phase does not have that safety net: once Jupiter's quote
- * has already won the comparison, `getZapInDlmmDirectParams` commits to fetching Jupiter's
- * swap-instructions for that exact quote (`buildJupiterSwapTransaction` ->
- * `getJupiterSwapInstruction`), which throws hard (`response.status` + body, no DLMM fallback)
- * if that specific call fails. Either failure is worth the same actionable hint, so both call
- * sites below are wrapped with it.
+ * `zapInDlmm`'s quote phase talks to Jupiter's live API, and the underlying error rarely says
+ * why it failed. `estimateDlmmDirectSwap` degrades gracefully when Jupiter's quote endpoint
+ * alone is unreachable — internally it falls back to the DLMM pool's own bin quote and only
+ * throws a generic "Failed to get ... swap quote" once THAT also fails — so that is the one
+ * failure worth an actionable hint. Under the default Jupiter API v2 the swap instructions
+ * arrive inside the quote, so the build phase makes no further Jupiter request.
  */
 function wrapJupiterQuoteFailure(error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
@@ -508,10 +393,8 @@ function wrapJupiterQuoteFailure(error: unknown): Error {
 
 /**
  * Zap a single input token into a BRAND-NEW DLMM position — Jupiter-quoted, unlike
- * `zapInDammV2`'s direct route. Verified against the installed `@meteora-ag/zap-sdk@1.3.2`
- * `.d.ts`, its compiled source, and its own `examples/zapInDlmmDirect(SingleSided).ts` (its
- * `docs.md` only covers `zapOut*`/Jupiter helpers, not zap-in — cross-checked against source
- * instead, same as `zapInDammV2`).
+ * `zapInDammV2`'s direct route. Verified against the installed `@meteora-ag/zap-sdk@2.0.0`
+ * `.d.ts`, its compiled source, and its own `examples/zapInDlmmDirect(SingleSided).ts`.
  *
  * Reads config.zapInDlmm: inputMint (must be tokenX or tokenY of the lbPair — direct route
  * only, same requirement as zapInDammV2), amountIn (human units of inputMint), swapSlippageBps,
@@ -519,7 +402,7 @@ function wrapJupiterQuoteFailure(error: unknown): Error {
  * e.g. -34/34), strategyType (0 Spot | 1 Curve | 2 BidAsk), singleSided ("x" | "y" | null),
  * favorXInActiveId (the active bin's own X/Y tie-break; forced to match singleSided whenever
  * it's set — mirrors the SDK's own `zapInDlmmDirectSingleSided.ts` example), maxActiveBinSlippage,
- * maxAccounts, maxTransferAmountExtendPercentage.
+ * maxAccounts (account budget of Jupiter's quote), maxTransferAmountExtendPercentage.
  *
  * Always creates a new position, co-signed once by a throwaway keypair whose address is
  * logged: `buildZapInDlmmTransaction` only builds the uninitialized-position instruction. The
@@ -534,14 +417,13 @@ function wrapJupiterQuoteFailure(error: unknown): Error {
  * natural split across the target bin range isn't already what the strategy wants, which is the
  * common case for a single-token deposit — and compares it against the pool's own bin quote,
  * keeping whichever pays out more; there is no parameter to force the DLMM-only route. When
- * Jupiter's quote wins, the build phase (`getZapInDlmmDirectParams`) also calls Jupiter's
- * swap-instructions endpoint to build that swap transaction.
+ * Jupiter's quote wins, its swap instructions come back inside that quote and the build phase
+ * (`getZapInDlmmDirectParams`) adds them to the instruction list.
  *
  * Three-phase SDK call: `estimateDlmmDirectSwap` -> `getZapInDlmmDirectParams` ->
- * `buildZapInDlmmTransaction`. Response is the same ordered multi-transaction bundle shape as
- * `zapInDammV2` — setupTransaction? -> swapTransactions[] -> ledgerTransaction ->
- * zapInTransaction -> cleanUpTransaction — sent in that exact order via the shared
- * `sendOrderedTransactions` helper.
+ * `buildZapInDlmmTransaction`. Response is the same shape as `zapInDammV2`'s — the instructions
+ * in execution order plus their lookup tables — sent via the shared `sendOrderedInstructions`
+ * helper.
  */
 export async function zapInDlmm(
   config: ZapConfig,
@@ -659,6 +541,7 @@ export async function zapInDlmm(
     '\n> Requesting a swap quote for the rebalancing swap (Jupiter or the pool itself, whichever pays more)...'
   );
   const estimate = await estimateDlmmDirectSwap({
+    user: wallet.publicKey,
     amountIn: amountInLamports,
     inputTokenMint,
     lbPair: poolAddress,
@@ -668,6 +551,7 @@ export async function zapInDlmm(
     maxDeltaId,
     strategy: strategyType as StrategyType,
     singleSided: singleSidedMode,
+    jupiterQuoteOptions: { maxAccounts },
     config: jupiterConfig,
   }).catch((error) => {
     throw wrapJupiterQuoteFailure(error);
@@ -686,31 +570,26 @@ export async function zapInDlmm(
     console.log('>>> Save this — it identifies the position this zap deposited into.');
   }
 
-  const directParams = await zap
-    .getZapInDlmmDirectParams({
-      user: wallet.publicKey,
-      maxActiveBinSlippage,
-      favorXInActiveId: resolvedFavorXInActiveId,
-      maxAccounts,
-      maxTransferAmountExtendPercentage,
-      directSwapEstimate: estimate.result,
-      ...estimate.context,
-    })
-    .catch((error) => {
-      throw wrapJupiterQuoteFailure(error);
-    });
+  const directParams = await zap.getZapInDlmmDirectParams({
+    user: wallet.publicKey,
+    maxActiveBinSlippage,
+    favorXInActiveId: resolvedFavorXInActiveId,
+    maxTransferAmountExtendPercentage,
+    directSwapEstimate: estimate.result,
+    ...estimate.context,
+  });
 
   const bundle = await zap.buildZapInDlmmTransaction({
     ...directParams,
     position: positionKeypair.publicKey,
   });
 
-  const steps: OrderedTransactionStep[] = buildDlmmZapInSteps(bundle, positionKeypair);
-
-  await sendOrderedTransactions(
+  await sendOrderedInstructions(
     connection,
-    steps,
+    bundle.instructions,
+    bundle.addressLookupTableAccounts,
     wallet.payer,
+    [positionKeypair],
     config.dryRun,
     config.computeUnitPriceMicroLamports ?? 0,
     {
@@ -718,93 +597,6 @@ export async function zapInDlmm(
       recoveryAddress: positionKeypair.publicKey.toString(),
     }
   );
-}
-
-/**
- * Builds the ordered step list for a DLMM zap-in bundle. Setup and ledger are combined for the
- * same reason as `buildDammV2ZapInSteps`: the zap-in instruction reads a ledger account the
- * preceding step creates, which a per-step dry run cannot simulate in isolation.
- *
- * Zap-in stays alone in its transaction here too. The DLMM program has a different fee model
- * and has not been shown to carry cp-amm's single-swap restriction, but its rebalancing swap
- * is common and can be Jupiter-routed, and Jupiter routes already sit close to the transaction
- * size ceiling.
- */
-function buildDlmmZapInSteps(
-  bundle: {
-    setupTransaction?: Transaction;
-    swapTransactions: Transaction[];
-    ledgerTransaction: Transaction;
-    zapInTransaction: Transaction;
-    cleanUpTransaction: Transaction;
-  },
-  positionKeypair: Keypair
-): OrderedTransactionStep[] {
-  if (bundle.swapTransactions.length === 0) {
-    const mergeable = [bundle.ledgerTransaction];
-    if (bundle.setupTransaction) {
-      mergeable.unshift(bundle.setupTransaction);
-    }
-    return [
-      {
-        label: bundle.setupTransaction
-          ? 'setup + ledger (combined into one transaction)'
-          : 'ledger update',
-        tx: combineTransactions(mergeable),
-        signers: [],
-      },
-      {
-        label: 'zap in (initializes the new position)',
-        tx: bundle.zapInTransaction,
-        signers: [positionKeypair],
-        dependsOnPriorStep: true,
-      },
-      {
-        label: 'clean up',
-        tx: bundle.cleanUpTransaction,
-        signers: [],
-        dependsOnPriorStep: true,
-      },
-    ];
-  }
-
-  // A real rebalancing swap is part of this bundle — keep steps separate (safe regardless of
-  // transaction size) and defer dry-run simulation of whatever depends on it landing for real.
-  const steps: OrderedTransactionStep[] = [];
-  if (bundle.setupTransaction) {
-    steps.push({
-      label: 'setup (wrap SOL / create ATAs)',
-      tx: bundle.setupTransaction,
-      signers: [],
-    });
-  }
-  bundle.swapTransactions.forEach((tx, i) => {
-    steps.push({
-      label: `rebalance swap ${i + 1}/${bundle.swapTransactions.length}`,
-      tx,
-      signers: [],
-      dependsOnPriorStep: i > 0,
-    });
-  });
-  steps.push({
-    label: 'ledger update',
-    tx: bundle.ledgerTransaction,
-    signers: [],
-    dependsOnPriorStep: true,
-  });
-  steps.push({
-    label: 'zap in (initializes the new position)',
-    tx: bundle.zapInTransaction,
-    signers: [positionKeypair],
-    dependsOnPriorStep: true,
-  });
-  steps.push({
-    label: 'clean up',
-    tx: bundle.cleanUpTransaction,
-    signers: [],
-    dependsOnPriorStep: true,
-  });
-  return steps;
 }
 
 /**
@@ -817,12 +609,11 @@ function buildDlmmZapInSteps(
  * transaction: the swap reads a
  * balance DELTA (current on-chain balance minus a `preUserTokenBalance` snapshot taken when the
  * zap-out instruction was built) to know how much the preceding removal actually freed up.
- * Building the removal and the swap as two separate, sequentially-CONFIRMED transactions would
- * make that delta read as zero (the balance would already reflect the removal by the time the
- * swap tx is built) and swap nothing — so unlike zap-in, this is combined into one Transaction
- * per protocol branch rather than left as separate ordered steps (DLMM's `removeLiquidity` can
- * still return multiple transactions for wide positions; only the LAST one is combined with the
- * swap, and any earlier ones are sent first as their own ordered steps).
+ * Landing the removal on its own and re-running would leave the freed tokens unswapped, since
+ * the re-run reads a position with nothing left to remove — so unlike zap-in, the removal and the
+ * swap are one group for `sendOrderedInstructions`, which never splits a group (DLMM's
+ * `removeLiquidity` can still return multiple transactions for wide positions; only the LAST one
+ * is grouped with the swap, and any earlier ones are their own groups, sent first).
  */
 export async function zapOut(
   config: ZapConfig,
@@ -954,10 +745,12 @@ async function zapOutDammV2(
 
   if (estimatedAmountIn.isZero()) {
     console.log('- Position is already single-sided in the output token — skipping the swap step.');
-    await sendOrderedTransactions(
+    await sendOrderedInstructions(
       connection,
-      [{ label: 'remove liquidity', tx: removeLiquidityTx, signers: [] }],
+      [removeLiquidityTx.instructions],
+      [],
       wallet.payer,
+      [],
       config.dryRun,
       config.computeUnitPriceMicroLamports ?? 0,
       {
@@ -1011,18 +804,12 @@ async function zapOutDammV2(
     percentageToZapOut: 100,
   });
 
-  const combinedTx = new Transaction().add(removeLiquidityTx).add(zapOutTx);
-
-  await sendOrderedTransactions(
+  await sendOrderedInstructions(
     connection,
-    [
-      {
-        label: `remove liquidity + zap out to ${outputMint.toString()}`,
-        tx: combinedTx,
-        signers: [],
-      },
-    ],
+    [[...removeLiquidityTx.instructions, ...zapOutTx.instructions]],
+    zapOutTx.addressLookupTableAccounts,
     wallet.payer,
+    [],
     config.dryRun,
     config.computeUnitPriceMicroLamports ?? 0,
     {
@@ -1106,26 +893,20 @@ async function zapOutDlmm(
 
   console.log(`- Output mint: ${outputMint.toString()}`);
 
-  const steps: OrderedTransactionStep[] = removeLiquidityTxs
+  const groups: TransactionInstruction[][] = removeLiquidityTxs
     .slice(0, -1)
-    .map((tx, i): OrderedTransactionStep => ({
-      label: `remove liquidity (${i + 1}/${removeLiquidityTxs.length})`,
-      tx,
-      signers: [],
-    }));
+    .map((tx) => tx.instructions);
   const lastRemoveLiquidityTx = removeLiquidityTxs[removeLiquidityTxs.length - 1]!;
 
   if (estimatedAmountIn.isZero()) {
     console.log('- Position is already single-sided in the output token — skipping the swap step.');
-    steps.push({
-      label: `remove liquidity (${removeLiquidityTxs.length}/${removeLiquidityTxs.length})`,
-      tx: lastRemoveLiquidityTx,
-      signers: [],
-    });
-    await sendOrderedTransactions(
+    groups.push(lastRemoveLiquidityTx.instructions);
+    await sendOrderedInstructions(
       connection,
-      steps,
+      groups,
+      [],
       wallet.payer,
+      [],
       config.dryRun,
       config.computeUnitPriceMicroLamports ?? 0,
       {
@@ -1160,17 +941,14 @@ async function zapOutDlmm(
     percentageToZapOut: 100,
   });
 
-  const combinedTx = new Transaction().add(lastRemoveLiquidityTx).add(zapOutTx);
-  steps.push({
-    label: `remove liquidity (${removeLiquidityTxs.length}/${removeLiquidityTxs.length}) + zap out to ${outputMint.toString()}`,
-    tx: combinedTx,
-    signers: [],
-  });
+  groups.push([...lastRemoveLiquidityTx.instructions, ...zapOutTx.instructions]);
 
-  await sendOrderedTransactions(
+  await sendOrderedInstructions(
     connection,
-    steps,
+    groups,
+    zapOutTx.addressLookupTableAccounts,
     wallet.payer,
+    [],
     config.dryRun,
     config.computeUnitPriceMicroLamports ?? 0,
     {

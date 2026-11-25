@@ -68,7 +68,8 @@ pnpm studio airdrop-sol --network localnet   # fixed 5 SOL per call; no --amount
 The validator preloads **all** Meteora programs — DLMM, DAMM v1, DAMM v2, DBC, Alpha
 Vault, Dynamic Vault, Met Lock, and Dynamic Fee Sharing, plus **Presale**, **Stake2Earn
 (M3M3)**, **Zap**, and **Pool Farms** — so every product's golden path is testable on
-localnet without faucets.
+localnet without faucets. The exception is **DLMM Pro**, which is not preloaded: run
+`dlmm-pro-*` actions on devnet or mainnet.
 
 ## Verify Setup
 

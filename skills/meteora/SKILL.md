@@ -1,25 +1,27 @@
 ---
 name: meteora
-description: "Do anything on Meteora, Solana's liquidity layer: launch tokens on Dynamic Bonding Curves (DBC), create and manage DAMM v1/v2 and DLMM pools, add or remove liquidity, swap, place DLMM limit orders, claim fees, migrate DBC pools to DAMM, run alpha and presale vaults, lock tokens on vesting schedules, stake for fees (M3M3) or into LP farms, zap single tokens into and out of positions, split fees across wallets, and write TypeScript against Meteora SDKs. Use for any Meteora, meteora-invent, DBC, DLMM, DAMM, alpha vault, presale, token vesting, fee sharing, staking, farming, zap, or Solana liquidity/LP task — including building launchpads, trading bots, and integrations."
+description: "Do anything on Meteora, Solana's liquidity layer: launch tokens on Dynamic Bonding Curves (DBC), create and manage DAMM v1/v2, DLMM and DLMM Pro pools, add or remove liquidity, swap, place DLMM and DLMM Pro limit orders, claim fees, migrate DBC pools to DAMM, run alpha and presale vaults, lock tokens on vesting schedules, stake for fees (M3M3) or into LP farms, zap single tokens into and out of positions, split fees across wallets, and write TypeScript against Meteora SDKs. Use for any Meteora, meteora-invent, DBC, DLMM, DLMM Pro, DAMM, alpha vault, presale, token vesting, fee sharing, staking, farming, zap, or Solana liquidity/LP task — including building launchpads, trading bots, and integrations."
 license: MIT
 compatibility: "Requires Node.js 22.12+ and pnpm 10+ for the studio CLI path (repo enforces engine-strict), or Node.js 18+ with npm for standalone SDK code; network access to a Solana RPC; a funded keypair for on-chain writes."
-metadata: {"version": "2.0.0", "author": "MeteoraAg", "openclaw": {"emoji": "🌊", "homepage": "https://github.com/MeteoraAg/meteora-invent", "requires": {"anyBins": ["pnpm", "npm"]}}, "hermes": {"category": "defi", "tags": ["solana", "meteora", "defi", "liquidity", "token-launch"]}}
+metadata: {"version": "2.1.0", "author": "MeteoraAg", "openclaw": {"emoji": "🌊", "homepage": "https://github.com/MeteoraAg/meteora-invent", "requires": {"anyBins": ["pnpm", "npm"]}}, "hermes": {"category": "defi", "tags": ["solana", "meteora", "defi", "liquidity", "token-launch"]}}
 ---
 
 # Meteora
 
 Meteora is Solana's liquidity layer: bonding-curve token launches (DBC), constant-product AMMs
-(DAMM v1/v2), bin-based concentrated liquidity with limit orders (DLMM), plus launch vaults.
+(DAMM v1/v2), bin-based concentrated liquidity with limit orders (DLMM), tick-based
+concentrated liquidity with limit orders and launch controls (DLMM Pro), plus launch vaults.
 This skill covers **doing actions on-chain** and **writing code against the SDKs**.
 
 ## Product Map
 
 | Protocol | What it is | Choose when | SDK (pinned version) | Program ID (mainnet + devnet) |
 |---|---|---|---|---|
-| **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@1.5.11` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
-| **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.4.5` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
+| **DBC** | Virtual-liquidity bonding curve; token launches that graduate to an AMM | Launching a new token | `@meteora-ag/dynamic-bonding-curve-sdk@2.0.0` | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
+| **DAMM v2** | Constant-product AMM with position NFTs, fee schedulers, locks, farming | Pools for existing tokens; DBC graduation target (default) | `@meteora-ag/cp-amm-sdk@1.5.1` | `cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG` |
 | **DLMM** | Bin-based concentrated liquidity, dynamic fees, limit orders | Active LP strategies, capital efficiency, limit orders | `@meteora-ag/dlmm@1.9.14` | `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo` |
-| **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@1.4.1` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
+| **DLMM Pro** (beta) | Tick-based concentrated liquidity; multi-range NFT positions, limit orders, scheduled + dynamic fees, activation rules, permanent/vesting locks | Tick-level price control, limit orders beside LP liquidity, timed or price-gated launches, locked liquidity | `@meteora-ag/dlmm-pro-sdk@0.1.4` | `dPro1D5wiqnGMH8vMDG23jh35btTHoWdyqXjqkqxe8n` |
+| **DAMM v1** | Legacy dynamic AMM; LP tokens, lock escrows, Stake2Earn farms | Only for existing v1 pools or Stake2Earn/memecoin-v1 flows | `@meteora-ag/dynamic-amm-sdk@2.0.0` | `Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB` |
 | **Alpha Vault** | Anti-sniper launch deposit vault (FCFS/prorata) on DLMM/DAMM | Fair-launch allocation on a new pool | `@meteora-ag/alpha-vault@1.1.16` | `vaU6kP7iNEGkbmPkLmZfGwiGxd4Mob24QQCie5R9kd2` |
 | **Presale Vault** | Generic presale with vesting | Presale before pool creation | `@meteora-ag/presale@0.1.1` | `presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj` |
 | **Met Lock** | Standalone vesting/token-lock escrows (any SPL/Token-2022 mint) | Lock a team/creator allocation with a cliff + vesting schedule | `@meteora-ag/met-lock-sdk@1.0.1` | `LocpQgucEQHbqNABEYvBvwoxCPsSbG91A1QaQhQQqjn` |
@@ -33,13 +35,14 @@ Compact SDK surfaces for the remaining products — Alpha Vault, Presale, Stake2
 
 **ACT — the user wants an outcome on-chain now** → use the **meteora-invent studio CLI**
 (config-driven JSONC, `dryRun` simulation, devnet parity). Covers launches, migrations,
-pool creation, seeding, vaults, locks — and swaps, position/status reads, and DLMM fee
-claims on every protocol.
+pool creation, seeding, vaults, locks — and swaps, position/status reads, and DLMM and DLMM
+Pro fee claims on every protocol.
 
 **BUILD — the user wants code, or a flow the studio doesn't have** → use the **SDKs
 directly** with the pinned versions above. Required for: bots, backends, UIs, DLMM
-add/remove/rebalance on existing positions, CP-AMM position ops on arbitrary pools, and
-anything else not exposed as a studio action.
+add/remove/rebalance on existing positions, DLMM Pro deposits into existing positions and
+range resizing, CP-AMM position ops on arbitrary pools, and anything else not exposed as a
+studio action.
 
 | Intent | Path | First action → then read |
 |---|---|---|
@@ -47,6 +50,9 @@ anything else not exposed as a studio action.
 | Launch token on bonding curve | ACT | Run intake in `references/dbc.md` → `dbc-create-config` → `dbc-create-pool` (`references/studio-actions.md`) |
 | Migrate graduated DBC pool | ACT | Check progress (`dbc-get-status`) → `dbc-migrate-to-damm-v2` (`references/studio-actions.md`) |
 | Create DLMM/DAMM pool, seed liquidity | ACT | Edit the protocol config → `<protocol>-create-pool` → seed action (`references/studio-actions.md`) |
+| Create a DLMM Pro pool (static config, launch pool, or dynamic config) and seed it | ACT | Read the pool types in `references/studio-actions.md` §DLMM Pro → `dlmm-pro-create-pool` → `dlmm-pro-open-position` (`minPrice` = the pool's `initialPrice`, `amountY: 0` seeds with the base token only) |
+| Open / exit a DLMM Pro position, lock its liquidity | ACT | `dlmm-pro-open-position` / `dlmm-pro-remove-liquidity` (`closePosition: true` = full exit) / `dlmm-pro-lock-position` (permanent lock is irreversible) |
+| Place / list / cancel a DLMM Pro limit order | ACT | `dlmm-pro-place-limit-order` → `dlmm-pro-get-limit-orders` → `dlmm-pro-cancel-limit-order` (`references/studio-actions.md`) |
 | Create an alpha/presale vault, a DAMM v1 lock escrow, or a Stake2Earn farm | ACT | `alpha-vault-create` / `presale-vault-create` / `damm-v1-lock-liquidity` / `damm-v1-create-stake2earn-farm` (`references/studio-actions.md`) |
 | Participate in a launch vault (deposit / claim / refund) | ACT | `alpha-vault-deposit` → `alpha-vault-claim` (`references/studio-actions.md`) |
 | Join / claim a presale (deposit, claim, refunds) | ACT | `presale-vault-deposit` → `presale-vault-claim` (`references/studio-actions.md`) |
@@ -57,9 +63,10 @@ anything else not exposed as a studio action.
 | Split a fee stream between wallets (create/fund/claim fee vault) | ACT | `fee-sharing-create-vault` (`references/studio-actions.md`) |
 | Enter/exit an LP position with a single token (zap) | ACT | `zap-in-damm-v2` / `zap-in-dlmm` / `zap-out` (`references/studio-actions.md` — DAMM v2 zap-in is direct-route only; DLMM zap-in is Jupiter-quoted, needs `JUPITER_API_KEY`/`JUPITER_API_URL` setup) |
 | Swap / quote on any pool | ACT | Set the `<protocol>Swap` config block → `pnpm studio <protocol>-swap --poolAddress <POOL>` (dbc: `dbc-swap --baseMint`) |
-| List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
-| Claim DLMM fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` |
+| List positions, pool state, fees owed | ACT | `dlmm-get-positions` / `dlmm-pro-get-positions` / `damm-v2-get-positions` / `dbc-get-status`, or REST (`references/data-and-apis.md`) |
+| Claim DLMM or DLMM Pro fees + rewards | ACT | `pnpm studio dlmm-claim-fees --poolAddress <POOL>` / `pnpm studio dlmm-pro-claim-fees --poolAddress <POOL>` |
 | DLMM add/remove/rebalance an existing position | BUILD | Read `references/dlmm.md`, write against `@meteora-ag/dlmm@1.9.14` |
+| DLMM Pro: add to an existing position, resize ranges, compound fees, delegates, reward campaigns | BUILD | Read `references/dlmm-pro.md`, write against `@meteora-ag/dlmm-pro-sdk@0.1.4` |
 | Trading bot, backend, integration | BUILD | Read the protocol reference pack, then code against the pinned SDK |
 | Launchpad / token UI | BUILD | `references/scaffolds.md` (fun-launch or custom via `references/dbc.md`) |
 | Aggregated multi-DEX swap routing, DCA across venues | **Defer** | Jupiter APIs — not this skill |
@@ -75,6 +82,8 @@ New token to launch?
 └─ No, token already exists
    ├─ Passive/simple pool, position NFTs, fee scheduler → DAMM v2
    ├─ Concentrated liquidity, active strategy, limit orders → DLMM
+   ├─ Tick-level ranges in one position NFT, limit orders in the same pool, a timed or
+   │  price-gated launch, or permanently locked liquidity → DLMM Pro (beta)
    └─ Existing DAMM v1 pool / Stake2Earn farm → DAMM v1 (do not start new projects here)
 ```
 
@@ -96,9 +105,9 @@ do before doing it:
 **Gates (non-negotiable):**
 1. First execution of any state-changing flow runs with `"dryRun": true` (ACT) or a
    simulation/quote (BUILD); show the owner the result. For actions that generate a fresh
-   keypair (lock escrow, fee-sharing vault, stake2earn unstake account, zap position), the
-   address a dry run prints is a throwaway placeholder — only save the address the real
-   (`dryRun: false`) run prints.
+   keypair (lock escrow, fee-sharing vault, stake2earn unstake account, zap position, DLMM
+   Pro position and limit order NFT mints), the address a dry run prints is a throwaway
+   placeholder — only save the address the real (`dryRun: false`) run prints.
 2. Mainnet + real execution only after the owner explicitly confirms in this conversation.
 3. After executing, verify on-chain (see Verification) and report addresses, costs, and
    next steps. Never claim success without verifying.
@@ -125,7 +134,7 @@ pnpm studio generate-keypair --network devnet --airdrop
 pnpm studio <action> [--baseMint <MINT> | --poolAddress <POOL>]
 ```
 
-All 81 actions with their real flags, config blocks, and outputs:
+All 91 actions with their real flags, config blocks, and outputs:
 `references/studio-actions.md`. Environment details and wallet import:
 `references/studio-setup.md`.
 
@@ -133,19 +142,22 @@ All 81 actions with their real flags, config blocks, and outputs:
 
 Read the protocol reference pack first, then write code against the pinned SDK versions in
 the Product Map (`npm install <pkg>@<pinned>` in a fresh project OUTSIDE the monorepo; run
-TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
+TypeScript with `npx ts-node`, not tsx). Universal rules — all five SDKs:
 
 1. **web3.js v1 only** (`Connection`, `Transaction`, `PublicKey`, `Keypair`). Never
    `@solana/kit` / web3.js v2 types.
-2. **Anchor split:** DBC, DAMM v2, DLMM use Anchor **0.31**; DAMM v1 uses Anchor **0.29**.
-   Don't mix DAMM v1 with the others in one package without dependency isolation.
+2. **Anchor split:** DBC, DAMM v2, DLMM and DAMM v1 use Anchor **0.31** (DAMM v1 since
+   2.0.0; its 1.x releases used 0.29); DLMM Pro uses Anchor **0.32**. Never pass `Program`
+   objects across SDKs.
 3. **Everything returns unsigned transactions** — you attach blockhash, fee payer, and
    signers, then send. Some methods return `Transaction[]` or `{ transaction, keypairs }`
-   (extra signers!) — check the reference before assuming a single `Transaction`.
+   (extra signers!), and every DLMM Pro builder returns `{ tx, ... }` — check the reference
+   before assuming a single `Transaction`.
 4. **`CollectFeeMode` is a different enum in each SDK.** Never carry enums across packages.
 5. **Amounts are `BN` in base units (lamports).** Convert with the token's decimals.
 6. **Refresh before quoting:** DLMM `refetchStates()`, DAMM v1 `updateState()`; fetch fresh
-   pool state in DBC/DAMM v2.
+   pool state in DBC/DAMM v2; DLMM Pro builders read state on every call, so quote right
+   before you build.
 7. Pin the versions from the Product Map; the references document those exact APIs and the
    breaking changes around them ("version fences"). If installed versions are newer, check
    the SDK's CHANGELOG before trusting a snippet.
@@ -188,6 +200,7 @@ TypeScript with `npx ts-node`, not tsx). Universal rules — all four SDKs:
 | DBC: launch intake contract, curve modes, SDK surface, migration | `references/dbc.md` |
 | DAMM v2: pools, positions, swaps, locks, fee modes | `references/damm-v2.md` |
 | DLMM: bins/strategies, positions, swaps, limit orders, rebalance | `references/dlmm.md` |
+| DLMM Pro: ticks, shaped positions, limit orders, pool creation, locks | `references/dlmm-pro.md` |
 | DAMM v1: pools, deposits, lock escrow, Stake2Earn | `references/damm-v1.md` |
 | Keypairs, RPC, priority fees, send/confirm patterns | `references/wallets-and-txs.md` |
 | Read-only data: REST APIs vs SDK state fetchers | `references/data-and-apis.md` |
@@ -207,6 +220,9 @@ After every state-changing action:
      fees) or `client.state.getPoolByBaseMint(mint)`.
    - DAMM v2: `cpAmm.fetchPoolState(pool)` / `getUserPositionByPool(pool, user)`.
    - DLMM: `dlmm.refetchStates()` → `getActiveBin()`, `getPositionsByUserAndLbPair(user)`.
+   - DLMM Pro: `pnpm studio dlmm-pro-get-positions --poolAddress <POOL>` (pool price, tick,
+     positions, fees) or `client.state.fetchPool(pool)` /
+     `fetchPositionArrayWithPositions(derivePosition(nftMint), { withReward })`.
    - DAMM v1: `pool.updateState()` → `poolInfo`, `getUserBalance(owner)`.
 3. Report to the owner: what executed, tx signature(s), created addresses (mint, pool,
    position, config), cost in SOL, and the next step in the flow.

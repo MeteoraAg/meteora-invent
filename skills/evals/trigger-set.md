@@ -28,6 +28,9 @@ trigger-rate ≥ 0.5 for should-trigger, ≤ 0.1 for should-not). Re-run wheneve
 | T17 | Stake for fees on this memecoin pool (M3M3) |
 | T18 | Zap 1 SOL into this DAMM v2 pool |
 | T19 | Split my DBC trading fees 70/30 between two wallets |
+| T20 | Create a DLMM Pro launch pool for my token that opens trading in one hour |
+| T21 | Open a curve-shaped DLMM Pro position between 0.9 and 1.1 |
+| T22 | Permanently lock the liquidity in my DLMM Pro position |
 
 ## Should NOT trigger (near misses)
 

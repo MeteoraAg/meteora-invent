@@ -1,6 +1,10 @@
 # only resolve versions published at least a week ago (in minutes), a compromised release is
 # usually caught and unpublished within days
 minimumReleaseAge: 10080
+# Meteora's own SDK, published from MeteoraAg/dlmm-pro-sdk. DLMM Pro is in beta and studio follows
+# its releases as they ship, so it is exempt from the wait
+minimumReleaseAgeExclude:
+  - "@meteora-ag/dlmm-pro-sdk"
 
 auditConfig:
   # Advisories of transitive dependencies with no fix within the versions upstream depends on,
@@ -39,6 +43,7 @@ auditConfig:
     - GHSA-4qx8-w7c3-pj3p
     - GHSA-9j65-hcg3-gc64
     - GHSA-9qmh-m7c6-f92p
+    - GHSA-h895-cgqg-jf52
     # zod 3 (fixed in 4.6.6): only constrained arrays, sets and records are affected. fun-launch's
     # create-pool schema has none, and @reown/appkit-wallet only validates in the user's own browser
     - GHSA-mrhx-c7xc-m3w5

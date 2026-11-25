@@ -66,19 +66,12 @@
     "maxPrice": null, // max price (in terms of quote/base price) - NOTE: null would use the MAX_SQRT_PRICE for the DAMM v2 balanced pool
     "poolFees": {
       "baseFee": {
-        "baseFeeMode": 2, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter | 3 - Fee Market Cap Scheduler: Linear | 4 - Fee Market Cap Scheduler: Exponential
-        // "feeTimeSchedulerParam": {
-        //   "startingFeeBps": 120, // starting base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
-        //   "endingFeeBps": 120, // ending base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
-        //   "numberOfPeriod": 0, // number of periods
-        //   "totalDuration": 0 // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
-        // }
-        "rateLimiterParam": {
-          "baseFeeBps": 120, // base fee (max 50% base fee === 5000 bps)
-          "feeIncrementBps": 100, // fee increment (max fee increment = 5000 bps - baseFeeBps)
-          "referenceAmount": 1, // reference amount (not in lamports)
-          "maxLimiterDuration": 3600, // if activationType is 0 (slots), maxLimiterDuration = duration / 0.4, if activationType is 1 (timestamp), maxLimiterDuration = duration)
-          "maxFeeBps": 5000 // max 50% base fee can go to === 5000 bps
+        "baseFeeMode": 0, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 3 - Fee Market Cap Scheduler: Linear | 4 - Fee Market Cap Scheduler: Exponential
+        "feeTimeSchedulerParam": {
+          "startingFeeBps": 120, // starting base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
+          "endingFeeBps": 120, // ending base fee (in basis points) (if you want a flat fee, set startingFeeBps and endingFeeBps to the same value)
+          "numberOfPeriod": 0, // number of periods
+          "totalDuration": 0 // total duration (If activationType is 0 (slots), totalDuration = duration / 0.4 | If activationType is 1 (timestamp), totalDuration = duration)
         }
         // "feeMarketCapSchedulerParam": {
         //   "startingFeeBps": 500, // starting base fee (in basis points)
