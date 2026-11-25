@@ -4,7 +4,7 @@
 > studio (as of 2026-08-03). Creation flows for alpha/presale
 > vaults are ACT-path (`studio-actions.md`); this file covers the SDK surface — above all
 > the **read/verify calls** the studio doesn't expose. All are web3.js v1.
-> ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · zap-sdk `@anchor-lang/core` 1.x · the rest 0.31) —
+> ⚠️ Anchor versions diverge (vault-sdk 0.28 · farming-sdk 0.28 · m3m3 0.29 · zap-sdk `@anchor-lang/core` 1.x · the others in this file 0.31) —
 > never pass `Program`/`BN` objects across these SDK boundaries.
 
 ## Alpha Vault — `@meteora-ag/alpha-vault@1.1.16`

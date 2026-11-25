@@ -88,9 +88,10 @@ const sig = await sendAndConfirmTransaction(connection, tx, signers, { commitmen
 
 - **Check the return shape** before assuming one tx + one signer:
   `Transaction[]` (DLMM removes/claims, DAMM v1 pool creation) → send sequentially;
-  `{ transaction, ...keypairs }` (DBC `migrateToDammV2`), `{ tx, ... }` (every DLMM Pro
-  builder) and generated account keypairs (DBC config, DLMM position, CP-AMM position NFT,
-  DLMM Pro position and limit order NFT mints) → **extra signers**.
+  `{ tx, ... }` (every DLMM Pro builder) → send `.tx`;
+  `{ transaction, ...keypairs }` (DBC `migrateToDammV2`) and generated account keypairs (DBC
+  config, DLMM position, CP-AMM position NFT, DLMM Pro position and limit order NFT mints)
+  → **extra signers**.
 - Simulate before sending real value: set blockhash + feePayer, **sign first**, then
   `await connection.simulateTransaction(tx)` and read the program logs
   (the studio's `runSimulateTransaction` helper follows this order).

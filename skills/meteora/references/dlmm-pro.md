@@ -196,6 +196,7 @@ const claimable = await client.position.getClaimableFees({ pool, nftMint })  // 
 const claimed = await client.position.claimFee({
   ...accounts, bitmap: claimable.bitmap, tickRanges: claimable.tickRanges,
 })
+await sendAndConfirmTransaction(connection, claimed.tx, [wallet])
 
 // Exit: withdraw 100% of the unlocked liquidity of every range, claim, then close.
 const tickRanges = positions.map(({ tickLowerId, tickUpperId }) => ({ tickLowerId, tickUpperId }))
@@ -209,6 +210,9 @@ const removed = await client.position.removeLiquidityByBps({
 const closed = await client.position.closePosition({
   pool, owner: wallet.publicKey, nftMint, rentReceiver: wallet.publicKey, tickRanges,
 })
+// Builders only return unsigned transactions: send the removal, then any claims, then the close.
+await sendAndConfirmTransaction(connection, removed.tx, [wallet])
+await sendAndConfirmTransaction(connection, closed.tx, [wallet])
 ```
 
 `closePosition` fails with `PositionIsNotEmpty` while any range holds liquidity, unclaimed
@@ -244,6 +248,8 @@ const cancelled = await client.limitOrder.cancelLimitOrder({
 const closedOrder = await client.limitOrder.closeLimitOrder({
   pool, nftMint: nft.publicKey, owner: wallet.publicKey, rentReceiver: wallet.publicKey,
 })
+await sendAndConfirmTransaction(connection, cancelled.tx, [wallet])
+await sendAndConfirmTransaction(connection, closedOrder.tx, [wallet])
 ```
 
 Tick ids must be usable ticks (multiples of the tick spacing). A bid must sit at or below the
