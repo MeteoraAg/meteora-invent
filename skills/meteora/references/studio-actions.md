@@ -314,6 +314,8 @@ pnpm studio dlmm-pro-remove-liquidity --poolAddress <POOL> [--position <NFT_MINT
 Flags: `--poolAddress` (required), `--position` (required only when the wallet has more than
 one position on the pool; the error lists them). Reads `removeLiquidity`: `bps` (share of
 the **unlocked** liquidity of every range, 10000 = 100%), `slippageBps`, `closePosition`.
+Liquidity that has vested since the position was last updated counts as unlocked: the program
+releases it first, and the printed estimate and the slippage minimum include it.
 With `closePosition: true` (needs `bps: 10000`) it also claims fees and every reward, then
 closes the position and refunds its rent — this is the full exit, and it also closes a
 position that is already empty. Locked or unvested liquidity stays, and a position still

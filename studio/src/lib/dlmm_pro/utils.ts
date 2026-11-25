@@ -1,6 +1,7 @@
 import {
   DLMM_PRO_PROGRAM_ID,
   DlmmProClient,
+  MAX_BASIS_POINT,
   PoolErrorCode,
   PoolExtension,
   decodeLimitOrderDataFromData,
@@ -15,6 +16,7 @@ import {
   type LimitOrder,
   type Pool,
   type PositionArray,
+  type PositionVesting,
 } from '@meteora-ag/dlmm-pro-sdk';
 import { Mint, TOKEN_2022_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import {
@@ -69,6 +71,7 @@ export interface PositionAccount {
   nftMint: PublicKey;
   address: PublicKey;
   layoutVersion: number;
+  vesting: PositionVesting;
   slots: DecodedPosition[] | DecodedPositionWithReward[];
 }
 
@@ -158,6 +161,32 @@ export function formatSqrtPrice(grid: PriceGrid, sqrtPrice: BN): string {
     .toString();
 }
 
+/**
+ * A range's unlocked liquidity once the program has released what has vested by
+ * `currentPoint`, which it does at the start of every withdrawal.
+ */
+export function unlockedLiquidityAt(
+  vesting: PositionVesting,
+  slot: DecodedPosition,
+  currentPoint: BN
+): BN {
+  if (vesting.initialize !== 1 || currentPoint.lt(vesting.cliffPoint)) {
+    return slot.unlockedLiquidity;
+  }
+  let vestedBps = new BN(vesting.cliffUnlockBps);
+  if (!vesting.periodFrequency.isZero() && vesting.bpsPerPeriod !== 0) {
+    const periods = currentPoint.sub(vesting.cliffPoint).div(vesting.periodFrequency);
+    vestedBps = periods.gten(vesting.numberOfPeriod)
+      ? new BN(MAX_BASIS_POINT)
+      : vestedBps.add(periods.muln(vesting.bpsPerPeriod));
+  }
+  const vested = slot.vestingLiquidity
+    .add(slot.releasedVestingLiquidity)
+    .mul(vestedBps)
+    .divn(MAX_BASIS_POINT);
+  return slot.unlockedLiquidity.add(vested).sub(slot.releasedVestingLiquidity);
+}
+
 export function assertBps(field: string, value: number, min: number): void {
   if (!Number.isInteger(value) || value < min || value > 10_000) {
     throw new Error(`${field} must be an integer from ${min} to 10000, got ${value}`);
@@ -217,6 +246,7 @@ function decodePosition(
     nftMint,
     address: derivePosition(nftMint),
     layoutVersion: header.layoutVersion,
+    vesting: header.vesting,
     slots: decodePositionsFromData(data, pool.withReward),
   };
 }

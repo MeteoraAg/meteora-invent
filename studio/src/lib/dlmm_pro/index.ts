@@ -1,6 +1,7 @@
 import { Wallet } from '@coral-xyz/anchor';
 import {
   ACCESS_REGISTRY_PROGRAM_ID,
+  ActivationType,
   BaseFeeMode,
   CollectFeeMode,
   DlmmProClient,
@@ -60,6 +61,7 @@ import {
   resolveLimitOrder,
   resolvePosition,
   TransactionStep,
+  unlockedLiquidityAt,
   usableTickAtOrAbovePrice,
   usableTickAtOrBelowPrice,
 } from './utils';
@@ -527,37 +529,37 @@ export async function removeDlmmProLiquidity(
   }));
   const steps: TransactionStep[] = [];
 
-  // The program releases the liquidity that has vested before it withdraws, so a position
-  // with only vesting liquidity may still have something to withdraw.
-  const hasVestingLiquidity = position.slots.some((slot) => !slot.vestingLiquidity.isZero());
-  const hasWithdrawableLiquidity =
-    hasVestingLiquidity || position.slots.some((slot) => !slot.unlockedLiquidity.isZero());
-  if (hasWithdrawableLiquidity) {
+  // The program releases the liquidity that has vested before it withdraws, so the withdrawal
+  // is a share of what is unlocked at that point, not of what the account shows now.
+  const clock = await readClock(connection, connection.commitment);
+  const currentPoint =
+    pool.state.activationType === ActivationType.Slot ? clock.slot : clock.timestamp;
+  const unlocked = position.slots.map((slot) =>
+    unlockedLiquidityAt(position.vesting, slot, currentPoint)
+  );
+  if (unlocked.some((liquidity) => !liquidity.isZero())) {
     const expected = position.slots.reduce(
-      (total, slot) => {
+      (total, slot, index) => {
         const { amountX, amountY } = getAmountsFromLiquidity({
           tickCurrentId: pool.state.tickCurrentId,
           tickLowerId: slot.tickLowerId,
           tickUpperId: slot.tickUpperId,
           currentSqrtPrice: pool.state.sqrtPrice,
-          liquidity: slot.unlockedLiquidity.muln(settings.bps).divn(10_000).neg(),
+          liquidity: unlocked[index]!.muln(settings.bps).divn(10_000).neg(),
         });
         return { x: total.x.add(amountX), y: total.y.add(amountY) };
       },
       { x: new BN(0), y: new BN(0) }
     );
-    const { epoch } = await readClock(connection, connection.commitment);
     const received = {
-      x: calculateTransferFeeExcludedAmount(pool.mintX, epoch, expected.x).amount,
-      y: calculateTransferFeeExcludedAmount(pool.mintY, epoch, expected.y).amount,
+      x: calculateTransferFeeExcludedAmount(pool.mintX, clock.epoch, expected.x).amount,
+      y: calculateTransferFeeExcludedAmount(pool.mintY, clock.epoch, expected.y).amount,
     };
     console.log(
       `- Withdrawing ${settings.bps / 100}% of the unlocked liquidity: about ${getAmountInTokens(received.x, pool.mintX.decimals)} token X + ${getAmountInTokens(received.y, pool.mintY.decimals)} token Y`
     );
-    if (hasVestingLiquidity) {
-      console.log(
-        '- Liquidity that has vested since the last update is released and withdrawn too'
-      );
+    if (position.slots.some((slot, index) => unlocked[index]!.gt(slot.unlockedLiquidity))) {
+      console.log('- This includes liquidity that has vested since the position was last updated');
     }
 
     const removed = await client.position.removeLiquidityByBps({
